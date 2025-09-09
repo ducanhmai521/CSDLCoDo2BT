@@ -225,7 +225,7 @@ export const getEmulationScores = query({
         return Object.entries(classScores).map(([className, data]) => ({
             className,
             ...data
-        })).sort((a, b) => b.totalPoints - a.totalPoints);
+        })).sort((a, b) => a.className.localeCompare(b.className));
     }
 });
 
@@ -313,6 +313,50 @@ export const getViolationLogs = query({
             .order('desc')
             .collect();
         return logs;
+    }
+});
+export const bulkReportViolations = mutation({
+    args: {
+        violations: v.array(v.object({
+            targetType: v.union(v.literal("student"), v.literal("class")),
+            studentName: v.optional(v.string()),
+            violatingClass: v.string(),
+            violationType: v.string(),
+            details: v.optional(v.string()),
+        }))
+    },
+    handler: async (ctx, args) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) {
+          throw new Error("Bạn phải đăng nhập để báo cáo vi phạm.");
+        }
+
+        for (const violation of args.violations) {
+            if (violation.targetType === "student" && !violation.studentName) {
+                throw new Error("Student name is required for student violations.");
+            }
+            
+            const rawClass = (violation.violatingClass || '').trim();
+            const upperNoSpace = rawClass.toUpperCase().replace(/\s+/g, '');
+            const classMatch = upperNoSpace.match(/^(10|11|12)[A-Z]\d{1,2}$/);
+            if (!classMatch) {
+              throw new Error(`Tên lớp không hợp lệ: ${violation.violatingClass}`);
+            }
+            const grade = parseInt(classMatch[1], 10);
+
+            await ctx.db.insert("violations", {
+                reporterId: userId,
+                status: "reported",
+                grade,
+                targetType: violation.targetType,
+                studentName: violation.studentName,
+                violatingClass: upperNoSpace,
+                violationDate: Date.now(),
+                violationType: violation.violationType,
+                details: violation.details || "",
+                evidenceFileIds: [], // AI-parsed violations don't have evidence files
+            });
+        }
     }
 });
 

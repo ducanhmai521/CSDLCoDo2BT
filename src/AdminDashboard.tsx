@@ -31,7 +31,7 @@ export default function AdminDashboard() {
   const [weekBaseDate, setWeekBaseDate] = useState<string>(new Date().toISOString().slice(0,10));
   const [weekNumber, setWeekNumber] = useState<number>(1);
   const [weekInput, setWeekInput] = useState<number>(1);
-  const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'violations' | 'roster' | 'settings' | 'emulation'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'violations' | 'emulation' | 'roster' | 'users' | 'settings' >('overview');
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
   const saveSetting = useMutation(api.users.setSetting);
   const clearStoredFiles = useAction(api.adminTools.clearStoredFiles);
@@ -174,20 +174,20 @@ export default function AdminDashboard() {
         <div className="md:hidden -mx-4 mb-3 sticky top-16 z-10 bg-white/80 backdrop-blur border-b">
           <div className="flex overflow-x-auto gap-2 px-4 py-2">
             <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='overview' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='users' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('users')}>Người dùng</button>
             <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='violations' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('violations')}>Vi phạm</button>
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='roster' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('roster')}>DS học sinh</button>
             <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='emulation' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('emulation')}>Điểm thi đua</button>
+            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='roster' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('roster')}>DS học sinh</button>
+            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='users' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('users')}>Xét duyệt thành viên</button>
             <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='settings' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('settings')}>Cài đặt</button>
           </div>
         </div>
         <aside className="hidden md:block w-60 shrink-0">
           <nav className="sticky top-20 space-y-2">
             <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='overview' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='users' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('users')}>Quản lý Người dùng</button>
             <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='violations' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('violations')}>Quản lý Vi phạm</button>
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='roster' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('roster')}>Danh sách học sinh</button>
             <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='emulation' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('emulation')}>Điểm thi đua</button>
+            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='roster' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('roster')}>Danh sách học sinh</button>
+            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='users' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('users')}>Xét duyệt thành viên</button>
             <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='settings' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('settings')}>Cài đặt</button>
           </nav>
         </aside>

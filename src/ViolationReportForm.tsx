@@ -5,6 +5,7 @@ import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../convex/_generated/dataModel";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
+import { AIViolationInputModal } from "./AIViolationInputModal"; // Import the new modal
 
 const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(category => category.violations);
 
@@ -22,6 +23,16 @@ export default function ViolationReportForm() {
 
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const reportViolation = useMutation(api.violations.reportViolation);
+
+  const resetForm = () => {
+    setTargetType("class");
+    setStudentName("");
+    setViolatingClass("");
+    setViolationType(ALL_VIOLATIONS[0]);
+    setDetails("");
+    setSelectedFiles([]);
+    if(fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -66,14 +77,7 @@ export default function ViolationReportForm() {
         evidenceFileIds,
       });
       toast.success("Báo cáo vi phạm thành công!");
-      // Reset form
-      setTargetType("class");
-      setStudentName("");
-      setViolatingClass("");
-      setViolationType(violationType[0]);
-      setDetails("");
-      setSelectedFiles([]);
-      if(fileInputRef.current) fileInputRef.current.value = "";
+      resetForm();
     } catch (error) {
       toast.error((error as Error).message);
     }
@@ -81,6 +85,11 @@ export default function ViolationReportForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-6 bg-white/70 backdrop-blur-md rounded-xl shadow-md border border-white/50">
+      <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold text-slate-800">Báo cáo vi phạm</h2>
+          <AIViolationInputModal onBulkSubmitSuccess={resetForm} />
+      </div>
+
       <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
         <label className="font-semibold block mb-3 text-slate-700">Đối tượng vi phạm</label>
         <div className="flex space-x-6">
@@ -118,7 +127,6 @@ export default function ViolationReportForm() {
           required
         />
       )}
-
       <input
         className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
         placeholder="Lớp vi phạm (ví dụ: 10A1)"
@@ -126,7 +134,27 @@ export default function ViolationReportForm() {
         onChange={(e) => setViolatingClass(e.target.value)}
         required
       />
-
+      {targetType === "student" && studentName && (
+        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-blue-800">Gợi ý tên học sinh</p>
+            <span className="text-xs text-blue-600">{classFilter ? `Đang lọc theo lớp ${classFilter}` : 'Không lọc theo lớp'}</span>
+          </div>
+          {studentSuggestions === undefined ? (
+            <p className="text-xs text-blue-500">Đang tải...</p>
+          ) : (studentSuggestions as any[]).length === 0 ? (
+            <p className="text-xs text-blue-500">Không có gợi ý.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {(studentSuggestions as any[]).map((s, idx) => (
+                <button key={idx} type="button" className="text-xs bg-white px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all" onClick={() => setStudentName(s.fullName)}>
+                  {s.fullName} ({s.className})
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <select
         className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
         value={violationType}
@@ -164,28 +192,6 @@ export default function ViolationReportForm() {
           className="block w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
         />
       </div>
-
-      {targetType === "student" && studentName && (
-        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-semibold text-blue-800">Gợi ý tên học sinh</p>
-            <span className="text-xs text-blue-600">{classFilter ? `Đang lọc theo lớp ${classFilter}` : 'Không lọc theo lớp'}</span>
-          </div>
-          {studentSuggestions === undefined ? (
-            <p className="text-xs text-blue-500">Đang tải...</p>
-          ) : (studentSuggestions as any[]).length === 0 ? (
-            <p className="text-xs text-blue-500">Không có gợi ý.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {(studentSuggestions as any[]).map((s, idx) => (
-                <button key={idx} type="button" className="text-xs bg-white px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all" onClick={() => setStudentName(s.fullName)}>
-                  {s.fullName} ({s.className})
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       <button type="submit" className="auth-button">
         Gửi Báo cáo

@@ -18,6 +18,14 @@ import { v } from "convex/values";
       },
     });
 
+    export const getAllStudents = query({
+      args: {},
+      handler: async (ctx) => {
+        const students = await ctx.db.query("studentRoster").collect();
+        return students;
+      },
+    });
+
     export const createMyProfile = mutation({
       args: {
         fullName: v.string(),

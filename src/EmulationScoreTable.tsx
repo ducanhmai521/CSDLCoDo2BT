@@ -3,7 +3,8 @@ import { useQuery, useAction } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { useState } from "react";
 import { DateRange } from "react-day-picker";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, endOfDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { vi } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -14,17 +15,32 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, FileDown } from "lucide-react";
 
+const TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
 function cn(...classes: (string | boolean | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
+function getCurrentWeekRange(): DateRange {
+    const now = new Date();
+    const zonedNow = toZonedTime(now, TIME_ZONE);
+    const from = startOfWeek(zonedNow, { weekStartsOn: 1 });
+    const to = endOfWeek(zonedNow, { weekStartsOn: 1 });
+    return { from, to };
+}
+
 export default function EmulationScoreTable() {
-  const [date, setDate] = useState<DateRange | undefined>();
+  const [date, setDate] = useState<DateRange | undefined>(getCurrentWeekRange());
   const [isExporting, setIsExporting] = useState(false);
 
   const emulationScores = useQuery(
     api.violations.getEmulationScores,
-    date ? { dateRange: { start: date.from?.getTime() ?? 0, end: date.to?.getTime() ?? Date.now() } } : {}
+    date?.from ? {
+        dateRange: {
+            start: date.from.getTime(),
+            end: endOfDay(date.to ?? date.from).getTime()
+        }
+    } : "skip"
   );
 
   const exportEmulationScores = useAction(api.excelExport.exportEmulationScores);
@@ -33,9 +49,9 @@ export default function EmulationScoreTable() {
     setIsExporting(true);
     try {
       const url = await exportEmulationScores({
-        dateRange: date ? {
-          start: date.from?.getTime() ?? 0,
-          end: date.to?.getTime() ?? Date.now()
+        dateRange: date?.from ? {
+          start: date.from.getTime(),
+          end: endOfDay(date.to ?? date.from).getTime()
         } : undefined
       });
       if (url) {
@@ -54,7 +70,17 @@ export default function EmulationScoreTable() {
     <div className="space-y-6">
       <div className="bg-white/70 backdrop-blur-md rounded-xl shadow-md border border-white/50 p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-slate-800">Bảng Điểm Thi Đua</h2>
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-800">Bảng Điểm Thi Đua</h2>
+            {date?.from && (
+              <p className="text-sm text-slate-500 mt-1">
+                {date.to
+                  ? `Dữ liệu từ ${format(date.from, "dd/MM/yyyy")} đến ${format(date.to, "dd/MM/yyyy")}`
+                  : `Dữ liệu cho ngày ${format(date.from, "dd/MM/yyyy")}`
+                }
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <div className={cn("grid gap-2")}>
               <Popover>
@@ -128,6 +154,7 @@ export default function EmulationScoreTable() {
                         {score.violations.map((v) => (
                           <div key={v._id} className="text-sm text-gray-700">
                             <span className="font-semibold">{v.violationType}</span>
+                            {v.studentName && <span className="font-normal text-blue-600"> ({v.studentName})</span>}
                             {v.details && <span>: {v.details}</span>}
                             <span className="text-gray-500"> ({new Date(v.violationDate).toLocaleDateString('vi-VN')})</span>
                           </div>

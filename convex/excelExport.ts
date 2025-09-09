@@ -16,50 +16,87 @@ export const exportEmulationScores = action({
         // Sort classes in ascending order
         emulationScores.sort((a, b) => a.className.localeCompare(b.className, 'vi', { numeric: true }));
 
+        // Create Title and Date Range Rows
+        const titleRow = ["BẢNG TỔNG HỢP ĐIỂM THI ĐUA"];
+        let dateRangeRow = ["Áp dụng cho tuần hiện tại"];
+        if (args.dateRange) {
+            const { start, end } = args.dateRange;
+            const startDate = new Date(start).toLocaleDateString('vi-VN');
+            const endDate = new Date(end).toLocaleDateString('vi-VN');
+            dateRangeRow = [`Từ ngày ${startDate} đến ngày ${endDate}`];
+        }
+
         const headerRow = [
             "Lớp",
             "Tổng Điểm Trừ",
             "Chi Tiết Vi Phạm",
         ];
 
-        const rows: Array<Array<string | number>> = [headerRow];
-
+        const dataRows: Array<Array<string | number>> = [];
         for (const score of emulationScores) {
-            const violationDetails = score.violations.map(v =>
-                `${v.violationType}${v.details ? `: ${v.details}` : ''} (${new Date(v.violationDate).toLocaleDateString('vi-VN')})`
-            ).join("\n");
+            const violationDetails = score.violations.map(v => {
+                const studentInfo = v.studentName ? ` (${v.studentName})` : '';
+                const detailsInfo = v.details ? `: ${v.details}` : '';
+                const dateInfo = new Date(v.violationDate).toLocaleDateString('vi-VN');
+                return `${v.violationType}${studentInfo}${detailsInfo} [${dateInfo}]`;
+            }).join("\n");
 
-            rows.push([
+            dataRows.push([
                 score.className,
                 score.totalPoints > 0 ? `-${score.totalPoints}` : 0,
                 violationDetails,
             ]);
         }
 
+        const rows = [
+            titleRow,
+            dateRangeRow,
+            [], // Empty row for spacing
+            headerRow,
+            ...dataRows
+        ];
+
         const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
-        // Style header
-        const range = XLSX.utils.decode_range((worksheet as any)["!ref"] || "A1:A1");
+        // Merge cells for title and date range
+        if (!worksheet['!merges']) worksheet['!merges'] = [];
+        worksheet['!merges'].push(
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, // Merge for title
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }, // Merge for date range
+        );
+
+        // Style title
+        if (worksheet['A1']) worksheet['A1'].s = {
+            font: { bold: true, sz: 16 },
+            alignment: { horizontal: "center", vertical: "center" }
+        };
+
+        // Style date range
+        if (worksheet['A2']) worksheet['A2'].s = {
+            font: { italic: true, sz: 12 },
+            alignment: { horizontal: "center", vertical: "center" }
+        };
+
+        // Style header (now at row index 3)
+        const headerStyle = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: "CCCCCC" } },
+            alignment: { horizontal: "center", vertical: "center" }
+        };
         for (let c = 0; c <= 2; c++) {
-            const addr = XLSX.utils.encode_cell({ c, r: 0 });
-            if (!(worksheet as any)[addr]) continue;
-            (worksheet as any)[addr].s = {
-                font: { bold: true },
-                fill: { fgColor: { rgb: "CCCCCC" } },
-                alignment: { horizontal: "center", vertical: "center" }
-            };
+            const addr = XLSX.utils.encode_cell({ c, r: 3 });
+            if (!worksheet[addr]) continue;
+            worksheet[addr].s = headerStyle;
         }
 
-        // Apply wrap text to the "Chi Tiết Vi Phạm" column (column C)
-        for (let i = 1; i < rows.length; i++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: i, c: 2 });
-            if ((worksheet as any)[cellAddress]) {
-                (worksheet as any)[cellAddress].s = {
-                    alignment: { wrapText: true, vertical: "top" }
-                };
+        // Apply wrap text to the "Chi Tiết Vi Phạm" column (column C) starting from data row
+        for (let i = 0; i < dataRows.length; i++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: i + 4, c: 2 });
+            if (worksheet[cellAddress]) {
+                if (!worksheet[cellAddress].s) worksheet[cellAddress].s = {};
+                (worksheet[cellAddress].s as any).alignment = { wrapText: true, vertical: "top" };
             }
         }
-
 
         // Set column widths
         (worksheet as any)["!cols"] = [
