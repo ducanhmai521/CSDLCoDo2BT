@@ -18,7 +18,7 @@ export default function App() {
       <header className="sticky top-0 z-10 bg-white/50 backdrop-blur-xl h-16 flex justify-between items-center border-b border-white/40 shadow-md px-4 md:px-8">
         <div className="flex items-center gap-3">
           <div className="bg-primary/10 p-2 rounded-xl">
-            <img src="favicon.ico" alt="favicon" className="w-8 h-8 rounded-lg" />
+            <img src="https://uc66dc92569a956180b10e49f027.dl.dropboxusercontent.com/cd/0/inline/CxCkleRNL7AQrVTS06irSyW0-rtJvrwCsf3u5faMIWh9QuEhrhCAM0l1gf8wMMJv68FIes3guA8jUVzNXy95r69hfsciXO_KivRjkeMX_9-Z1H5D2tu4ctDM-1V3PqGnbdpz7uUiL7I0h9A0wNZnsWVE/file#" alt="favicon" className="w-8 h-8 rounded-lg" />
           </div>
           <div>
             <h2 className="text-lg font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPT Số 2 Bảo Thắng</h2>
