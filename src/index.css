@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Quicksand", sans-serif;
+  background-color: #d1d8f0;
+  background-image: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
+  color: #22304d;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Nunito", sans-serif;
+  font-weight: 700;
+}
+
+.glass-card {
+  @apply bg-white/60 backdrop-blur-xl rounded-2xl shadow-lg p-6 md:p-8 border border-white/50 hover:shadow-xl transition-all;
+}
+
+.auth-input-field {
+  @apply w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary-light outline-none transition-all shadow-sm hover:shadow-md text-slate-700 font-medium;
+}
+
+.auth-button {
+  @apply w-full px-4 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.feature-card {
+  @apply bg-white/60 backdrop-blur-md rounded-xl p-4 border border-white/60 shadow-md transition-all hover:shadow-lg hover:scale-[1.02];
+}
+
+.animated-gradient-bg {
+  @apply bg-gradient-to-br 
+  from-indigo-300/20 
+  via-purple-300/20 
+  to-blue-300/20 
+  bg-size-200 
+  animate-gradient-slow;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-slow {
+  animation: gradient-shift 8s ease infinite;
+}
+
+.bg-size-200 {
+  background-size: 200% 200%;
+}
