@@ -31,9 +31,11 @@ export const parseViolationsWithAI = action({
       ${ALL_VIOLATIONS.join(", ")}
 
       Now, parse the following raw text.
-      1.  **Extract Violations**: For each entry, identify the student's name (or null if it's a class-level violation), their class, and the violation.
-          - If an entry is for a class (e.g., "10a8 vệ sinh muộn"), the student name should be null, and the violatingClass should be the class name.
-          - The violation must be one of the exact strings from the provided list. Map common abbreviations or descriptions to the correct violation type (e.g., "sai dp" or "dép lê" should be "Sai đồng phục/đầu tóc,...").
+      1.  **Extract Violations**: For each entry, identify the student's name (or null if it's a class-level violation), their class, the violation type, and specific details.
+          - If an entry is for a class (e.g., "10a8 vệ sinh muộn"), the student name should be null.
+          - **violationType**: This MUST be one of the exact strings from the provided list. Map common abbreviations or descriptions to the correct violation type (e.g., "sai dp", "dép lê", or "đeo khuyên tai" should all be mapped to "Sai đồng phục/đầu tóc,...").
+          - **details**: This should be the specific detail of the violation mentioned in the text. For example, if the input is "bùi hiếu 11a7 đeo khuyên tai", the detail is "Đeo khuyên tai". If the input is just "10a8 vệ sinh muộn" with no extra detail, this field should be an empty string. Make sure to standardize the detail to make it look professional if needed (e.g: captial characters, use of words like "vs muộn" to "Vệ sinh muộn"; "tóc" to "Đầu tóc"; "khuyên tai" to "Đeo khuyên tai")
+          - **originalText**: The exact original line from the raw text that this violation was parsed from.
           - Return the student name as it appears in the text. Do not try to find the full name.
           - Class names should be normalized to uppercase (e.g., "11a8" -> "11A8").
           - Each student can only violate 1 error type at once (no duplicate entry for same student with same error, one student still can violate mutiple error if they are different in type.)
@@ -51,7 +53,9 @@ export const parseViolationsWithAI = action({
           {
             "studentName": "string | null",
             "violatingClass": "string",
-            "violationType": "string"
+            "violationType": "string",
+            "details": "string",
+            "originalText": "string"
           }
         ],
         "checkedClasses": ["string"]

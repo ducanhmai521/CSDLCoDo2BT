@@ -22,12 +22,14 @@ const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
   (category) => category.violations
 );
 
-type ParsedViolation = {
-  studentName: string | undefined;
+interface ParsedViolation {
+  studentName: string | null;
   violatingClass: string;
   violationType: string;
+  details: string | null;
   targetType: "student" | "class";
-};
+  originalText: string;
+}
 
 export function AIViolationInputModal({
   onBulkSubmitSuccess,
@@ -43,6 +45,7 @@ export function AIViolationInputModal({
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<"input" | "results">("input");
 
   const parseWithAI = useAction(api.ai.parseViolationsWithAI);
   const bulkReportViolations = useMutation(api.violations.bulkReportViolations);
@@ -54,6 +57,7 @@ export function AIViolationInputModal({
     return allStudents.map((s) => ({
       value: s.fullName,
       label: `${s.fullName} - ${s.className}`,
+      id: s._id, // <<< SỬA ĐỔI 1: Thêm ID duy nhất
     }));
   }, [allStudents]);
 
@@ -71,28 +75,37 @@ export function AIViolationInputModal({
     try {
       const result = await parseWithAI({ rawText });
 
-      const matchedResults = result.violations.map((v: { studentName: string | null, violatingClass: string, violationType: string }) => {
+      const matchedResults = result.violations.map((v: any) => {
         let matchedViolation: ParsedViolation = {
           ...v,
-          studentName: v.studentName || undefined,
+          studentName: v.studentName || null,
+          details: v.details || null,
           targetType: v.studentName ? "student" : "class",
         };
 
         if (matchedViolation.studentName) {
           const parsedName = matchedViolation.studentName.trim().toLowerCase();
           const studentsInClass = allStudents.filter(
-            (s) => normalizeClassName(s.className) === normalizeClassName(matchedViolation.violatingClass)
+            (s) =>
+              normalizeClassName(s.className) ===
+              normalizeClassName(matchedViolation.violatingClass)
           );
-          
-          const targetStudents = studentsInClass.length > 0 ? studentsInClass : allStudents;
+
+          const targetStudents =
+            studentsInClass.length > 0 ? studentsInClass : allStudents;
 
           const studentNames = targetStudents.map((s) => s.fullName);
-          
-          if (studentNames.length > 0) {
-            const ratings = studentNames.map(name => ({ name, score: stringSimilarity(parsedName, name.toLowerCase()) }));
-            const bestMatch = ratings.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
 
-            if (bestMatch.score > 0.5) { 
+          if (studentNames.length > 0) {
+            const ratings = studentNames.map((name) => ({
+              name,
+              score: stringSimilarity(parsedName, name.toLowerCase()),
+            }));
+            const bestMatch = ratings.reduce((prev, curr) =>
+              prev.score > curr.score ? prev : curr
+            );
+
+            if (bestMatch.score > 0.5) {
               matchedViolation.studentName = bestMatch.name;
             }
           }
@@ -102,11 +115,10 @@ export function AIViolationInputModal({
 
       setParsedViolations(matchedResults);
       setCheckedClasses(result.checkedClasses);
+      setCurrentView("results");
       toast.success(`Đã phân tích xong ${matchedResults.length} mục.`);
     } catch (error) {
-      toast.error(
-        "Lỗi khi phân tích bằng AI: " + (error as Error).message
-      );
+      toast.error("Lỗi khi phân tích bằng AI: " + (error as Error).message);
       console.error(error);
     } finally {
       setIsParsing(false);
@@ -121,13 +133,15 @@ export function AIViolationInputModal({
     const updatedViolations = [...parsedViolations];
     const violationToUpdate = { ...updatedViolations[index] };
 
-    if (field === 'studentName') {
-      violationToUpdate.studentName = value || undefined;
-      violationToUpdate.targetType = value ? 'student' : 'class';
-    } else if (field === 'violatingClass') {
+    if (field === "studentName") {
+      violationToUpdate.studentName = value || null;
+      violationToUpdate.targetType = value ? "student" : "class";
+    } else if (field === "violatingClass") {
       violationToUpdate.violatingClass = value;
-    } else if (field === 'violationType') {
+    } else if (field === "violationType") {
       violationToUpdate.violationType = value;
+    } else if (field === "details") {
+      violationToUpdate.details = value;
     }
 
     updatedViolations[index] = violationToUpdate;
@@ -136,7 +150,9 @@ export function AIViolationInputModal({
 
   const handleCopyReport = async () => {
     if (checkedClasses.length === 0) {
-      toast.warning("Thiếu thông tin các lớp đã kiểm tra. Vui lòng bổ sung trong ô nhập liệu và phân tích lại.");
+      toast.warning(
+        "Thiếu thông tin các lớp đã kiểm tra. Vui lòng bổ sung trong ô nhập liệu và phân tích lại."
+      );
       return;
     }
 
@@ -146,65 +162,106 @@ export function AIViolationInputModal({
     }
 
     const today = new Date();
-    const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+    const formattedDate = `${today.getDate().toString().padStart(2, "0")}/${(
+      today.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}/${today.getFullYear()}`;
 
     const studentViolations = parsedViolations
-      .filter(v => v.targetType === 'student')
-      .map(v => `- ${v.studentName} (${v.violatingClass}): ${v.violationType}`)
-      .join('\n');
+      .filter((v) => v.targetType === "student")
+      .map(
+        (v) =>
+          `- ${v.studentName} (${v.violatingClass}): ${
+            v.details || v.violationType
+          }`
+      )
+      .join("\n");
 
     const classViolations = parsedViolations
-      .filter(v => v.targetType === 'class')
-      .map(v => `- ${v.violatingClass}: ${v.violationType}`)
-      .join('\n');
+      .filter((v) => v.targetType === "class")
+      .map(
+        (v) => `- ${v.violatingClass}: ${v.details || v.violationType}`
+      )
+      .join("\n");
 
     const reportString = `Ngày trực: ${formattedDate}
 Người trực: ${myProfile.fullName} (${myProfile.className})
-Các lớp đã kiểm tra: ${checkedClasses.join(', ')}
-Nội dung vi phạm nền nếp:${studentViolations ? '\n' + studentViolations : ' Không có'}
-Nội dung tự quản:${classViolations ? '\n' + classViolations : ' Không có'}`;
+Các lớp đã kiểm tra: ${checkedClasses.join(", ")}
+Nội dung vi phạm nền nếp:${
+      studentViolations ? "\n" + studentViolations : " Không có"
+    }
+Nội dung tự quản:${
+      classViolations ? "\n" + classViolations : " Không có"
+    }`;
 
     try {
       await navigator.clipboard.writeText(reportString);
       toast.success("Đã sao chép mẫu báo cáo vào clipboard!");
     } catch (err) {
       toast.error("Không thể sao chép. Vui lòng thử lại.");
-      console.error('Failed to copy: ', err);
+      console.error("Failed to copy: ", err);
     }
+  };
+
+  const handleBackToInput = () => {
+    setCurrentView("input");
   };
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const result = await bulkReportViolations({ violations: parsedViolations, customDate: customDate ?? undefined });
-      
+      const violationsToSubmit = parsedViolations.map((v) => ({
+        studentName: v.studentName || undefined,
+        violatingClass: v.violatingClass,
+        violationType: v.violationType,
+        details: v.details || undefined,
+        targetType: v.targetType,
+      }));
+
+      const result = await bulkReportViolations({
+        violations: violationsToSubmit,
+        customDate: customDate ?? undefined,
+      });
+
       if (result.successCount > 0) {
         toast.success(`Đã gửi thành công ${result.successCount} báo cáo.`);
       }
 
       if (result.duplicateCount > 0) {
-        const duplicateList = result.duplicates.join('\n');
+        const duplicateList = result.duplicates.join("\n");
         toast.warning(
           `${result.duplicateCount} báo cáo bị trùng lặp đã được bỏ qua.`,
           {
-            description: <pre className="whitespace-pre-wrap text-xs">{duplicateList}</pre>,
+            description: (
+              <pre className="whitespace-pre-wrap text-xs">
+                {duplicateList}
+              </pre>
+            ),
             duration: 10000,
           }
         );
       }
 
-      if (result.successCount === 0 && result.duplicateCount === 0 && parsedViolations.length > 0) {
-          toast.info("Không có báo cáo nào được gửi vì tất cả đều bị trùng lặp.");
+      if (
+        result.successCount === 0 &&
+        result.duplicateCount === 0 &&
+        parsedViolations.length > 0
+      ) {
+        toast.info(
+          "Không có báo cáo nào được gửi vì tất cả đều bị trùng lặp."
+        );
       } else if (parsedViolations.length === 0) {
-          toast.info("Không có báo cáo nào để gửi.");
-          setIsSubmitting(false);
-          return;
+        toast.info("Không có báo cáo nào để gửi.");
+        setIsSubmitting(false);
+        return;
       }
 
       setRawText("");
       setParsedViolations([]);
       setCustomDate(null);
       setIsOpen(false);
+      setCurrentView("input");
       onBulkSubmitSuccess();
     } catch (error) {
       toast.error("Lỗi khi gửi hàng loạt: " + (error as Error).message);
@@ -217,9 +274,9 @@ Nội dung tự quản:${classViolations ? '\n' + classViolations : ' Không có
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
+        <Button variant="default" className="w-full py-6 text-lg font-semibold shadow-md hover:shadow-lg transition-all bg-gradient-to-r from-primary to-primary/80">
           <svg
-            className="h-4 w-4 mr-2"
+            className="h-5 w-5 mr-2"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -238,8 +295,8 @@ Nội dung tự quản:${classViolations ? '\n' + classViolations : ' Không có
         <DialogHeader>
           <DialogTitle>Nhập liệu vi phạm hàng loạt bằng AI</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow overflow-hidden">
-          <div className="flex flex-col space-y-2">
+        {currentView === "input" ? (
+          <div className="flex flex-col space-y-2 flex-grow">
             <h3 className="font-semibold">1. Dán danh sách vi phạm</h3>
             <Textarea
               placeholder="Ví dụ:
@@ -252,105 +309,147 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
             />
             {myProfile?.role === "gradeManager" && (
               <div className="mt-2">
-                <label className="font-semibold">Ngày report tùy chỉnh (tùy chọn)</label>
+                <label className="font-semibold">
+                  Override ngày (không động vô nếu không cần)
+                </label>
                 <Input
                   type="date"
                   onChange={(e) => {
-                    const selectedDate = e.target.value ? new Date(e.target.value).getTime() : null;
+                    const selectedDate = e.target.value
+                      ? new Date(e.target.value).getTime()
+                      : null;
                     setCustomDate(selectedDate);
                   }}
                 />
               </div>
             )}
-            <Button onClick={handleParse} disabled={isParsing || isSubmitting || !allStudents}>
-              {isParsing ? "Đang phân tích..." : "Phân tích"}
-            </Button>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="ghost">Hủy</Button>
+              </DialogClose>
+              <Button
+                onClick={handleParse}
+                disabled={isParsing || isSubmitting || !allStudents}
+              >
+                {isParsing ? "Đang phân tích..." : "Phân tích"}
+              </Button>
+            </DialogFooter>
           </div>
+        ) : (
           <div className="flex flex-col space-y-2 overflow-hidden">
             <h3 className="font-semibold">2. Kiểm tra và chỉnh sửa</h3>
-            <div className="border rounded-md flex-grow overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-50">
-                  <tr>
-                    <th className="p-2 text-left w-2/5">Học sinh</th>
-                    <th className="p-2 text-left w-1/5">Lớp</th>
-                    <th className="p-2 text-left w-2/5">Vi phạm</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsedViolations.map((v, i) => (
-                    <tr key={i} className="border-b">
-                      <td className="p-2 w-2/5">
-                        <input
-                          list={`students-list-${i}`}
-                          type="text"
-                          value={v.studentName || ""}
-                          onChange={(e) =>
-                            handleFieldChange(i, "studentName", e.target.value)
-                          }
-                          className="w-full p-1 border rounded"
-                        />
-                        <datalist id={`students-list-${i}`}>
-                          {studentOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </datalist>
-                      </td>
-                      <td className="p-2 w-1/5">
-                        <input
-                          type="text"
-                          value={v.violatingClass}
-                          onChange={(e) =>
-                            handleFieldChange(i, "violatingClass", e.target.value)
-                          }
-                          className="w-full p-1 border rounded"
-                        />
-                      </td>
-                      <td className="p-2 w-2/5">
-                        <select
-                          value={v.violationType}
-                          onChange={(e) =>
-                            handleFieldChange(i, "violationType", e.target.value)
-                          }
-                          className="w-full p-1 border rounded"
-                        >
-                          {ALL_VIOLATIONS.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="border rounded-md flex-grow overflow-y-auto p-4 space-y-4">
+              {parsedViolations.map((v, i) => (
+                <div key={i} className="border rounded-lg p-4 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <h4 className="font-bold text-lg mb-2 break-words w-full">
+                      {v.studentName
+                        ? `${v.studentName} (${v.violatingClass})`
+                        : v.violatingClass}
+                    </h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Học sinh</label>
+                      <input
+                        list={`students-list-${i}`}
+                        type="text"
+                        value={v.studentName || ""}
+                        onChange={(e) =>
+                          handleFieldChange(i, "studentName", e.target.value)
+                        }
+                        className="w-full p-1 border rounded mt-1"
+                      />
+                      <datalist id={`students-list-${i}`}>
+                        {studentOptions.map((opt) => (
+                          <option key={opt.id} value={opt.value}> 
+                            {opt.label}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Lớp</label>
+                      <input
+                        type="text"
+                        value={v.violatingClass}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            i,
+                            "violatingClass",
+                            e.target.value
+                          )
+                        }
+                        className="w-full p-1 border rounded mt-1"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium">Vi phạm</label>
+                      <select
+                        value={v.violationType}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            i,
+                            "violationType",
+                            e.target.value
+                          )
+                        }
+                        className="w-full p-1 border rounded mt-1"
+                      >
+                        {ALL_VIOLATIONS.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium">Chi tiết</label>
+                      <input
+                        type="text"
+                        value={v.details || ""}
+                        onChange={(e) =>
+                          handleFieldChange(i, "details", e.target.value)
+                        }
+                        className="w-full p-1 border rounded mt-1"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">Dữ liệu gốc: {v.originalText}</p>
+                </div>
+              ))}
               {parsedViolations.length === 0 && (
                 <p className="p-4 text-center text-slate-500">
                   Chưa có dữ liệu
                 </p>
               )}
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleBackToInput}>
+                Quay lại
+              </Button>
+              <Button
+                onClick={handleCopyReport}
+                variant="secondary"
+                disabled={
+                  isParsing || isSubmitting || parsedViolations.length === 0
+                }
+              >
+                Copy mẫu báo cáo
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={
+                  isSubmitting || isParsing || parsedViolations.length === 0
+                }
+              >
+                {isSubmitting
+                  ? "Đang gửi..."
+                  : `Gửi ${parsedViolations.length} mục`}
+              </Button>
+            </DialogFooter>
           </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="ghost">Hủy</Button>
-          </DialogClose>
-          <Button
-            onClick={handleCopyReport}
-            variant="secondary"
-            disabled={isParsing || isSubmitting || parsedViolations.length === 0}
-          >
-            Copy mẫu báo cáo
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={
-              isSubmitting || isParsing || parsedViolations.length === 0
-            }
-          >
-            {isSubmitting ? "Đang gửi..." : `Gửi ${parsedViolations.length} mục`}
-          </Button>
-        </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
