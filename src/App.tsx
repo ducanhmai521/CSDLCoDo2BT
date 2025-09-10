@@ -21,8 +21,8 @@ export default function App() {
             <img src="https://www.dropbox.com/scl/fi/23fj64gvknqcw0fu6ibzw/icon.ico?rlkey=t0qmc0ffbkoh5z16g5xts105w&st=for1a0hd&raw=1" alt="favicon" className="w-8 h-8 rounded-lg" />
           </div>
           <div>
-            <h2 className="text-lg font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPT Số 2 Bảo Thắng</h2>
-            <p className="hidden md:block text-xs text-slate-600">Nền tảng quản lý vi phạm và xếp loại nền nếp học sinh</p>
+            <h2 className="text-lg font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPTS2BT</h2>
+            <p className="hidden md:block text-xs text-slate-600">Nền tảng quản lý vi phạm và nền nếp của trường THPT Số 2 Bảo Thắng</p>
           </div>
         </div>
         <Authenticated>
