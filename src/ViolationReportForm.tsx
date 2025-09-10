@@ -11,27 +11,32 @@ const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(category => category.violati
 
 export default function ViolationReportForm() {
   const [targetType, setTargetType] = useState<"student" | "class">("class");
-  const [studentName, setStudentName] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<{name: string, className: string} | null>(null);
   const [violatingClass, setViolatingClass] = useState("");
   const [violationType, setViolationType] = useState(ALL_VIOLATIONS[0]);
   const [details, setDetails] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const normalizedClass = normalizeClassName(violatingClass);
-  const classFilter = isValidClassName(normalizedClass) ? normalizedClass : undefined;
-  const studentSuggestions = useQuery(api.users.searchStudents, studentName ? { className: classFilter, q: studentName } : "skip");
+  const studentSuggestions = useQuery(api.users.searchStudents, studentSearch ? { q: studentSearch } : "skip");
 
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const reportViolation = useMutation(api.violations.reportViolation);
 
   const resetForm = () => {
     setTargetType("class");
-    setStudentName("");
+    setStudentSearch("");
+    setSelectedStudent(null);
     setViolatingClass("");
     setViolationType(ALL_VIOLATIONS[0]);
     setDetails("");
     setSelectedFiles([]);
     if(fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  const handleSelectStudent = (student: {fullName: string, className: string}) => {
+    setSelectedStudent({name: student.fullName, className: student.className});
+    setStudentSearch(`${student.fullName} (${student.className})`);
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -61,16 +66,23 @@ export default function ViolationReportForm() {
     }
 
     try {
-      const normalizedClass = normalizeClassName(violatingClass);
+      const finalViolatingClass = targetType === 'student' ? selectedStudent?.className : violatingClass;
+      const normalizedClass = normalizeClassName(finalViolatingClass || "");
+
       if (!isValidClassName(normalizedClass)) {
         toast.error("Tên lớp vi phạm không hợp lệ. Ví dụ: 10A1, 11A2, 12B3.");
         return;
       }
 
+      if (targetType === 'student' && !selectedStudent) {
+        toast.error("Vui lòng chọn một học sinh từ danh sách gợi ý.");
+        return;
+      }
+
       await reportViolation({
         targetType,
-        studentName: targetType === "student" ? studentName : undefined,
-        violatingClass: normalizedClass || "",
+        studentName: targetType === "student" ? selectedStudent?.name : undefined,
+        violatingClass: normalizedClass,
         violationDate: Date.now(),
         violationType,
         details: details || "",
@@ -118,42 +130,42 @@ export default function ViolationReportForm() {
         </div>
       </div>
 
-      {targetType === "student" && (
-        <input
-          className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
-          placeholder="Tên học sinh"
-          value={studentName}
-          onChange={(e) => setStudentName(e.target.value)}
-          required
-        />
-      )}
-      <input
-        className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
-        placeholder="Lớp vi phạm (ví dụ: 10A1)"
-        value={violatingClass}
-        onChange={(e) => setViolatingClass(e.target.value)}
-        required
-      />
-      {targetType === "student" && studentName && (
-        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-semibold text-blue-800">Gợi ý tên học sinh</p>
-            <span className="text-xs text-blue-600">{classFilter ? `Đang lọc theo lớp ${classFilter}` : 'Không lọc theo lớp'}</span>
-          </div>
-          {studentSuggestions === undefined ? (
-            <p className="text-xs text-blue-500">Đang tải...</p>
-          ) : (studentSuggestions as any[]).length === 0 ? (
-            <p className="text-xs text-blue-500">Không có gợi ý.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {(studentSuggestions as any[]).map((s, idx) => (
-                <button key={idx} type="button" className="text-xs bg-white px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all" onClick={() => setStudentName(s.fullName)}>
-                  {s.fullName} ({s.className})
-                </button>
-              ))}
+      {targetType === "student" ? (
+        <div className="relative">
+          <input
+            className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
+            placeholder="Tìm kiếm học sinh (ví dụ: Quốc Việt 12A1)"
+            value={studentSearch}
+            onChange={(e) => {
+              setStudentSearch(e.target.value);
+              setSelectedStudent(null);
+            }}
+            required
+          />
+          {studentSuggestions && studentSuggestions.length > 0 && !selectedStudent && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+              <ul className="py-1">
+                {(studentSuggestions as any[]).map((s, idx) => (
+                  <li
+                    key={idx}
+                    className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSelectStudent(s)}
+                  >
+                    {s.fullName} ({s.className})
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
+      ) : (
+        <input
+          className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
+          placeholder="Lớp vi phạm (ví dụ: 10A1)"
+          value={violatingClass}
+          onChange={(e) => setViolatingClass(e.target.value)}
+          required
+        />
       )}
       <select
         className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"

@@ -5,6 +5,44 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 
+async function checkForDuplicate(
+  ctx: QueryCtx,
+  args: {
+    violationDate: number;
+    violationType: string;
+    violatingClass: string;
+    studentName?: string;
+    targetType: "student" | "class";
+  }
+) {
+  const startOfDay = new Date(args.violationDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(args.violationDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  let query = ctx.db
+    .query("violations")
+    .withIndex("by_violatingClass", (q) =>
+      q.eq("violatingClass", args.violatingClass)
+    )
+    .filter((q) =>
+      q.and(
+        q.gte(q.field("violationDate"), startOfDay.getTime()),
+        q.lte(q.field("violationDate"), endOfDay.getTime()),
+        q.eq(q.field("violationType"), args.violationType)
+      )
+    );
+
+  if (args.targetType === "student" && args.studentName) {
+    query = query.filter((q) => q.eq(q.field("studentName"), args.studentName));
+  } else {
+    query = query.filter((q) => q.eq(q.field("targetType"), "class"));
+  }
+
+  const existing = await query.first();
+  return existing;
+}
+
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
 });
@@ -42,6 +80,12 @@ export const reportViolation = mutation({
     }
     const grade = parseInt(classMatch[1], 10);
 
+    const duplicate = await checkForDuplicate(ctx, { ...args, violatingClass: upperNoSpace });
+    if (duplicate) {
+        const target = args.targetType === 'student' ? args.studentName : `Lớp ${args.violatingClass}`;
+        throw new Error(`Lỗi trùng lặp: ${target} đã có vi phạm '${args.violationType}' trong ngày.`);
+    }
+
     const violationId = await ctx.db.insert("violations", {
       reporterId: userId,
       status: "reported",
@@ -60,15 +104,26 @@ export const reportViolation = mutation({
 export type ViolationWithDetails = Doc<"violations"> & {
     reporterName: string;
     evidenceUrls: (string | null)[];
+    points: number;
 };
 
 async function resolveViolationDetails(ctx: QueryCtx, v: Doc<"violations">): Promise<ViolationWithDetails> {
     const reporterProfile = await ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', v.reporterId)).unique();
     const evidenceUrls = v.evidenceFileIds ? await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId))) : [];
+
+    const violationPointsMap = new Map<string, number>();
+    VIOLATION_CATEGORIES.forEach(category => {
+        category.violations.forEach(violationName => {
+            violationPointsMap.set(violationName, category.points);
+        });
+    });
+    const points = violationPointsMap.get(v.violationType) ?? 0;
+
     return {
         ...v,
         reporterName: reporterProfile?.fullName ?? 'Không rõ',
         evidenceUrls,
+        points,
     }
 }
 
@@ -323,13 +378,21 @@ export const bulkReportViolations = mutation({
             violatingClass: v.string(),
             violationType: v.string(),
             details: v.optional(v.string()),
-        }))
+        })),
+        customDate: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
         if (!userId) {
           throw new Error("Bạn phải đăng nhập để báo cáo vi phạm.");
         }
+
+        const reportDate = args.customDate ?? Date.now();
+        const results = {
+            successCount: 0,
+            duplicateCount: 0,
+            duplicates: [] as string[],
+        };
 
         for (const violation of args.violations) {
             if (violation.targetType === "student" && !violation.studentName) {
@@ -344,6 +407,19 @@ export const bulkReportViolations = mutation({
             }
             const grade = parseInt(classMatch[1], 10);
 
+            const duplicate = await checkForDuplicate(ctx, {
+                ...violation,
+                violatingClass: upperNoSpace,
+                violationDate: reportDate,
+            });
+
+            if (duplicate) {
+                const target = violation.targetType === 'student' ? violation.studentName : `Lớp ${violation.violatingClass}`;
+                results.duplicateCount++;
+                results.duplicates.push(`${target}: ${violation.violationType}`);
+                continue;
+            }
+
             await ctx.db.insert("violations", {
                 reporterId: userId,
                 status: "reported",
@@ -351,12 +427,14 @@ export const bulkReportViolations = mutation({
                 targetType: violation.targetType,
                 studentName: violation.studentName,
                 violatingClass: upperNoSpace,
-                violationDate: Date.now(),
+                violationDate: reportDate,
                 violationType: violation.violationType,
                 details: violation.details || "",
                 evidenceFileIds: [], // AI-parsed violations don't have evidence files
             });
+            results.successCount++;
         }
+        return results;
     }
 });
 

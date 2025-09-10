@@ -13,6 +13,7 @@ import {
 } from "./components/ui/dialog";
 import { Button } from "./components/ui/button";
 import { Textarea } from "./components/ui/textarea";
+import { Input } from "./components/ui/input";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
 import { normalizeClassName } from "./lib/utils";
 import { stringSimilarity } from "string-similarity-js";
@@ -37,6 +38,8 @@ export function AIViolationInputModal({
   const [parsedViolations, setParsedViolations] = useState<ParsedViolation[]>(
     []
   );
+  const [checkedClasses, setCheckedClasses] = useState<string[]>([]);
+  const [customDate, setCustomDate] = useState<number | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -44,6 +47,7 @@ export function AIViolationInputModal({
   const parseWithAI = useAction(api.ai.parseViolationsWithAI);
   const bulkReportViolations = useMutation(api.violations.bulkReportViolations);
   const allStudents = useQuery(api.users.getAllStudents);
+  const myProfile = useQuery(api.users.getMyProfile);
 
   const studentOptions = useMemo(() => {
     if (!allStudents) return [];
@@ -67,7 +71,7 @@ export function AIViolationInputModal({
     try {
       const result = await parseWithAI({ rawText });
 
-      const matchedResults = result.map((v: { studentName: string | null, violatingClass: string, violationType: string }) => {
+      const matchedResults = result.violations.map((v: { studentName: string | null, violatingClass: string, violationType: string }) => {
         let matchedViolation: ParsedViolation = {
           ...v,
           studentName: v.studentName || undefined,
@@ -75,6 +79,7 @@ export function AIViolationInputModal({
         };
 
         if (matchedViolation.studentName) {
+          const parsedName = matchedViolation.studentName.trim().toLowerCase();
           const studentsInClass = allStudents.filter(
             (s) => normalizeClassName(s.className) === normalizeClassName(matchedViolation.violatingClass)
           );
@@ -84,7 +89,7 @@ export function AIViolationInputModal({
           const studentNames = targetStudents.map((s) => s.fullName);
           
           if (studentNames.length > 0) {
-            const ratings = studentNames.map(name => ({ name, score: stringSimilarity(matchedViolation.studentName!, name) }));
+            const ratings = studentNames.map(name => ({ name, score: stringSimilarity(parsedName, name.toLowerCase()) }));
             const bestMatch = ratings.reduce((prev, curr) => (prev.score > curr.score) ? prev : curr);
 
             if (bestMatch.score > 0.5) { 
@@ -96,6 +101,7 @@ export function AIViolationInputModal({
       });
 
       setParsedViolations(matchedResults);
+      setCheckedClasses(result.checkedClasses);
       toast.success(`Đã phân tích xong ${matchedResults.length} mục.`);
     } catch (error) {
       toast.error(
@@ -128,13 +134,76 @@ export function AIViolationInputModal({
     setParsedViolations(updatedViolations);
   };
 
+  const handleCopyReport = async () => {
+    if (checkedClasses.length === 0) {
+      toast.warning("Thiếu thông tin các lớp đã kiểm tra. Vui lòng bổ sung trong ô nhập liệu và phân tích lại.");
+      return;
+    }
+
+    if (!myProfile) {
+      toast.error("Không thể lấy thông tin người dùng. Vui lòng thử lại.");
+      return;
+    }
+
+    const today = new Date();
+    const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+
+    const studentViolations = parsedViolations
+      .filter(v => v.targetType === 'student')
+      .map(v => `- ${v.studentName} (${v.violatingClass}): ${v.violationType}`)
+      .join('\n');
+
+    const classViolations = parsedViolations
+      .filter(v => v.targetType === 'class')
+      .map(v => `- ${v.violatingClass}: ${v.violationType}`)
+      .join('\n');
+
+    const reportString = `Ngày trực: ${formattedDate}
+Người trực: ${myProfile.fullName} (${myProfile.className})
+Các lớp đã kiểm tra: ${checkedClasses.join(', ')}
+Nội dung vi phạm nền nếp:${studentViolations ? '\n' + studentViolations : ' Không có'}
+Nội dung tự quản:${classViolations ? '\n' + classViolations : ' Không có'}`;
+
+    try {
+      await navigator.clipboard.writeText(reportString);
+      toast.success("Đã sao chép mẫu báo cáo vào clipboard!");
+    } catch (err) {
+      toast.error("Không thể sao chép. Vui lòng thử lại.");
+      console.error('Failed to copy: ', err);
+    }
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await bulkReportViolations({ violations: parsedViolations });
-      toast.success(`Đã gửi thành công ${parsedViolations.length} báo cáo.`);
+      const result = await bulkReportViolations({ violations: parsedViolations, customDate: customDate ?? undefined });
+      
+      if (result.successCount > 0) {
+        toast.success(`Đã gửi thành công ${result.successCount} báo cáo.`);
+      }
+
+      if (result.duplicateCount > 0) {
+        const duplicateList = result.duplicates.join('\n');
+        toast.warning(
+          `${result.duplicateCount} báo cáo bị trùng lặp đã được bỏ qua.`,
+          {
+            description: <pre className="whitespace-pre-wrap text-xs">{duplicateList}</pre>,
+            duration: 10000,
+          }
+        );
+      }
+
+      if (result.successCount === 0 && result.duplicateCount === 0 && parsedViolations.length > 0) {
+          toast.info("Không có báo cáo nào được gửi vì tất cả đều bị trùng lặp.");
+      } else if (parsedViolations.length === 0) {
+          toast.info("Không có báo cáo nào để gửi.");
+          setIsSubmitting(false);
+          return;
+      }
+
       setRawText("");
       setParsedViolations([]);
+      setCustomDate(null);
       setIsOpen(false);
       onBulkSubmitSuccess();
     } catch (error) {
@@ -181,6 +250,18 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
               onChange={(e) => setRawText(e.target.value)}
               disabled={isParsing || isSubmitting}
             />
+            {myProfile?.role === "gradeManager" && (
+              <div className="mt-2">
+                <label className="font-semibold">Ngày report tùy chỉnh (tùy chọn)</label>
+                <Input
+                  type="date"
+                  onChange={(e) => {
+                    const selectedDate = e.target.value ? new Date(e.target.value).getTime() : null;
+                    setCustomDate(selectedDate);
+                  }}
+                />
+              </div>
+            )}
             <Button onClick={handleParse} disabled={isParsing || isSubmitting || !allStudents}>
               {isParsing ? "Đang phân tích..." : "Phân tích"}
             </Button>
@@ -254,6 +335,13 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
           <DialogClose asChild>
             <Button variant="ghost">Hủy</Button>
           </DialogClose>
+          <Button
+            onClick={handleCopyReport}
+            variant="secondary"
+            disabled={isParsing || isSubmitting || parsedViolations.length === 0}
+          >
+            Copy mẫu báo cáo
+          </Button>
           <Button
             onClick={handleSubmit}
             disabled={

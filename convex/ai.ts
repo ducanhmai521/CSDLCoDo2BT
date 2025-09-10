@@ -30,34 +30,62 @@ export const parseViolationsWithAI = action({
       Here is the list of all possible violation types:
       ${ALL_VIOLATIONS.join(", ")}
 
-      Now, parse the following raw text. For each entry, identify the student's name (or null if it's a class-level violation), their class, and the violation.
-      - If an entry is for a class (e.g., "10a8 vệ sinh muộn"), the student name should be null, and the violatingClass should be the class name.
-      - The violation must be one of the exact strings from the provided list. Map common abbreviations or descriptions to the correct violation type (e.g., "sai dp" or "dép lê" should be "Sai đồng phục/đầu tóc,...").
-      - Return the student name as it appears in the text. Do not try to find the full name.
-      - Class names should be normalized to uppercase (e.g., "11a8" -> "11A8").
+      Now, parse the following raw text.
+      1.  **Extract Violations**: For each entry, identify the student's name (or null if it's a class-level violation), their class, and the violation.
+          - If an entry is for a class (e.g., "10a8 vệ sinh muộn"), the student name should be null, and the violatingClass should be the class name.
+          - The violation must be one of the exact strings from the provided list. Map common abbreviations or descriptions to the correct violation type (e.g., "sai dp" or "dép lê" should be "Sai đồng phục/đầu tóc,...").
+          - Return the student name as it appears in the text. Do not try to find the full name.
+          - Class names should be normalized to uppercase (e.g., "11a8" -> "11A8").
+          - Each student can only violate 1 error type at once (no duplicate entry for same student with same error, one student still can violate mutiple error if they are different in type.)
+
+      2.  **Extract Checked Classes**: Look for a line starting with "ktra:", "ktr:", "check:", or similar keywords, which indicates a list of classes that were checked. Extract these class names.
+          - The classes might be comma-separated and some might be partial (e.g., "12a1,2,3,6"). You need to expand them based on the first class mentioned (e.g., "12a1,2,3,6" becomes "12A1", "12A2", "12A3", "12A6").
+          - Normalize all class names to uppercase.
 
       Raw text:
       "${rawText}"
 
-      Return a JSON array of objects, where each object has the following structure:
+      Return a single JSON object with the following structure:
       {
-        "studentName": "string | null",
-        "violatingClass": "string",
-        "violationType": "string"
+        "violations": [
+          {
+            "studentName": "string | null",
+            "violatingClass": "string",
+            "violationType": "string"
+          }
+        ],
+        "checkedClasses": ["string"]
       }
+      If no checked classes are found, return an empty array for "checkedClasses".
     `;
 
     try {
       const result = await model.generateContent(prompt);
       const response = await result.response;
-      const text = response.text();
-      
-      // Clean the response to get only the JSON part
-      const jsonString = text.substring(text.indexOf("["), text.lastIndexOf("]") + 1);
-      const parsedData = JSON.parse(jsonString);
-      
-      return parsedData;
+      let text = response.text();
 
+      // Clean the response to get only the JSON part
+      if (text.includes("```json")) {
+        text = text.substring(
+          text.indexOf("```json") + 7,
+          text.lastIndexOf("```")
+        );
+      } else if (text.includes("```")) {
+        text = text.substring(text.indexOf("```") + 3, text.lastIndexOf("```"));
+      }
+
+      const parsedData = JSON.parse(text);
+
+      // Handle cases where the AI might return the old array format
+      if (Array.isArray(parsedData)) {
+        return { violations: parsedData, checkedClasses: [] };
+      }
+
+      // Ensure the new structure is correct, with defaults
+      return {
+        violations: parsedData.violations || [],
+        checkedClasses: parsedData.checkedClasses || [],
+      };
     } catch (error) {
       console.error("Error calling Gemini API:", error);
       throw new Error("Failed to parse violations using AI.");

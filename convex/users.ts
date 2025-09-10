@@ -18,14 +18,6 @@ import { v } from "convex/values";
       },
     });
 
-    export const getAllStudents = query({
-      args: {},
-      handler: async (ctx) => {
-        const students = await ctx.db.query("studentRoster").collect();
-        return students;
-      },
-    });
-
     export const createMyProfile = mutation({
       args: {
         fullName: v.string(),
@@ -141,26 +133,57 @@ import { v } from "convex/values";
       },
     });
 
+    export const getAllStudents = query({
+      handler: async (ctx) => {
+        const students = await ctx.db.query("studentRoster").collect();
+        return students;
+      },
+    });
+
     export const searchStudents = query({
       args: {
-        className: v.optional(v.string()),
         q: v.string(),
       },
       handler: async (ctx, args) => {
         const normQ = args.q.trim().toLowerCase();
-        const pick = (s: string) => s.toLowerCase();
-        let rows = await ctx.db.query('studentRoster').collect();
-        if (args.className) {
-          const classKey = args.className.toUpperCase().replace(/\s+/g, '');
-          rows = rows.filter(r => r.className.toUpperCase().replace(/\s+/g, '') === classKey);
+        if (!normQ) {
+          return [];
         }
-        const results = rows.filter(r => {
-          const parts = r.fullName.split(/\s+/).map(pick);
-          const joined = r.fullName.toLowerCase();
-          return joined.includes(normQ) || parts.some(p => p.startsWith(normQ));
-        }).slice(0, 20);
-        return results.map(r => ({ fullName: r.fullName, className: r.className }));
-      }
+
+        const classRegex = /\b(1[0-2][a-z]\d{1,2})\b/i;
+        const classMatch = normQ.match(classRegex);
+
+        let classNameFilter: string | undefined;
+        let nameQuery = normQ;
+
+        if (classMatch) {
+          classNameFilter = classMatch[0].toUpperCase();
+          nameQuery = nameQuery.replace(classMatch[0], "").trim();
+        }
+
+        let rows = await ctx.db.query("studentRoster").collect();
+
+        if (classNameFilter) {
+          const classKey = classNameFilter.replace(/\s+/g, "");
+          rows = rows.filter(
+            (r) => r.className.toUpperCase().replace(/\s+/g, "") === classKey
+          );
+        }
+
+        if (nameQuery) {
+          const searchTerms = nameQuery.split(/\s+/).filter(Boolean);
+          rows = rows.filter((r) => {
+            const fullNameLower = r.fullName.toLowerCase();
+            return searchTerms.every((term) => fullNameLower.includes(term));
+          });
+        }
+
+        const results = rows.slice(0, 10);
+        return results.map((r) => ({
+          fullName: r.fullName,
+          className: r.className,
+        }));
+      },
     });
 
     export const listRoster = query({

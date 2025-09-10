@@ -81,7 +81,7 @@ function Content() {
           <div className="flex flex-col justify-center space-y-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 font-display leading-tight">
-                Nâng cao hiệu quả <span className="text-primary">quản lý Cờ đỏ</span>
+                Nâng cao hiệu quả <span className="text-primary">quản lý nền nếp học sinh</span>
               </h1>
               <p className="mt-4 text-slate-700 text-lg">
                 Hệ thống tập trung quản lý vi phạm, tổng hợp báo cáo, và hỗ trợ ra quyết
@@ -109,7 +109,7 @@ function Content() {
                   </span>
                   <div>
                     <h3 className="font-bold text-slate-800">Báo cáo thống kê</h3>
-                    <p className="text-sm text-slate-600">Theo khối, lớp, tuần/tháng</p>
+                    <p className="text-sm text-slate-600">Theo tuần/tháng, xuất Excel tiện lợi</p>
                   </div>
                 </div>
               </div>
@@ -120,8 +120,8 @@ function Content() {
                     <FiUsers />
                   </span>
                   <div>
-                    <h3 className="font-bold text-slate-800">Phân quyền rõ ràng</h3>
-                    <p className="text-sm text-slate-600">Quản trị viên, Quản lý khối</p>
+                    <h3 className="font-bold text-slate-800">Tự động nhập liệu bằng AI</h3>
+                    <p className="text-sm text-slate-600">Chuẩn hóa danh sách lỗi thô</p>
                   </div>
                 </div>
               </div>
@@ -132,8 +132,8 @@ function Content() {
                     <FiDatabase />
                   </span>
                   <div>
-                    <h3 className="font-bold text-slate-800">Dữ liệu an toàn</h3>
-                    <p className="text-sm text-slate-600">Bảo vệ và lưu trữ trên nền tảng hiện đại</p>
+                    <h3 className="font-bold text-slate-800">Giao diện thân thiện</h3>
+                    <p className="text-sm text-slate-600">Dễ sử dụng, thân thiện với người dùng</p>
                   </div>
                 </div>
               </div>

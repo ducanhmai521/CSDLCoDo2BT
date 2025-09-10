@@ -6,6 +6,56 @@ import { api } from "./_generated/api";
 import * as XLSX from "xlsx-js-style";
 import { ViolationWithDetails } from "./violations";
 
+// --- Styling Constants ---
+const titleStyle = {
+  font: { bold: true, sz: 18, color: { rgb: "FFFFFF" } },
+  alignment: { horizontal: "center", vertical: "center" },
+  fill: { fgColor: { rgb: "4F81BD" } },
+};
+
+const dateRangeStyle = {
+  font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
+  alignment: { horizontal: "center", vertical: "center" },
+  fill: { fgColor: { rgb: "4F81BD" } },
+};
+
+const dayHeaderStyle = {
+  font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+  alignment: { horizontal: "center", vertical: "center" },
+  fill: { fgColor: { rgb: "8064A2" } },
+};
+
+const tableHeaderStyle = {
+  font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+  fill: { fgColor: { rgb: "9BBB59" } },
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  border: {
+    top: { style: "thin", color: { rgb: "000000" } },
+    bottom: { style: "thin", color: { rgb: "000000" } },
+    left: { style: "thin", color: { rgb: "000000" } },
+    right: { style: "thin", color: { rgb: "000000" } },
+  },
+};
+
+const cellStyle = {
+  font: { sz: 10 },
+  alignment: { vertical: "top", wrapText: true },
+  border: {
+    top: { style: "thin", color: { rgb: "000000" } },
+    bottom: { style: "thin", color: { rgb: "000000" } },
+    left: { style: "thin", color: { rgb: "000000" } },
+    right: { style: "thin", color: { rgb: "000000" } },
+  },
+};
+
+const cellStyleAlt = { ...cellStyle, fill: { fgColor: { rgb: "F2F2F2" } } };
+
+const noViolationsStyle = {
+    font: { italic: true, sz: 10, color: { rgb: "808080" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: cellStyle.border,
+};
+
 export const exportEmulationScores = action({
     args: {
         dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
@@ -136,153 +186,118 @@ export const exportViolations = action({
         const { weekLabel, ...filters } = args as any;
         const violations: ViolationWithDetails[] = await ctx.runQuery(api.violations.getAllViolationsForAdmin, filters);
 
-        // Build an array-of-arrays grouped by weekdays (Mon-Sat)
-        const headerRow = [
-            "Ngày Vi Phạm",
+        const worksheet = XLSX.utils.aoa_to_sheet([]);
+        const merges: XLSX.Range[] = [];
+        let R = 0; // Current row index
+
+        const header = [
+            "STT",
             "Đối tượng",
-            "Tên Học Sinh",
-            "Lớp Vi Phạm",
-            "Loại Vi Phạm",
-            "Chi Tiết",
-            "Người Báo Cáo",
-            "Trạng Thái",
-            "Lý Do Kháng Cáo",
-            "Bằng Chứng URLs",
+            "Tên/Lớp",
+            "Chi tiết vi phạm",
+            "Điểm trừ",
+            "Người báo cáo",
+            "Trạng thái",
         ];
+        const colWidths = [5, 10, 22, 45, 8, 22, 12];
 
-        const dayNameVi: Record<number, string> = {
-            1: "Thứ Hai",
-            2: "Thứ Ba",
-            3: "Thứ Tư",
-            4: "Thứ Năm",
-            5: "Thứ Sáu",
-            6: "Thứ Bảy",
-        };
+        // --- Main Title & Date Range --- 
+        worksheet['A1'] = { v: "BÁO CÁO VI PHẠM CHI TIẾT", t: 's', s: titleStyle };
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } });
+        R++;
 
-        const startTime = args.dateRange?.start ?? 0;
-        const endTime = args.dateRange?.end ?? Date.now();
+        worksheet['A2'] = { v: weekLabel || "Toàn bộ thời gian", t: 's', s: dateRangeStyle };
+        merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: header.length - 1 } });
+        R++;
+        R++; // Blank row
 
-        // Helper: normalize to start/end of day in local time
+        // --- Group Violations by Day --- 
+        const violationsByDay = new Map<number, ViolationWithDetails[]>();
+        const dayNameVi: Record<number, string> = { 1: "Thứ Hai", 2: "Thứ Ba", 3: "Thứ Tư", 4: "Thứ Năm", 5: "Thứ Sáu", 6: "Thứ Bảy" };
+
         const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-        const endOfDayTs = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+        
+        violations.forEach(v => {
+            const dayStart = startOfDay(new Date(v.violationDate));
+            if (!violationsByDay.has(dayStart)) {
+                violationsByDay.set(dayStart, []);
+            }
+            violationsByDay.get(dayStart)!.push(v);
+        });
 
-        // Iterate days from start to end, include only Mon-Sat (1..6)
-        const rows: Array<Array<string>> = [];
-        if (weekLabel && (weekLabel as string).trim().length > 0) {
-            rows.push([weekLabel as string]);
-            rows.push([]);
-        }
-        let cursor = new Date(startTime);
-        while (cursor.getTime() <= endTime) {
-            const day = cursor.getDay(); // 0=Sun..6=Sat
-            if (day >= 1 && day <= 6) {
-                const dayStart = startOfDay(cursor);
-                const dayEnd = endOfDayTs(cursor);
-                const dayDisplay = `${dayNameVi[day]} (${new Date(dayStart).toLocaleDateString('vi-VN')})`;
+        const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
 
-                // Section header
-                rows.push([dayDisplay]);
-                // Column headers
-                rows.push(headerRow);
+        // --- Iterate Through Days and Build Sheet --- 
+        for (const dayStart of sortedDays) {
+            const day = new Date(dayStart).getDay();
+            if (day < 1 || day > 6) continue; // Skip Sunday
 
-                const dayViolations = violations
-                    .filter(v => v.violationDate >= dayStart && v.violationDate <= dayEnd)
-                    .sort((a, b) => {
-                        const clsA = (a.violatingClass || "");
-                        const clsB = (b.violatingClass || "");
-                        if (clsA !== clsB) return clsA.localeCompare(clsB, 'vi');
-                        // Individual (student) first, then class-level
-                        const rank = (t: string) => (t === 'student' ? 0 : 1);
-                        const rA = rank(a.targetType as string);
-                        const rB = rank(b.targetType as string);
-                        if (rA !== rB) return rA - rB;
-                        return a.violationDate - b.violationDate;
+            const dayDisplay = `${dayNameVi[day]}, ngày ${new Date(dayStart).toLocaleDateString('vi-VN')}`;
+            const dayViolations = violationsByDay.get(dayStart)!;
+
+            // Day Header Row
+            worksheet[XLSX.utils.encode_cell({ r: R, c: 0 })] = { v: dayDisplay, t: 's', s: dayHeaderStyle };
+            merges.push({ s: { r: R, c: 0 }, e: { r: R, c: header.length - 1 } });
+            R++;
+
+            // Table Header Row
+            header.forEach((h, C) => {
+                worksheet[XLSX.utils.encode_cell({ r: R, c: C })] = { v: h, t: 's', s: tableHeaderStyle };
+            });
+            R++;
+
+            if (dayViolations.length === 0) {
+                // No violations row
+                worksheet[XLSX.utils.encode_cell({ r: R, c: 0 })] = { v: "(Không có vi phạm)", t: 's', s: noViolationsStyle };
+                merges.push({ s: { r: R, c: 0 }, e: { r: R, c: header.length - 1 } });
+                R++;
+            } else {
+                // Data Rows
+                dayViolations.sort((a, b) => a.violatingClass.localeCompare(b.violatingClass, 'vi') || (a.studentName || '').localeCompare(b.studentName || '', 'vi'))
+                    .forEach((v, i) => {
+                        const style = i % 2 === 0 ? cellStyle : cellStyleAlt;
+                        const rowData = [
+                            { v: i + 1, t: 'n', s: { ...style, alignment: { ...style.alignment, horizontal: 'center' } } },
+                            { v: v.targetType === 'student' ? 'Học sinh' : 'Lớp', t: 's', s: style },
+                            { v: v.targetType === 'student' ? `${v.studentName} (${v.violatingClass})` : v.violatingClass, t: 's', s: style },
+                            { v: `${v.violationType}${v.details ? `: ${v.details}` : ''}`, t: 's', s: style },
+                            { v: v.points, t: 'n', s: { ...style, alignment: { ...style.alignment, horizontal: 'center' } } },
+                            { v: v.reporterName, t: 's', s: style },
+                            { v: v.status, t: 's', s: style },
+                        ];
+                        rowData.forEach((cell, C) => {
+                            worksheet[XLSX.utils.encode_cell({ r: R, c: C })] = cell;
+                        });
+                        R++;
                     });
-                if (dayViolations.length === 0) {
-                    rows.push(["(Không có vi phạm)"]);
-                } else {
-                    for (const v of dayViolations) {
-                        rows.push([
-                            new Date(v.violationDate).toLocaleString('vi-VN'),
-                            v.targetType === 'student' ? 'Học sinh' : 'Lớp',
-                            v.studentName ?? '',
-                            v.violatingClass,
-                            v.violationType,
-                            v.details ?? "",
-                            v.reporterName,
-                            v.status,
-                            v.appealReason ?? '',
-                            v.evidenceUrls.filter(url => url !== null).join(", "),
-                        ]);
-                    }
-                }
-
-                // Blank row between days
-                rows.push([]);
             }
-
-            // Move to next day
-            cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+            R++; // Blank row between days
         }
 
-        // Fallback: if no rows generated (e.g., date range only Sunday), create a placeholder
-        if (rows.length === 0) {
-            rows.push(["Không có ngày hợp lệ (Thứ Hai đến Thứ Bảy) trong khoảng đã chọn."]);
+        if (sortedDays.length === 0) {
+            worksheet[XLSX.utils.encode_cell({ r: R, c: 0 })] = { v: "Không có vi phạm nào trong khoảng thời gian đã chọn.", t: 's' };
+            merges.push({ s: { r: R, c: 0 }, e: { r: R, c: header.length - 1 } });
+            R++;
         }
 
-        const worksheet = XLSX.utils.aoa_to_sheet(rows);
-        // Bold styling for headers and section titles
-        try {
-            const range = XLSX.utils.decode_range((worksheet as any)["!ref"] || "A1:A1");
-            const maxCols = headerRow.length;
-            const boldRow = (r: number) => {
-                for (let c = 0; c < maxCols; c++) {
-                    const addr = XLSX.utils.encode_cell({ c, r });
-                    if (!(worksheet as any)[addr]) continue;
-                    (worksheet as any)[addr].s = {
-                        font: { bold: true }
-                    };
-                }
-            };
-            for (let r = range.s.r; r <= range.e.r; r++) {
-                const firstAddr = XLSX.utils.encode_cell({ c: 0, r });
-                const cell = (worksheet as any)[firstAddr];
-                const text = (cell && typeof cell.v === 'string') ? cell.v : '';
-                if (!text) continue;
-                if (text === headerRow[0]) boldRow(r);
-                if (text.startsWith('Thứ ') || text.startsWith('Tuần ') || text.startsWith('Tháng ') || text.startsWith('Khoảng ngày')) boldRow(r);
-            }
-        } catch {}
-        // Optional: set column widths for readability (applies where headers exist)
-        (worksheet as any)["!cols"] = [
-            { wch: 19 }, // Ngày Vi Phạm
-            { wch: 10 }, // Đối tượng
-            { wch: 20 }, // Tên Học Sinh
-            { wch: 12 }, // Lớp Vi Phạm
-            { wch: 20 }, // Loại Vi Phạm
-            { wch: 40 }, // Chi Tiết
-            { wch: 20 }, // Người Báo Cáo
-            { wch: 12 }, // Trạng Thái
-            { wch: 25 }, // Lý Do Kháng Cáo
-            { wch: 40 }, // Bằng Chứng URLs
-        ];
+        // --- Finalize Worksheet --- 
+        worksheet['!merges'] = merges;
+        worksheet['!cols'] = colWidths.map(wch => ({ wch }));
+        const range = { s: { r: 0, c: 0 }, e: { r: R, c: header.length - 1 } };
+        worksheet["!ref"] = XLSX.utils.encode_range(range);
 
+        // --- Create and Return File --- 
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Vi_pham_theo_ngay");
+        XLSX.utils.book_append_sheet(workbook, worksheet, "BaoCao_ViPham");
 
         const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
-        // Ensure a valid content type so Convex sets a proper Content-Type header
-        const blob = new Blob([buffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
         const storageId = await ctx.storage.store(blob);
-        // Optionally record stored excel file via internal mutation (actions can't access db directly)
         try {
             const { internal } = await import("./_generated/api.js");
             await ctx.runMutation((internal as any).adminMaintenance.recordStoredFile, { storageId, kind: "excel" });
         } catch (_) {}
-        // Note: Actions cannot access DB; tracking of stored files is skipped here
 
         const url = await ctx.storage.getUrl(storageId);
         return url;
