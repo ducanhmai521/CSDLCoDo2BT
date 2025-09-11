@@ -7,7 +7,7 @@ import EmulationScoreTable from "./EmulationScoreTable";
 import { useEffect, useState } from "react";
 import { startOfWeek, startOfDay, endOfDay, toDate, differenceInCalendarWeeks, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
-import { normalizeClassName, isValidClassName } from "./lib/utils";
+import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -77,17 +77,21 @@ export default function AdminDashboard() {
         const startStr = format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'dd/MM/yyyy');
         const endStr = format(toZonedTime(new Date(dateRange.end), TIME_ZONE), 'dd/MM/yyyy');
         let headerLabel = '';
+        let filename = 'vi-pham';
         if (filterMode === 'week') {
           headerLabel = `Tuần ${weekInput} (${startStr} - ${endStr})`;
+          filename = `vi-pham-tuan-${weekInput}-${format(new Date(), 'yyyy-MM-dd')}`;
         } else if (filterMode === 'month') {
           const monthStr = format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'MM/yyyy');
           headerLabel = `Tháng ${monthStr} (${startStr} - ${endStr})`;
+          filename = `vi-pham-thang-${format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'yyyy-MM')}`;
         } else {
           headerLabel = `Khoảng ngày (${startStr} - ${endStr})`;
+          filename = `vi-pham-${format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'yyyy-MM-dd')}-den-${format(toZonedTime(new Date(dateRange.end), TIME_ZONE), 'yyyy-MM-dd')}`;
         }
         const url = await exportViolations({ ...filters, weekLabel: headerLabel } as any);
         if (url) {
-            window.open(url, '_blank');
+            await triggerFileDownload(url, `${filename}.xlsx`);
             toast.success("Đã xuất tệp Excel thành công!");
         } else {
             throw new Error("Không thể tạo URL cho tệp Excel.");

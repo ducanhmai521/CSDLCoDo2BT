@@ -241,22 +241,48 @@ export const deleteViolation = mutation({
     }
 });
 
-export const getEmulationScores = query({
+export const getPublicEmulationScores = query({
     args: {
-        dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
+        start: v.optional(v.number()),
+        end: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const myProfile = await ctx.runQuery(api.users.getMyProfile);
-        if (myProfile?.role !== 'admin') {
-            return [];
+        let startTime, endTime;
+
+        if (args.start && args.end) {
+            startTime = args.start;
+            endTime = args.end;
+        } else {
+            const now = new Date();
+            const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1));
+            startOfWeek.setHours(0, 0, 0, 0);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(endOfWeek.getDate() + 6);
+            endOfWeek.setHours(23, 59, 59, 999);
+            startTime = startOfWeek.getTime();
+            endTime = endOfWeek.getTime();
         }
 
-        let violations = await ctx.db.query("violations").order("desc").collect();
+        const violations = await ctx.db
+            .query("violations")
+            .filter(q => q.and(
+                q.gte(q.field("violationDate"), startTime),
+                q.lte(q.field("violationDate"), endTime)
+            ))
+            .collect();
+        
+        const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
+        const reporterProfiles = await Promise.all(
+            reporterUserIds.map(userId => 
+                ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', userId)).unique()
+            )
+        );
 
-        if (args.dateRange) {
-            violations = violations.filter(v => v.violationDate >= args.dateRange!.start && v.violationDate <= args.dateRange!.end);
-        }
-
+        const reporterProfileMap = new Map();
+        reporterProfiles.forEach(profile => {
+            if (profile) { reporterProfileMap.set(profile.userId, profile); }
+        });
+        
         const violationPointsMap = new Map<string, number>();
         VIOLATION_CATEGORIES.forEach(category => {
             category.violations.forEach(violationName => {
@@ -264,25 +290,85 @@ export const getEmulationScores = query({
             });
         });
 
-        const classScores: Record<string, { totalPoints: number, violations: ViolationWithDetails[] }> = {};
+        const scoresByClass: Record<string, { totalPoints: number; violations: any[] }> = {};
+        for (const v of violations) {
+            const points = violationPointsMap.get(v.violationType) ?? 0;
+            const reporterProfile = reporterProfileMap.get(v.reporterId);
+            const detailedViolation = { ...v, reporterName: reporterProfile?.fullName ?? 'Không rõ', points: points };
+            if (!scoresByClass[v.violatingClass]) {
+                scoresByClass[v.violatingClass] = { totalPoints: 0, violations: [] };
+            }
+            scoresByClass[v.violatingClass].totalPoints += points;
+            scoresByClass[v.violatingClass].violations.push(detailedViolation);
+        }
+        
+        const allClasses = await ctx.db.query("classes").collect();
+        const allClassNames = allClasses.map(c => c.name);
+        allClassNames.sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
+
+        const emulationScores = allClassNames.map(className => {
+            if (scoresByClass[className]) {
+                return {
+                    className,
+                    totalPoints: scoresByClass[className].totalPoints,
+                    violations: scoresByClass[className].violations,
+                };
+            } else {
+                return {
+                    className,
+                    totalPoints: 0,
+                    violations: [],
+                };
+            }
+        });
+
+        return emulationScores;
+    }
+});
+
+export const getPublicViolations = query({
+    args: {
+        start: v.optional(v.number()),
+        end: v.optional(v.number()),
+    },
+    handler: async (ctx, args) => {
+        let startTime, endTime;
+        if (args.start && args.end) {
+            startTime = args.start;
+            endTime = args.end;
+        } else {
+            const now = new Date();
+            const startOfWeekDate = new Date(now.setDate(now.getDate() - now.getDay() + 1));
+            startOfWeekDate.setHours(0, 0, 0, 0);
+            const endOfWeekDate = new Date(startOfWeekDate);
+            endOfWeekDate.setDate(endOfWeekDate.getDate() + 6);
+            endOfWeekDate.setHours(23, 59, 59, 999);
+            startTime = startOfWeekDate.getTime();
+            endTime = endOfWeekDate.getTime();
+        }
+
+        const violations = await ctx.db
+            .query("violations")
+            .filter(q => q.and(
+                q.gte(q.field("violationDate"), startTime),
+                q.lte(q.field("violationDate"), endTime)
+            ))
+            .order("desc")
+            .collect();
 
         const detailedViolations = await Promise.all(violations.map(v => resolveViolationDetails(ctx, v)));
 
-        for (const v of detailedViolations) {
-            const points = violationPointsMap.get(v.violationType) ?? 0;
-            if (!classScores[v.violatingClass]) {
-                classScores[v.violatingClass] = { totalPoints: 0, violations: [] };
+        return detailedViolations.sort((a, b) => {
+            const classCompare = a.violatingClass.localeCompare(b.violatingClass, 'vi', { numeric: true });
+            if (classCompare !== 0) {
+                return classCompare;
             }
-            classScores[v.violatingClass].totalPoints += points;
-            classScores[v.violatingClass].violations.push(v);
-        }
-
-        return Object.entries(classScores).map(([className, data]) => ({
-            className,
-            ...data
-        })).sort((a, b) => a.className.localeCompare(b.className));
+            return b.violationDate - a.violationDate;
+        });
     }
 });
+
+
 
 export const editViolation = mutation({
     args: {
@@ -485,4 +571,26 @@ export const getOverviewForDate = query({
             details: details.slice(0, 200),
         };
     }
+});
+
+import { internalMutation } from "./_generated/server";
+
+export const populateClassesTable = internalMutation({
+  handler: async (ctx) => {
+    const allStudentDocs = await ctx.db.query("studentRoster").collect();
+    const allClassNames = [...new Set(allStudentDocs.map(s => s.className))];
+
+    const existingClasses = await ctx.db.query("classes").collect();
+    for (const cls of existingClasses) {
+      await ctx.db.delete(cls._id);
+    }
+    
+    for (const className of allClassNames) {
+      const existing = await ctx.db.query("classes").withIndex("by_name", q => q.eq("name", className)).unique();
+      if (!existing) {
+        await ctx.db.insert("classes", { name: className });
+      }
+    }
+    console.log(`Đã điền xong ${allClassNames.length} lớp vào bảng 'classes'.`);
+  },
 });

@@ -14,8 +14,21 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { CalendarIcon, FileDown } from "lucide-react";
+import { triggerFileDownload } from "@/lib/utils";
+import { Doc } from "../convex/_generated/dataModel";
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+// Định nghĩa kiểu dữ liệu cho kết quả trả về từ query
+interface EmulationScoreData {
+  className: string;
+  totalPoints: number;
+  violations: (Doc<"violations"> & { 
+    studentName?: string | null; 
+    details?: string | null; 
+    violationDate: number 
+  })[];
+}
 
 function cn(...classes: (string | boolean | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
@@ -34,12 +47,11 @@ export default function EmulationScoreTable() {
   const [isExporting, setIsExporting] = useState(false);
 
   const emulationScores = useQuery(
-    api.violations.getEmulationScores,
+    api.violations.getPublicEmulationScores,
     date?.from ? {
-        dateRange: {
-            start: date.from.getTime(),
-            end: endOfDay(date.to ?? date.from).getTime()
-        }
+        // Sửa lỗi: Truyền trực tiếp start và end, không lồng trong dateRange
+        start: date.from.getTime(),
+        end: endOfDay(date.to ?? date.from).getTime()
     } : "skip"
   );
 
@@ -55,7 +67,9 @@ export default function EmulationScoreTable() {
         } : undefined
       });
       if (url) {
-        window.open(url, '_blank');
+        const fromDate = date?.from ? format(date.from, "yyyy-MM-dd") : 'all';
+        const toDateStr = date?.to ? format(date.to, "yyyy-MM-dd") : fromDate;
+        await triggerFileDownload(url, `diem-thi-dua-${fromDate}-den-${toDateStr}.xlsx`);
       } else {
         console.error("Export failed: URL is null.");
       }
@@ -145,7 +159,8 @@ export default function EmulationScoreTable() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {emulationScores.map((score) => (
+                {/* Sửa lỗi: Sử dụng interface EmulationScoreData thay cho Doc<"emulationScores"> */}
+                {emulationScores.map((score: EmulationScoreData) => (
                   <tr key={score.className}>
                     <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{score.className}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-red-600 font-bold">-{score.totalPoints}</td>
@@ -171,22 +186,3 @@ export default function EmulationScoreTable() {
     </div>
   );
 }
-
-{VIOLATION_CATEGORIES.map((category) => (
-  <div key={category.name} className="bg-slate-50 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-    <div className="bg-slate-100 px-4 py-3 border-b border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-800">
-        {category.name} <span className="text-red-600">(-{category.points} điểm/lượt/1 HS)</span>
-      </h3>
-    </div>
-    <div className="p-4">
-      <ul className="list-disc list-inside space-y-2">
-        {category.violations.map((violation, index) => (
-          <li key={index} className="text-slate-700">
-            {violation}
-          </li>
-        ))}
-      </ul>
-    </div>
-  </div>
-))}

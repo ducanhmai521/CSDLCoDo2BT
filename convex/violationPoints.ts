@@ -4,7 +4,7 @@ export const VIOLATION_CATEGORIES = [
     points: 3,
     violations: [
       "Sai đồng phục/đầu tóc,...",
-      "Đi học muộn có phép",
+      "Đi học muộn/nghỉ học có phép",
       "Thiếu dụng cụ vệ sinh/đồ dùng học tập/ghế chào cờ",
       "Để xe không đúng quy định",
       "Cờ đỏ trực muộn 3 phút trở lên",
@@ -18,7 +18,7 @@ export const VIOLATION_CATEGORIES = [
       "Truy bài lộn xộn/không vào lớp giờ truy bài.",
       "Không có thư viện góc lớp, không đảm bảo chức năng.",
       "Xuống xếp hàng muộn, lộn xộn phải nhắc nhở",
-      "Đi học muộn không phép",
+      "Đi học muộn/nghỉ học không phép",
     ],
   },
   {

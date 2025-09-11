@@ -56,15 +56,56 @@ const noViolationsStyle = {
     border: cellStyle.border,
 };
 
+// --- New Data Styles for Emulation Score Export ---
+const dataCellStyle = {
+  font: { sz: 10 },
+  alignment: { vertical: "center" },
+  border: {
+    top: { style: "thin", color: { rgb: "000000" } },
+    bottom: { style: "thin", color: { rgb: "000000" } },
+    left: { style: "thin", color: { rgb: "000000" } },
+    right: { style: "thin", color: { rgb: "000000" } },
+  },
+};
+
+const dataCellStyleAlt = { ...dataCellStyle, fill: { fgColor: { rgb: "F2F2F2" } } };
+
+const scoreCellStyle = {
+    ...dataCellStyle,
+    alignment: { ...dataCellStyle.alignment, horizontal: "center" },
+    fill: { fgColor: { rgb: "C6EFCE" } }, // light green
+    font: { ...dataCellStyle.font, color: { rgb: "006100" }, bold: true } // dark green font
+};
+
+const deductionCellStyle = {
+    ...dataCellStyle,
+    alignment: { ...dataCellStyle.alignment, horizontal: "center" },
+    fill: { fgColor: { rgb: "FFC7CE" } }, // light red
+    font: { ...dataCellStyle.font, color: { rgb: "9C0006" }, bold: true } // dark red font
+};
+
+const detailsCellStyle = {
+    ...dataCellStyle,
+    alignment: { ...dataCellStyle.alignment, vertical: "top", wrapText: true },
+};
+
+const detailsCellStyleAlt = {
+    ...detailsCellStyle,
+    fill: { fgColor: { rgb: "F2F2F2" } },
+};
+
 export const exportEmulationScores = action({
     args: {
         dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
     },
     handler: async (ctx, args) => {
-        const emulationScores = await ctx.runQuery(api.violations.getEmulationScores, args);
+        const emulationScores = await ctx.runQuery(
+            api.violations.getPublicEmulationScores,
+            args.dateRange || {}
+        );
 
-        // Sort classes in ascending order
-        emulationScores.sort((a, b) => a.className.localeCompare(b.className, 'vi', { numeric: true }));
+        // Sort classes alphanumerically (e.g., 10A1, 10A2, 11A1)
+        emulationScores.sort((a: { className: string }, b: { className: string }) => a.className.localeCompare(b.className, 'vi', { numeric: true }));
 
         // Create Title and Date Range Rows
         const titleRow = ["BẢNG TỔNG HỢP ĐIỂM THI ĐUA"];
@@ -73,26 +114,30 @@ export const exportEmulationScores = action({
             const { start, end } = args.dateRange;
             const startDate = new Date(start).toLocaleDateString('vi-VN');
             const endDate = new Date(end).toLocaleDateString('vi-VN');
-            dateRangeRow = [`Từ ngày ${startDate} đến ngày ${endDate}`];
+            dateRangeRow = [`Từ ngày ${startDate} đến ngày ${endDate} | Tạo bởi codo2bt.vercel.app`];
         }
 
         const headerRow = [
             "Lớp",
+            "Điểm thi đua (chưa cộng điểm thưởng, trừ giờ khá)",
             "Tổng Điểm Trừ",
             "Chi Tiết Vi Phạm",
         ];
 
         const dataRows: Array<Array<string | number>> = [];
         for (const score of emulationScores) {
-            const violationDetails = score.violations.map(v => {
-                const studentInfo = v.studentName ? ` (${v.studentName})` : '';
-                const detailsInfo = v.details ? `: ${v.details}` : '';
-                const dateInfo = new Date(v.violationDate).toLocaleDateString('vi-VN');
-                return `${v.violationType}${studentInfo}${detailsInfo} [${dateInfo}]`;
-            }).join("\n");
+            const violationDetails = score.violations.length > 0 
+                ? score.violations.map((v: ViolationWithDetails) => {
+                    const studentInfo = v.studentName ? ` (${v.studentName})` : ''
+                    const detailsInfo = v.details ? `: ${v.details}` : '';
+                    const dateInfo = new Date(v.violationDate).toLocaleDateString('vi-VN');
+                    return `${v.violationType}${studentInfo}${detailsInfo} [${dateInfo}]`;
+                }).join("\n")
+                : "(Không có vi phạm)";
 
             dataRows.push([
                 score.className,
+                120 - score.totalPoints,
                 score.totalPoints > 0 ? `-${score.totalPoints}` : 0,
                 violationDetails,
             ]);
@@ -111,8 +156,8 @@ export const exportEmulationScores = action({
         // Merge cells for title and date range
         if (!worksheet['!merges']) worksheet['!merges'] = [];
         worksheet['!merges'].push(
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, // Merge for title
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }, // Merge for date range
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, // Merge for title
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, // Merge for date range
         );
 
         // Style title
@@ -128,29 +173,54 @@ export const exportEmulationScores = action({
         };
 
         // Style header (now at row index 3)
-        const headerStyle = {
-            font: { bold: true },
-            fill: { fgColor: { rgb: "CCCCCC" } },
-            alignment: { horizontal: "center", vertical: "center" }
-        };
-        for (let c = 0; c <= 2; c++) {
+        for (let c = 0; c <= 3; c++) {
             const addr = XLSX.utils.encode_cell({ c, r: 3 });
             if (!worksheet[addr]) continue;
-            worksheet[addr].s = headerStyle;
+            worksheet[addr].s = tableHeaderStyle;
         }
 
-        // Apply wrap text to the "Chi Tiết Vi Phạm" column (column C) starting from data row
+        // Apply styles to data rows
         for (let i = 0; i < dataRows.length; i++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: i + 4, c: 2 });
-            if (worksheet[cellAddress]) {
-                if (!worksheet[cellAddress].s) worksheet[cellAddress].s = {};
-                (worksheet[cellAddress].s as any).alignment = { wrapText: true, vertical: "top" };
+            const row = i + 4; // Data starts at row 5 (index 4)
+            const isEvenRow = i % 2 === 0;
+
+            // Column A: Lớp
+            const cellA = XLSX.utils.encode_cell({ r: row, c: 0 });
+            if (worksheet[cellA]) {
+                worksheet[cellA].s = isEvenRow ? dataCellStyle : dataCellStyleAlt;
+            }
+
+            // Column B: Điểm thi đua
+            const cellB = XLSX.utils.encode_cell({ r: row, c: 1 });
+            if (worksheet[cellB]) {
+                worksheet[cellB].s = scoreCellStyle;
+            }
+
+            // Column C: Tổng Điểm Trừ
+            const cellC = XLSX.utils.encode_cell({ r: row, c: 2 });
+            if (worksheet[cellC]) {
+                if (dataRows[i][2] === 0) {
+                    // Use green style for 0 deduction
+                    worksheet[cellC].s = scoreCellStyle;
+                } else {
+                    worksheet[cellC].s = deductionCellStyle;
+                }
+            }
+
+            // Column D: Chi Tiết Vi Phạm
+            const cellD = XLSX.utils.encode_cell({ r: row, c: 3 });
+            if (worksheet[cellD]) {
+                worksheet[cellD].s = isEvenRow ? detailsCellStyle : detailsCellStyleAlt;
+                if (dataRows[i][3] === "(Không có vi phạm)") {
+                    worksheet[cellD].s.alignment = { ...worksheet[cellD].s.alignment, horizontal: "center" };
+                }
             }
         }
 
         // Set column widths
         (worksheet as any)["!cols"] = [
             { wch: 10 },  // Lớp
+            { wch: 25 },  // Điểm thi đua
             { wch: 15 },  // Tổng Điểm Trừ
             { wch: 100 }, // Chi Tiết Vi Phạm
         ];

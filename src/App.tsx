@@ -11,8 +11,23 @@ import { startOfDay, endOfDay, format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { useState } from "react";
 import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiLogOut } from "react-icons/fi";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import PublicEmulationScoreTable from "./public/PublicEmulationScoreTable";
+import PublicViolationReport from "./public/PublicViolationReport";
 
-export default function App() {
+export default function AppWrapper() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/bang-diem-thi-dua-tho" element={<PublicEmulationScoreTable />} />
+        <Route path="/bang-bao-cao-vi-pham" element={<PublicViolationReport />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function App() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-500/40 via-purple-400/30 to-blue-500/40 animated-gradient-bg bg-size-200 animate-gradient-slow">
       <header className="sticky top-0 z-10 bg-white/50 backdrop-blur-xl h-16 flex justify-between items-center border-b border-white/40 shadow-md px-4 md:px-8">

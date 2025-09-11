@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
@@ -52,6 +52,22 @@ export function AIViolationInputModal({
   const allStudents = useQuery(api.users.getAllStudents);
   const myProfile = useQuery(api.users.getMyProfile);
 
+  const { classRosterCounts, normalizedToOriginalClassMap } = useMemo(() => {
+    if (!allStudents)
+      return { classRosterCounts: {}, normalizedToOriginalClassMap: {} };
+    const counts: { [key: string]: number } = {};
+    const nameMap: { [key: string]: string } = {};
+    for (const student of allStudents) {
+      const normalizedName = normalizeClassName(student.className);
+      if (!counts[normalizedName]) {
+        counts[normalizedName] = 0;
+        nameMap[normalizedName] = student.className;
+      }
+      counts[normalizedName]++;
+    }
+    return { classRosterCounts: counts, normalizedToOriginalClassMap: nameMap };
+  }, [allStudents]);
+
   const studentOptions = useMemo(() => {
     if (!allStudents) return [];
     return allStudents.map((s) => ({
@@ -59,6 +75,26 @@ export function AIViolationInputModal({
       label: `${s.fullName} - ${s.className}`,
       id: s._id, // <<< SỬA ĐỔI 1: Thêm ID duy nhất
     }));
+  }, [allStudents]);
+
+  const studentsByClass = useMemo(() => {
+    if (!allStudents) return new Map();
+    const map = new Map<
+      string,
+      { value: string; label: string; id: string }[]
+    >();
+    for (const student of allStudents) {
+      const normalizedClass = normalizeClassName(student.className);
+      if (!map.has(normalizedClass)) {
+        map.set(normalizedClass, []);
+      }
+      map.get(normalizedClass)!.push({
+        value: student.fullName,
+        label: `${student.fullName} - ${student.className}`,
+        id: student._id,
+      });
+    }
+    return map;
   }, [allStudents]);
 
   const handleParse = async () => {
@@ -168,8 +204,58 @@ export function AIViolationInputModal({
       .toString()
       .padStart(2, "0")}/${today.getFullYear()}`;
 
+    // Attendance report generation
+    const absentKeywords = ["nghỉ", "muộn"];
+    const absentViolations = parsedViolations.filter(
+      (v) =>
+        v.targetType === "student" &&
+        v.studentName &&
+        absentKeywords.some((keyword) =>
+          (v.violationType + (v.details || "")).toLowerCase().includes(keyword)
+        )
+    );
+
+    let attendanceReportString = "";
+    if (absentViolations.length > 0) {
+      const absentStudentsByClass: { [key: string]: string[] } = {};
+      for (const violation of absentViolations) {
+        const normalizedClass = normalizeClassName(violation.violatingClass);
+        if (!absentStudentsByClass[normalizedClass]) {
+          absentStudentsByClass[normalizedClass] = [];
+        }
+        absentStudentsByClass[normalizedClass].push(violation.studentName!);
+      }
+
+      const attendanceLines = checkedClasses.map((className) => {
+        const normalizedClass = normalizeClassName(className);
+        const originalClassName =
+          normalizedToOriginalClassMap[normalizedClass] || className;
+        const totalStudents = classRosterCounts[normalizedClass] || 0;
+        const absentList = absentStudentsByClass[normalizedClass] || [];
+        const absentCount = absentList.length;
+
+        if (absentCount > 0) {
+          const presentCount = totalStudents - absentCount;
+          const absentNames = absentList.join(", ");
+          return `  + ${originalClassName}: ${presentCount}/${totalStudents} (${absentNames} có phép)`;
+        } else {
+          return `  + ${originalClassName}: Đủ`;
+        }
+      });
+
+      if (attendanceLines.length > 0) {
+        attendanceReportString = `\n- Sĩ số:\n${attendanceLines.join("\n")}`;
+      }
+    }
+
     const studentViolations = parsedViolations
-      .filter((v) => v.targetType === "student")
+      .filter(v => {
+        if (v.targetType !== "student" || !v.studentName) return false;
+        const isAbsent = absentKeywords.some(keyword => 
+          (v.violationType + (v.details || "")).toLowerCase().includes(keyword)
+        );
+        return !isAbsent;
+      })
       .map(
         (v) =>
           `- ${v.studentName} (${v.violatingClass}): ${
@@ -187,7 +273,7 @@ export function AIViolationInputModal({
 
     const reportString = `Ngày trực: ${formattedDate}
 Người trực: ${myProfile.fullName} (${myProfile.className})
-Các lớp đã kiểm tra: ${checkedClasses.join(", ")}
+Các lớp đã kiểm tra: ${checkedClasses.join(", ")}${attendanceReportString}
 Nội dung vi phạm nền nếp:${
       studentViolations ? "\n" + studentViolations : " Không có"
     }
@@ -339,85 +425,92 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
           <div className="flex flex-col space-y-2 overflow-hidden">
             <h3 className="font-semibold">2. Kiểm tra và chỉnh sửa</h3>
             <div className="border rounded-md flex-grow overflow-y-auto p-4 space-y-4">
-              {parsedViolations.map((v, i) => (
-                <div key={i} className="border rounded-lg p-4 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-lg mb-2 break-words w-full">
-                      {v.studentName
-                        ? `${v.studentName} (${v.violatingClass})`
-                        : v.violatingClass}
-                    </h4>
+              {parsedViolations.map((v, i) => {
+                const studentOptionsForClass =
+                  studentsByClass.get(normalizeClassName(v.violatingClass)) ||
+                  studentOptions;
+                return (
+                  <div key={i} className="border rounded-lg p-4 shadow-sm">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-bold text-lg mb-2 break-words w-full">
+                        {v.studentName
+                          ? `${v.studentName} (${v.violatingClass})`
+                          : v.violatingClass}
+                      </h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium">Học sinh</label>
+                        <input
+                          list={`students-list-${i}`}
+                          type="text"
+                          value={v.studentName || ""}
+                          onChange={(e) =>
+                            handleFieldChange(i, "studentName", e.target.value)
+                          }
+                          className="w-full p-1 border rounded mt-1"
+                        />
+                        <datalist id={`students-list-${i}`}>
+                          {studentOptionsForClass.map((opt: { id: Key | null | undefined; value: string | number | readonly string[] | undefined; label: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
+                            <option key={opt.id} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Lớp</label>
+                        <input
+                          type="text"
+                          value={v.violatingClass}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              i,
+                              "violatingClass",
+                              e.target.value
+                            )
+                          }
+                          className="w-full p-1 border rounded mt-1"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-sm font-medium">Vi phạm</label>
+                        <select
+                          value={v.violationType}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              i,
+                              "violationType",
+                              e.target.value
+                            )
+                          }
+                          className="w-full p-1 border rounded mt-1"
+                        >
+                          {ALL_VIOLATIONS.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-sm font-medium">Chi tiết</label>
+                        <input
+                          type="text"
+                          value={v.details || ""}
+                          onChange={(e) =>
+                            handleFieldChange(i, "details", e.target.value)
+                          }
+                          className="w-full p-1 border rounded mt-1"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Dữ liệu gốc: {v.originalText}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">Học sinh</label>
-                      <input
-                        list={`students-list-${i}`}
-                        type="text"
-                        value={v.studentName || ""}
-                        onChange={(e) =>
-                          handleFieldChange(i, "studentName", e.target.value)
-                        }
-                        className="w-full p-1 border rounded mt-1"
-                      />
-                      <datalist id={`students-list-${i}`}>
-                        {studentOptions.map((opt) => (
-                          <option key={opt.id} value={opt.value}> 
-                            {opt.label}
-                          </option>
-                        ))}
-                      </datalist>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Lớp</label>
-                      <input
-                        type="text"
-                        value={v.violatingClass}
-                        onChange={(e) =>
-                          handleFieldChange(
-                            i,
-                            "violatingClass",
-                            e.target.value
-                          )
-                        }
-                        className="w-full p-1 border rounded mt-1"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-sm font-medium">Vi phạm</label>
-                      <select
-                        value={v.violationType}
-                        onChange={(e) =>
-                          handleFieldChange(
-                            i,
-                            "violationType",
-                            e.target.value
-                          )
-                        }
-                        className="w-full p-1 border rounded mt-1"
-                      >
-                        {ALL_VIOLATIONS.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-sm font-medium">Chi tiết</label>
-                      <input
-                        type="text"
-                        value={v.details || ""}
-                        onChange={(e) =>
-                          handleFieldChange(i, "details", e.target.value)
-                        }
-                        className="w-full p-1 border rounded mt-1"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">Dữ liệu gốc: {v.originalText}</p>
-                </div>
-              ))}
+                );
+              })}
               {parsedViolations.length === 0 && (
                 <p className="p-4 text-center text-slate-500">
                   Chưa có dữ liệu

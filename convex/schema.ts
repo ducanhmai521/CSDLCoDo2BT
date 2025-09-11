@@ -63,6 +63,11 @@ const applicationTables = {
     key: v.string(),
     value: v.string(),
   }).index("by_key", ["key"]),
+
+  classes: defineTable({
+    name: v.string(),
+  }).index("by_name", ["name"]),
+
 };
 
 export default defineSchema({
