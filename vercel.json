@@ -1,12 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/bang-diem-thi-dua-tho",
-      "destination": "https://animated-pelican-663.convex.cloud/bang-diem-thi-dua-tho"
-    },
-    {
-      "source": "/bang-bao-cao-vi-pham",
-      "destination": "https://animated-pelican-663.convex.cloud/bang-bao-cao-vi-pham"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
