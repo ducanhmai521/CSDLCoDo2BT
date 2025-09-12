@@ -1,10 +1,17 @@
 export const VIOLATION_CATEGORIES = [
+   {
+    name: "Mức trừ 0 điểm",
+    points: 0,
+    violations: [
+      "Nghỉ học có phép",
+    ],
+   },
   {
     name: "Mức trừ 3 điểm",
     points: 3,
     violations: [
       "Sai đồng phục/đầu tóc,...",
-      "Đi học muộn/nghỉ học có phép",
+      "Đi học muộn có phép",
       "Thiếu dụng cụ vệ sinh/đồ dùng học tập/ghế chào cờ",
       "Để xe không đúng quy định",
       "Cờ đỏ trực muộn 3 phút trở lên",
