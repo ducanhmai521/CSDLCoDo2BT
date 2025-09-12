@@ -184,84 +184,89 @@ export function AIViolationInputModal({
     setParsedViolations(updatedViolations);
   };
 
-  const handleCopyReport = async () => {
-    if (checkedClasses.length === 0) {
-      toast.warning(
-        "Thiếu thông tin các lớp đã kiểm tra. Vui lòng bổ sung trong ô nhập liệu và phân tích lại."
-      );
-      return;
-    }
+  const handleCopyReport = async (andSubmit = false) => {
+    const formattedDate = customDate
+      ? new Date(customDate).toLocaleDateString("vi-VN")
+      : new Date().toLocaleDateString("vi-VN");
 
     if (!myProfile) {
-      toast.error("Không thể lấy thông tin người dùng. Vui lòng thử lại.");
+      toast.error("Không tìm thấy thông tin người dùng.");
       return;
     }
 
-    const today = new Date();
-    const formattedDate = `${today.getDate().toString().padStart(2, "0")}/${(
-      today.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}/${today.getFullYear()}`;
+    const checkedClasses = Array.from(
+      new Set(parsedViolations.map((v) => v.violatingClass))
+    ).sort();
 
-    // Attendance report generation
-    const absentKeywords = ["nghỉ", "muộn"];
-    const absentViolations = parsedViolations.filter(
-      (v) =>
-        v.targetType === "student" &&
-        v.studentName &&
-        absentKeywords.some((keyword) =>
-          (v.violationType + (v.details || "")).toLowerCase().includes(keyword)
-        )
-    );
+    const absenceKeywords = ["vắng", "nghỉ"];
+    const lateKeywords = ["muộn"];
+    const permittedKeywords = ["có phép", "cp"];
 
-    let attendanceReportString = "";
-    if (absentViolations.length > 0) {
-      const absentStudentsByClass: { [key: string]: string[] } = {};
-      for (const violation of absentViolations) {
-        const normalizedClass = normalizeClassName(violation.violatingClass);
-        if (!absentStudentsByClass[normalizedClass]) {
-          absentStudentsByClass[normalizedClass] = [];
-        }
-        absentStudentsByClass[normalizedClass].push(violation.studentName!);
-      }
+    const lateWithPermission = new Map<string, string[]>();
+    const unexcusedAbsences = new Map<string, string[]>();
+    const otherStudentViolations: ParsedViolation[] = [];
 
-      const attendanceLines = checkedClasses.map((className) => {
-        const normalizedClass = normalizeClassName(className);
-        const originalClassName =
-          normalizedToOriginalClassMap[normalizedClass] || className;
-        const totalStudents = classRosterCounts[normalizedClass] || 0;
-        const absentList = absentStudentsByClass[normalizedClass] || [];
-        const absentCount = absentList.length;
+    for (const v of parsedViolations) {
+      if (v.targetType === "student" && v.studentName) {
+        const violationText = (
+          v.violationType + (v.details || "")
+        ).toLowerCase();
+        const isLate = lateKeywords.some((k) => violationText.includes(k));
+        const isAbsence = absenceKeywords.some((k) =>
+          violationText.includes(k)
+        );
+        const isPermitted = permittedKeywords.some((k) =>
+          violationText.includes(k)
+        );
 
-        if (absentCount > 0) {
-          const presentCount = totalStudents - absentCount;
-          const absentNames = absentList.join(", ");
-          return `  + ${originalClassName}: ${presentCount}/${totalStudents} (${absentNames} có phép)`;
+        if (isLate && isPermitted) {
+          if (!lateWithPermission.has(v.violatingClass)) {
+            lateWithPermission.set(v.violatingClass, []);
+          }
+          lateWithPermission.get(v.violatingClass)!.push(v.studentName);
+        } else if (isAbsence && !isPermitted) {
+          if (!unexcusedAbsences.has(v.violatingClass)) {
+            unexcusedAbsences.set(v.violatingClass, []);
+          }
+          unexcusedAbsences.get(v.violatingClass)!.push(v.studentName);
         } else {
-          return `  + ${originalClassName}: Đủ`;
+          otherStudentViolations.push(v);
         }
-      });
-
-      if (attendanceLines.length > 0) {
-        attendanceReportString = `\n- Sĩ số:\n${attendanceLines.join("\n")}`;
       }
     }
 
-    const studentViolations = parsedViolations
-      .filter(v => {
-        if (v.targetType !== "student" || !v.studentName) return false;
-        const isAbsent = absentKeywords.some(keyword => 
-          (v.violationType + (v.details || "")).toLowerCase().includes(keyword)
-        );
-        return !isAbsent;
+    const attendanceReportLines = checkedClasses.map((className) => {
+      const absentees = unexcusedAbsences.get(className) || [];
+      const latecomers = lateWithPermission.get(className) || [];
+
+      const attendanceStatus =
+        absentees.length > 0
+          ? `Vắng ${absentees.length} (${absentees.join(", ")})`
+          : "Đủ";
+
+      const lateNote =
+        latecomers.length > 0
+          ? ` (${latecomers.join(", ")} đi muộn có phép)`
+          : "";
+
+      return `${className}: ${attendanceStatus}${lateNote}`;
+    });
+
+    const attendanceReportString =
+      "\nSĩ số các lớp:\n" + attendanceReportLines.join("\n");
+
+    const studentViolations = otherStudentViolations
+      .map((v) => {
+        const violationText = (
+          v.violationType + (v.details || "")
+        ).toLowerCase();
+        const isLate = lateKeywords.some((k) => violationText.includes(k));
+        let detail = v.details || v.violationType;
+        if (isLate) {
+          detail = "Đi muộn không phép";
+        }
+        return `- ${v.studentName} (${v.violatingClass}): ${detail}`;
       })
-      .map(
-        (v) =>
-          `- ${v.studentName} (${v.violatingClass}): ${
-            v.details || v.violationType
-          }`
-      )
       .join("\n");
 
     const classViolations = parsedViolations
@@ -271,19 +276,18 @@ export function AIViolationInputModal({
       )
       .join("\n");
 
-    const reportString = `Ngày trực: ${formattedDate}
-Người trực: ${myProfile.fullName} (${myProfile.className})
-Các lớp đã kiểm tra: ${checkedClasses.join(", ")}${attendanceReportString}
-Nội dung vi phạm nền nếp:${
+    const reportString = `Ngày trực: ${formattedDate}\nNgười trực: ${myProfile.fullName} (${myProfile.className})\nCác lớp đã kiểm tra: ${checkedClasses.join(", ")}${attendanceReportString}\nNội dung vi phạm nền nếp:${
       studentViolations ? "\n" + studentViolations : " Không có"
-    }
-Nội dung tự quản:${
+    }\nNội dung tự quản:${
       classViolations ? "\n" + classViolations : " Không có"
     }`;
 
     try {
       await navigator.clipboard.writeText(reportString);
       toast.success("Đã sao chép mẫu báo cáo vào clipboard!");
+      if (andSubmit) {
+        await handleSubmit(true); // Pass a flag to avoid recursion
+      }
     } catch (err) {
       toast.error("Không thể sao chép. Vui lòng thử lại.");
       console.error("Failed to copy: ", err);
@@ -294,8 +298,10 @@ Nội dung tự quản:${
     setCurrentView("input");
   };
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
+  const handleSubmit = async (fromCopy = false) => {
+    if (!fromCopy) {
+       setIsSubmitting(true);
+    }
     try {
       const violationsToSubmit = parsedViolations.map((v) => ({
         studentName: v.studentName || undefined,
@@ -353,9 +359,17 @@ Nội dung tự quản:${
       toast.error("Lỗi khi gửi hàng loạt: " + (error as Error).message);
       console.error(error);
     } finally {
-      setIsSubmitting(false);
+       if (!fromCopy) {
+        setIsSubmitting(false);
+      }
     }
   };
+
+  const handleSubmitAndCopy = async () => {
+    setIsSubmitting(true);
+    await handleCopyReport(true);
+    setIsSubmitting(false);
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -517,21 +531,32 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                 </p>
               )}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={handleBackToInput}>
+            <DialogFooter className="gap-2 md:gap-4">
+              <Button variant="outline" onClick={handleBackToInput} className="py-6 px-4 text-base">
                 Quay lại
               </Button>
               <Button
-                onClick={handleCopyReport}
+                onClick={() => handleCopyReport()}
                 variant="secondary"
+                className="py-6 px-4 text-base"
                 disabled={
                   isParsing || isSubmitting || parsedViolations.length === 0
                 }
               >
                 Copy mẫu báo cáo
               </Button>
+               <Button
+                onClick={handleSubmitAndCopy}
+                className="py-6 px-4 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={
+                  isSubmitting || isParsing || parsedViolations.length === 0
+                }
+              >
+                {isSubmitting ? "Đang xử lý..." : "Gửi và Copy"}
+              </Button>
               <Button
-                onClick={handleSubmit}
+                onClick={() => handleSubmit()}
+                className="py-6 px-4 text-base font-bold"
                 disabled={
                   isSubmitting || isParsing || parsedViolations.length === 0
                 }
