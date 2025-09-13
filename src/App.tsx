@@ -39,9 +39,9 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-500/40 via-purple-400/30 to-blue-500/40 animated-gradient-bg bg-size-200 animate-gradient-slow">
-      <header className="sticky top-0 z-10 bg-white/50 backdrop-blur-xl h-16 flex justify-between items-center border-b border-white/40 shadow-md px-4 md:px-8">
+      <header className="sticky top-0 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8">
         <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2 rounded-xl">
+          <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm">
             <img src="https://www.dropbox.com/scl/fi/23fj64gvknqcw0fu6ibzw/icon.ico?rlkey=t0qmc0ffbkoh5z16g5xts105w&st=for1a0hd&raw=1" alt="favicon" className="w-8 h-8 rounded-lg" />
           </div>
           <div>
@@ -54,7 +54,7 @@ function App() {
             {myProfile?.isSuperUser && (
               <button
                 onClick={handleSwitchRole}
-                className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
+                className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition-colors p-2 rounded-xl hover:bg-white/20"
                 title="Switch Role"
               >
                 <FiRefreshCw />
@@ -71,11 +71,11 @@ function App() {
       
       <Toaster position="top-center" richColors />
       
-      <footer className="py-6 text-center text-sm text-slate-600 border-t border-white/40 mt-8 bg-white/50 backdrop-blur-md">
+      <footer className="py-6 text-center text-sm text-slate-700 border-t border-white/40 mt-8 nav-glass">
         <div className="max-w-7xl mx-auto px-4">
             <div>
-              <p className="font-medium">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
-              <p>Phát triển bởi Mai Đức Anh</p>
+              <p className="font-medium text-slate-800">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
+              <p className="text-slate-700">Phát triển bởi Mai Đức Anh</p>
             </div>
         </div>
       </footer>
@@ -92,9 +92,9 @@ function Content() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64 glass-card bg-white/20 backdrop-blur-md rounded-2xl p-8 border border-white/30 shadow-lg">
+      <div className="flex justify-center items-center h-64 glass-card">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/30 border-t-primary"></div>
+          <div className="form-loading-spinner w-12 h-12"></div>
           <p className="text-slate-700 font-medium">Đang tải dữ liệu...</p>
         </div>
       </div>
@@ -105,7 +105,7 @@ function Content() {
     <div>
       <Authenticated>
         {user && !myProfile ? (
-          <div className="glass-card bg-white/20 backdrop-blur-md rounded-2xl p-8 border border-white/30 shadow-lg">
+          <div className="glass-card">
             <ProfileCreationForm />
           </div>
         ) : (
@@ -113,7 +113,7 @@ function Content() {
         )}
       </Authenticated>
       <Unauthenticated>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center glass-card bg-white/20 backdrop-blur-md rounded-2xl p-8 border border-white/30 shadow-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center glass-card">
           <div className="flex flex-col justify-center space-y-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 font-display leading-tight">
@@ -126,9 +126,9 @@ function Content() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              <div className="feature-card bg-white/30 backdrop-blur-sm border border-white/40 shadow-md hover:shadow-lg transition-all">
+              <div className="feature-card">
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-lg">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-primary text-lg">
                     <FiShield />
                   </span>
                   <div>
@@ -138,21 +138,21 @@ function Content() {
                 </div>
               </div>
               
-              <div className="feature-card bg-white/30 backdrop-blur-sm border border-white/40 shadow-md hover:shadow-lg transition-all">
+              <div className="feature-card">
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-lg">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-primary text-lg">
                     <FiBarChart2 />
                   </span>
                   <div>
                     <h3 className="font-bold text-slate-800">Báo cáo thống kê</h3>
-                    <p className="text-sm text-slate-600">Theo tuần/tháng, xuất Excel tiện lợi</p>
+                    <p className="text-sm text-slate-600">Theo tuần/tháng, với trang xem công khai</p>
                   </div>
                 </div>
               </div>
               
-              <div className="feature-card bg-white/30 backdrop-blur-sm border border-white/40 shadow-md hover:shadow-lg transition-all">
+              <div className="feature-card">
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-lg">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-primary text-lg">
                     <FiUsers />
                   </span>
                   <div>
@@ -162,9 +162,9 @@ function Content() {
                 </div>
               </div>
               
-              <div className="feature-card bg-white/30 backdrop-blur-sm border border-white/40 shadow-md hover:shadow-lg transition-all">
+              <div className="feature-card">
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-lg">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-primary text-lg">
                     <FiDatabase />
                   </span>
                   <div>
@@ -175,9 +175,9 @@ function Content() {
               </div>
             </div>
             
-            <div className="mt-6 text-sm text-slate-600 bg-white/30 backdrop-blur-sm p-4 rounded-xl border border-white/40 shadow-md">
+            <div className="mt-6 text-sm text-slate-600 glass-card-subtle p-4">
               <p className="flex items-center gap-2">
-                <FiCheckCircle className="text-accent-green" /> 
+                <FiCheckCircle className="text-green-600" /> 
                 Hệ thống được cập nhật liên tục với các tính năng mới
               </p>
             </div>
@@ -195,18 +195,20 @@ function Content() {
     function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
       return (
         <div>
-          <h1 className="text-3xl font-bold mb-2">Xin chào, {profile.fullName}!</h1>
-          <p className="text-slate-600 mb-6">
-            Vai trò của bạn: <span className="font-semibold">{translateRole(profile.role)}</span>
-            {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
-          </p>
+          <div className="glass-card mb-6">
+            <h1 className="text-3xl font-bold mb-2 text-slate-900">Xin chào, {profile.fullName}! 👋</h1>
+            <p className="text-slate-700 mb-4">
+              Vai trò của bạn: <span className="font-semibold text-slate-800">{translateRole(profile.role)}</span>
+              {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
+            </p>
+          </div>
           
           {profile.role === 'admin' && <AdminDashboard />}
           {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} />}
           {profile.role === 'pending' && 
-            <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md">
-              <p className="font-bold">Tài khoản của bạn đang được xem xét</p>
-              <p>Vui lòng chờ Quản trị viên xác minh và cấp quyền truy cập.</p>
+            <div className="glass-card-subtle p-6 border-l-4 border-blue-600">
+              <p className="font-bold text-slate-800">⏳ Tài khoản của bạn đang được xem xét</p>
+              <p className="text-slate-700">Vui lòng chờ Quản trị viên xác minh và cấp quyền truy cập.</p>
             </div>
           }
         </div>

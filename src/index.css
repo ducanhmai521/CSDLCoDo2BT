@@ -6,9 +6,9 @@
 
 body {
   font-family: "Quicksand", sans-serif;
-  background-color: #d1d8f0;
-  background-image: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
-  color: #22304d;
+  background: linear-gradient(135deg, #f0f2f5 0%, #e0e4eb 100%); /* Light grey gradient */
+  background-attachment: fixed;
+  color: #2c3e50; /* Darker text color */
   min-height: 100vh;
 }
 
@@ -17,41 +17,179 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
+/* Enhanced Glassmorphism Components */
 .glass-card {
-  @apply bg-white/60 backdrop-blur-xl rounded-2xl shadow-lg p-6 md:p-8 border border-white/50 hover:shadow-xl transition-all;
+  @apply bg-white/20 backdrop-blur-xl rounded-3xl shadow-2xl p-6 md:p-8 border border-white/30 hover:shadow-3xl hover:bg-white/25 transition-all duration-300;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+}
+
+.glass-card-strong {
+  @apply bg-white/30 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 md:p-8 border border-white/40 hover:shadow-3xl hover:bg-white/35 transition-all duration-300;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+}
+
+.glass-card-subtle {
+  @apply bg-white/15 backdrop-blur-lg rounded-2xl shadow-lg p-4 border border-white/25 hover:shadow-xl hover:bg-white/20 transition-all duration-300;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.2);
 }
 
 .auth-input-field {
-  @apply w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary-light outline-none transition-all shadow-sm hover:shadow-md text-slate-700 font-medium;
+  @apply w-full px-4 py-3 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 focus:border-white/50 focus:ring-2 focus:ring-white/30 outline-none transition-all duration-300 shadow-lg hover:shadow-xl text-slate-800 font-medium placeholder-slate-500;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.15);
+}
+
+.auth-input-field:focus {
+  @apply bg-white/30;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.25);
 }
 
 .auth-button {
-  @apply w-full px-4 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply w-full px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500/80 to-purple-600/80 backdrop-blur-sm text-white font-bold hover:from-blue-600/90 hover:to-purple-700/90 transition-all duration-300 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed border border-white/20;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.3);
+}
+
+.auth-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.4);
 }
 
 .feature-card {
-  @apply bg-white/60 backdrop-blur-md rounded-xl p-4 border border-white/60 shadow-md transition-all hover:shadow-lg hover:scale-[1.02];
+  @apply bg-white/20 backdrop-blur-lg rounded-2xl p-4 border border-white/30 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:bg-white/25;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.2);
+}
+
+.feature-card:hover {
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.3);
 }
 
 .animated-gradient-bg {
   @apply bg-gradient-to-br 
-  from-indigo-300/20 
-  via-purple-300/20 
-  to-blue-300/20 
+  from-indigo-400/30 
+  via-purple-500/30 
+  to-blue-500/30 
   bg-size-200 
   animate-gradient-slow;
 }
 
+/* Enhanced Navigation */
+.nav-glass {
+  @apply bg-white/20 backdrop-blur-xl border-b border-white/30 shadow-lg;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+}
+
+/* Form Loading Indicator */
+.form-loading-overlay {
+  @apply absolute inset-0 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center z-10;
+}
+
+.form-loading-spinner {
+  @apply w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin;
+}
+
+/* Enhanced Buttons */
+.btn-glass {
+  @apply px-4 py-2 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 text-slate-800 font-semibold hover:bg-white/30 hover:shadow-lg transition-all duration-300;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.15);
+}
+
+.btn-glass:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.25);
+}
+
+.btn-glass-primary {
+  @apply px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500/80 to-purple-600/80 backdrop-blur-sm border border-white/30 text-white font-semibold hover:from-blue-600/90 hover:to-purple-700/90 transition-all duration-300;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.3);
+}
+
+.btn-glass-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.4);
+}
+
+/* Table Glassmorphism */
+.table-glass {
+  @apply bg-white/20 backdrop-blur-lg rounded-2xl border border-white/30 shadow-lg overflow-hidden;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+}
+
+.table-glass th {
+  @apply bg-white/30 backdrop-blur-sm border-b border-white/40 text-slate-800 font-semibold;
+}
+
+.table-glass td {
+  @apply border-b border-white/20 text-slate-700;
+}
+
+.table-glass tr:hover {
+  @apply bg-white/10;
+}
+
+/* Modal Glassmorphism */
+.modal-glass {
+  @apply bg-white/20 backdrop-blur-2xl rounded-3xl border border-white/30 shadow-2xl;
+  box-shadow: 0 25px 50px rgba(31, 38, 135, 0.4);
+}
+
+/* Enhanced Animations */
 @keyframes gradient-shift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 8px 32px rgba(31, 38, 135, 0.3); }
+  50% { box-shadow: 0 12px 40px rgba(31, 38, 135, 0.5); }
+}
+
 .animate-gradient-slow {
   animation: gradient-shift 8s ease infinite;
 }
 
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
 .bg-size-200 {
   background-size: 200% 200%;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-white/10 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/30 rounded-full hover:bg-white/40;
+}
+
+/* Enhanced Shadows */
+.shadow-3xl {
+  box-shadow: 0 25px 50px rgba(31, 38, 135, 0.3);
+}
+
+.hover\:shadow-3xl:hover {
+  box-shadow: 0 25px 50px rgba(31, 38, 135, 0.3);
+}
+
+.shadow-glass {
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+}
+
+.shadow-glass-lg {
+  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.4);
 }

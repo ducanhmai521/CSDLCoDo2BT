@@ -19,16 +19,23 @@ export function ForceRefresh() {
   if (!showNotification) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 bg-yellow-200 p-4 rounded-lg shadow-lg z-50">
-      <p className="mb-2">Đã có phiên bản web mới. Vui lòng cập nhật để tránh sai sót khi nhập liệu.</p>
-      <Button
-        onClick={() => {
-          updateMyWebVer({ webVer: webVer! });
-          window.location.reload();
-        }}
-      >
-        Cập nhật
-      </Button>
+    <div className="fixed bottom-4 right-4 glass-card-strong p-6 shadow-2xl z-50 animate-float">
+      <div className="flex items-start gap-3">
+        <div className="text-2xl text-primary">🔄</div>
+        <div className="flex-1">
+          <p className="text-slate-800 font-semibold mb-2">Đã có phiên bản web mới!</p>
+          <p className="text-slate-700 text-sm mb-4">Vui lòng cập nhật để tránh sai sót khi nhập liệu.</p>
+          <Button
+            onClick={() => {
+              updateMyWebVer({ webVer: webVer! });
+              window.location.reload();
+            }}
+            className="btn-glass-primary w-full"
+          >
+            ✨ Cập nhật ngay
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

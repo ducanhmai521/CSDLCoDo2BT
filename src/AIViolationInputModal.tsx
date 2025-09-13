@@ -207,6 +207,24 @@ export function AIViolationInputModal({
     setParsedViolations(updatedViolations);
   };
 
+  const handleDeleteViolation = (index: number) => {
+    const updatedViolations = parsedViolations.filter((_, i) => i !== index);
+    setParsedViolations(updatedViolations);
+  };
+
+  const handleAddViolation = () => {
+    const newViolation: ParsedViolation = {
+      studentName: null,
+      violatingClass: "",
+      violationType: ALL_VIOLATIONS[0] || "",
+      details: null,
+      targetType: "class",
+      originalText: "Thêm mới",
+      evidenceFiles: [],
+    };
+    setParsedViolations([...parsedViolations, newViolation]);
+  };
+
   const handleCopyReport = async (andSubmit = false) => {
     const formattedDate = customDate
       ? new Date(customDate).toLocaleDateString("vi-VN")
@@ -454,7 +472,7 @@ export function AIViolationInputModal({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" className="w-full py-6 text-lg font-semibold shadow-md hover:shadow-lg transition-all bg-gradient-to-r from-primary to-primary/80">
+        <Button variant="default" className="w-full py-6 text-lg font-semibold shadow-md hover:shadow-lg transition-all bg-gradient-to-r from-primary to-primary/80 rounded-2xl">
           <svg
             className="h-5 w-5 mr-2"
             fill="none"
@@ -471,29 +489,47 @@ export function AIViolationInputModal({
           Nhập bằng AI
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Nhập liệu vi phạm hàng loạt bằng AI</DialogTitle>
+      <DialogContent className="max-w-6xl w-[95vw] h-[95vh] flex flex-col bg-white border border-gray-200 shadow-2xl">
+        <DialogHeader className="pb-3 border-b border-gray-200">
+          <DialogTitle className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
+            Nhập liệu vi phạm hàng loạt bằng AI
+          </DialogTitle>
         </DialogHeader>
         {currentView === "input" ? (
-          <div className="flex flex-col space-y-2 flex-grow">
-            <h3 className="font-semibold">1. Dán danh sách vi phạm</h3>
-            <Textarea
-              placeholder="Ví dụ:
+          <div className="flex flex-col space-y-4 flex-grow overflow-hidden">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-gray-800">Dán danh sách vi phạm</h3>
+              </div>
+              <div className="relative">
+                <Textarea
+                  placeholder="Ví dụ:
 Ngô Xuân lộc 11a8 (sai dp, dép lê)
 10a8 vệ sinh muộn"
-              className="h-full resize-none"
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              disabled={isParsing || isSubmitting}
-            />
+                  className="min-h-[300px] md:min-h-[400px] resize-none w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500"
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  disabled={isParsing || isSubmitting}
+                />
+                {rawText.length > 0 && (
+                  <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-white/90 px-2 py-1 rounded border">
+                    {rawText.length} ký tự
+                  </div>
+                )}
+              </div>
+            </div>
+            
             {myProfile?.role === "gradeManager" && (
-              <div className="mt-2">
-                <label className="font-semibold">
+              <div className="space-y-2">
+                <label className="font-semibold text-gray-800 flex items-center gap-2">
+                  <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
                   Override ngày (không động vô nếu không cần)
                 </label>
                 <Input
                   type="date"
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                   onChange={(e) => {
                     const selectedDate = e.target.value
                       ? new Date(e.target.value).getTime()
@@ -503,38 +539,94 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                 />
               </div>
             )}
-            <DialogFooter>
+            
+            <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
               <DialogClose asChild>
-                <Button variant="ghost">Hủy</Button>
+                <Button variant="ghost" className="w-full sm:w-auto text-gray-600 hover:text-gray-800">Hủy</Button>
               </DialogClose>
               <Button
                 onClick={handleParse}
                 disabled={isParsing || isSubmitting || !allStudents}
+                className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-xl flex items-center gap-2 transition-all"
               >
-                {isParsing ? "Đang phân tích..." : "Phân tích"}
+                {isParsing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Đang phân tích...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Phân tích
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </div>
         ) : (
-          <div className="flex flex-col space-y-2 overflow-hidden">
-            <h3 className="font-semibold">2. Kiểm tra và chỉnh sửa</h3>
-            <div className="border rounded-md flex-grow overflow-y-auto p-4 space-y-4">
+          <div className="flex flex-col space-y-4 flex-grow overflow-hidden">
+            <div className="flex items-center gap-1 text-sm">
+              <h3 className="font-medium text-gray-800 whitespace-nowrap">
+                 Kiểm tra & chỉnh sửa
+              </h3>
+            <div className="ml-auto bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
+             {parsedViolations.length} mục
+           </div>
+          <Button
+          onClick={handleAddViolation}
+          className="ml-1 bg-green-500 hover:bg-green-600 text-white px-2 py-0.5 rounded-md text-xs font-medium flex items-center gap-0.5 transition-colors whitespace-nowrap"
+          >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Thêm
+          </Button>
+          </div>
+            
+            <div className="flex-grow overflow-y-auto space-y-4 pr-2">
               {parsedViolations.map((v, i) => {
                 const studentOptionsForClass =
                   studentsByClass.get(normalizeClassName(v.violatingClass)) ||
                   studentOptions;
                 return (
-                  <div key={i} className="border rounded-lg p-4 shadow-sm">
-                    <div className="flex justify-between items-start">
-                      <h4 className="font-bold text-lg mb-2 break-words w-full">
-                        {v.studentName
-                          ? `${v.studentName} (${v.violatingClass})`
-                          : v.violatingClass}
-                      </h4>
+                  <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-lg text-gray-800 break-words">
+                          {v.studentName
+                            ? `${v.studentName} (${v.violatingClass})`
+                            : v.violatingClass}
+                        </h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Dữ liệu gốc: {v.originalText}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
+                          #{i + 1}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteViolation(i)}
+                          className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-lg transition-colors"
+                          title="Xóa mục này"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium">Học sinh</label>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          Học sinh
+                        </label>
                         <input
                           list={`students-list-${i}`}
                           type="text"
@@ -542,7 +634,8 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                           onChange={(e) =>
                             handleFieldChange(i, "studentName", e.target.value)
                           }
-                          className="w-full p-1 border rounded mt-1"
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500"
+                          placeholder="Chọn hoặc nhập tên học sinh"
                         />
                         <datalist id={`students-list-${i}`}>
                           {studentOptionsForClass.map((opt: { id: Key | null | undefined; value: string | number | readonly string[] | undefined; label: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
@@ -552,8 +645,14 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                           ))}
                         </datalist>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium">Lớp</label>
+                      
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                          Lớp
+                        </label>
                         <input
                           type="text"
                           value={v.violatingClass}
@@ -564,11 +663,17 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                               e.target.value
                             )
                           }
-                          className="w-full p-1 border rounded mt-1"
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         />
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="text-sm font-medium">Vi phạm</label>
+                      
+                      <div className="lg:col-span-2 space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                          Loại vi phạm
+                        </label>
                         <select
                           value={v.violationType}
                           onChange={(e) =>
@@ -578,7 +683,7 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                               e.target.value
                             )
                           }
-                          className="w-full p-1 border rounded mt-1"
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         >
                           {ALL_VIOLATIONS.map((type) => (
                             <option key={type} value={type}>
@@ -587,81 +692,137 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                           ))}
                         </select>
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="text-sm font-medium">Chi tiết</label>
+                      
+                      <div className="lg:col-span-2 space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Chi tiết
+                        </label>
                         <input
                           type="text"
                           value={v.details || ""}
                           onChange={(e) =>
                             handleFieldChange(i, "details", e.target.value)
                           }
-                          className="w-full p-1 border rounded mt-1"
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500"
+                          placeholder="Mô tả chi tiết vi phạm"
                         />
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="text-sm font-medium">Bằng chứng (ảnh)</label>
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*"
-                          onChange={(e) => handleFileChange(i, e.target.files)}
-                          className="w-full p-1 border rounded mt-1"
-                        />
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {v.evidenceFiles?.map((file, fileIndex) => (
-                            <div key={fileIndex} className="relative">
-                              <img
-                                src={URL.createObjectURL(file)}
-                                alt={`preview ${fileIndex}`}
-                                className="h-20 w-20 object-cover rounded"
-                              />
-                              <button
-                                onClick={() => handleRemoveFile(i, fileIndex)}
-                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
-                              >
-                                X
-                              </button>
+                      
+                      <div className="lg:col-span-2 space-y-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Bằng chứng (ảnh)
+                        </label>
+                        <div className="space-y-3">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(i, e.target.files)}
+                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                          />
+                          {v.evidenceFiles && v.evidenceFiles.length > 0 && (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                              {v.evidenceFiles.map((file, fileIndex) => (
+                                <div key={fileIndex} className="relative group">
+                                  <img
+                                    src={URL.createObjectURL(file)}
+                                    alt={`preview ${fileIndex}`}
+                                    className="h-20 w-full object-cover rounded-lg shadow-sm"
+                                  />
+                                  <button
+                                    onClick={() => handleRemoveFile(i, fileIndex)}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                  >
+                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-lg truncate">
+                                    {file.name}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Dữ liệu gốc: {v.originalText}
-                    </p>
                   </div>
                 );
               })}
               {parsedViolations.length === 0 && (
-                <p className="p-4 text-center text-slate-500">
-                  Chưa có dữ liệu
-                </p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <svg className="h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-gray-500 font-medium">Chưa có dữ liệu để hiển thị</p>
+                  <p className="text-gray-400 text-sm mt-1">Hãy nhập danh sách vi phạm để bắt đầu</p>
+                </div>
               )}
             </div>
-            <DialogFooter className="gap-2 md:gap-4">
-              <Button variant="outline" onClick={handleBackToInput} className="py-6 px-4 text-base">
+            <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+              <Button 
+                variant="outline" 
+                onClick={handleBackToInput} 
+                className="w-full sm:w-auto flex items-center gap-2 py-3 px-6 text-gray-600 hover:text-gray-800 border-gray-300"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
                 Quay lại
               </Button>
-               <Button
-                onClick={handleSubmitAndCopy}
-                className="py-6 px-4 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={
-                  isSubmitting || isParsing || parsedViolations.length === 0
-                }
-              >
-                {isSubmitting ? "Đang xử lý..." : "Gửi và Copy"}
-              </Button>
-              <Button
-                onClick={() => handleSubmit()}
-                className="py-6 px-4 text-base font-bold"
-                disabled={
-                  isSubmitting || isParsing || parsedViolations.length === 0
-                }
-              >
-                {isSubmitting
-                  ? "Đang gửi..."
-                  : `Gửi ${parsedViolations.length} mục`}
-              </Button>
+              
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <Button
+                  onClick={handleSubmitAndCopy}
+                  className="w-full sm:w-auto flex items-center gap-2 py-3 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl"
+                  disabled={
+                    isSubmitting || isParsing || parsedViolations.length === 0
+                  }
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Gửi và Copy
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={() => handleSubmit()}
+                  className="w-full sm:w-auto flex items-center gap-2 py-3 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl"
+                  disabled={
+                    isSubmitting || isParsing || parsedViolations.length === 0
+                  }
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Đang gửi...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                      Gửi {parsedViolations.length} mục
+                    </>
+                  )}
+                </Button>
+              </div>
             </DialogFooter>
           </div>
         )}

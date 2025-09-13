@@ -10,7 +10,7 @@ export function SignInForm() {
   const [submitting, setSubmitting] = useState(false);
 
   return (
-    <div className="w-full animated-gradient-bg rounded-2xl p-6 shadow-lg border border-white/30">
+    <div className="w-full glass-card-strong">
       <div className="mb-6 text-center">
         <h2 className="text-2xl font-extrabold text-slate-800 flex items-center justify-center gap-2">
           {flow === "signIn" ? (
@@ -23,7 +23,7 @@ export function SignInForm() {
             </>
           )}
         </h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-700">
           Truy cập hệ thống CSDL Cờ đỏ và quản lý thông tin hiệu quả
         </p>
       </div>
@@ -31,25 +31,25 @@ export function SignInForm() {
       <div className="flex items-center justify-center gap-3 mb-6">
         <button
           type="button"
-          className={`px-4 py-2 text-sm rounded-xl border transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 text-sm rounded-2xl border transition-all flex items-center gap-2 ${
             flow === "signIn"
-              ? "bg-primary text-white border-primary shadow-md"
-              : "bg-white/80 text-slate-700 border-slate-200 hover:bg-white hover:shadow-md"
+              ? "bg-white/30 text-slate-800 border-white/50 shadow-lg backdrop-blur-sm"
+              : "bg-white/10 text-slate-700 border-white/30 hover:bg-white/20 hover:text-slate-800 hover:shadow-md backdrop-blur-sm"
           }`}
           onClick={() => setFlow("signIn")}
         >
-          <FiLogIn /> Đăng nhập
+          <FiLogIn className="text-primary" /> Đăng nhập
         </button>
         <button
           type="button"
-          className={`px-4 py-2 text-sm rounded-xl border transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 text-sm rounded-2xl border transition-all flex items-center gap-2 ${
             flow === "signUp"
-              ? "bg-primary text-white border-primary shadow-md"
-              : "bg-white/80 text-slate-700 border-slate-200 hover:bg-white hover:shadow-md"
+              ? "bg-white/30 text-slate-800 border-white/50 shadow-lg backdrop-blur-sm"
+              : "bg-white/10 text-slate-700 border-white/30 hover:bg-white/20 hover:text-slate-800 hover:shadow-md backdrop-blur-sm"
           }`}
           onClick={() => setFlow("signUp")}
         >
-          <FiUserPlus /> Đăng ký
+          <FiUserPlus className="text-primary" /> Đăng ký
         </button>
       </div>
       
@@ -110,7 +110,7 @@ export function SignInForm() {
         </div>
         
         <button 
-          className="auth-button mt-4 flex items-center justify-center gap-2" 
+          className="auth-button mt-4 flex items-center justify-center gap-2 relative" 
           type="submit" 
           disabled={submitting}
         >
@@ -124,11 +124,23 @@ export function SignInForm() {
             </>
           )}
           {submitting && (
-            <span className="ml-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+            <div className="form-loading-spinner ml-2"></div>
           )}
         </button>
         
-        <div className="text-center text-sm text-slate-600 mt-4 pt-4 border-t border-slate-200/50">
+        {/* Loading Overlay */}
+        {submitting && (
+          <div className="form-loading-overlay">
+            <div className="text-center">
+              <div className="form-loading-spinner mx-auto mb-4"></div>
+              <p className="text-slate-800 font-semibold">
+                {flow === "signIn" ? "Đang đăng nhập..." : "Đang tạo tài khoản..."}
+              </p>
+            </div>
+          </div>
+        )}
+        
+        <div className="text-center text-sm text-slate-700 mt-4 pt-4 border-t border-white/40">
           <span>
             {flow === "signIn" ? "Chưa có tài khoản? " : "Đã có tài khoản? "}
           </span>

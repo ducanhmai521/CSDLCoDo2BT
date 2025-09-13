@@ -175,30 +175,32 @@ export default function AdminDashboard() {
   return (
     <div className="w-full">
       <div className="md:flex gap-6">
-        <div className="md:hidden -mx-4 mb-3 sticky top-16 z-10 bg-white/80 backdrop-blur border-b">
+        <div className="md:hidden -mx-4 mb-3 sticky top-16 z-10 nav-glass">
           <div className="flex overflow-x-auto gap-2 px-4 py-2">
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='overview' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='violations' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('violations')}>Vi phạm</button>
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='emulation' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('emulation')}>Điểm thi đua</button>
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='roster' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('roster')}>DS học sinh</button>
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='users' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('users')}>Xét duyệt thành viên</button>
-            <button className={`shrink-0 px-3 py-2 rounded ${activeSection==='settings' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('settings')}>Cài đặt</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}>Vi phạm</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}>Điểm thi đua</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}>DS học sinh</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}>Xét duyệt thành viên</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}>Cài đặt</button>
           </div>
         </div>
         <aside className="hidden md:block w-60 shrink-0">
-          <nav className="sticky top-20 space-y-2">
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='overview' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='violations' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('violations')}>Quản lý Vi phạm</button>
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='emulation' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('emulation')}>Điểm thi đua</button>
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='roster' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('roster')}>Danh sách học sinh</button>
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='users' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('users')}>Xét duyệt thành viên</button>
-            <button className={`w-full text-left px-3 py-2 rounded ${activeSection==='settings' ? 'bg-slate-200 font-semibold' : 'hover:bg-slate-100'}`} onClick={() => setActiveSection('settings')}>Cài đặt</button>
+          <nav className="sticky top-20 space-y-2 glass-card-subtle p-4">
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}>📊 Tổng hợp</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}>⚠️ Quản lý Vi phạm</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}>🏆 Điểm thi đua</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}>👥 Danh sách học sinh</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}>✅ Xét duyệt thành viên</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}>⚙️ Cài đặt</button>
           </nav>
         </aside>
         <div className="flex-1 space-y-8">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-600">
-          <div>Giờ hệ thống (GMT+7): <span className="font-semibold">{format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy HH:mm:ss')}</span></div>
-        </div>
+          <div className="glass-card-subtle p-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-700">
+              <div>🕐 Giờ hệ thống (GMT+7): <span className="font-semibold text-slate-800">{format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy HH:mm:ss')}</span></div>
+            </div>
+          </div>
       {activeSection === 'emulation' && (
         <EmulationScoreTable />
       )}
@@ -235,37 +237,39 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'overview' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2">Thông tin tổng hợp theo ngày</h2>
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <label className="text-sm">Chọn ngày:</label>
-          <input
-            type="text"
-            placeholder="dd/mm/yyyy"
-            value={overviewDate}
-            onChange={(e) => setOverviewDate(e.target.value)}
-            className="auth-input-field min-w-[160px]"
-          />
-          <span className="text-sm text-slate-600">Khoảng: {format(toZonedTime(new Date(_overviewStart), TIME_ZONE), 'dd/MM/yyyy')} - {format(toZonedTime(new Date(_overviewEnd), TIME_ZONE), 'dd/MM/yyyy')}</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-white/80 border rounded-lg">
-            <div className="text-sm text-slate-500">Tổng vi phạm</div>
-            <div className="text-3xl font-bold">{overviewViolations ? overviewViolations.length : '...'}</div>
+        <div className="glass-card">
+          <h2 className="text-2xl font-bold mb-6 text-slate-800">📊 Thông tin tổng hợp theo ngày</h2>
+          <div className="flex flex-wrap items-center gap-3 mb-6">
+            <label className="text-sm text-slate-700">Chọn ngày:</label>
+            <input
+              type="text"
+              placeholder="dd/mm/yyyy"
+              value={overviewDate}
+              onChange={(e) => setOverviewDate(e.target.value)}
+              className="auth-input-field min-w-[160px]"
+            />
+            <span className="text-sm text-slate-600">Khoảng: {format(toZonedTime(new Date(_overviewStart), TIME_ZONE), 'dd/MM/yyyy')} - {format(toZonedTime(new Date(_overviewEnd), TIME_ZONE), 'dd/MM/yyyy')}</span>
           </div>
-          <div className="p-4 bg-white/80 border rounded-lg">
-            <div className="text-sm text-slate-500">Tuần hiện tại</div>
-            <div className="text-3xl font-bold">{weekNumber}</div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="glass-card-subtle p-6 text-center">
+              <div className="text-sm text-slate-600 mb-2">Tổng vi phạm</div>
+              <div className="text-4xl font-bold text-slate-900">{overviewViolations ? overviewViolations.length : '...'}</div>
+            </div>
+            <div className="glass-card-subtle p-6 text-center">
+              <div className="text-sm text-slate-600 mb-2">Tuần hiện tại</div>
+              <div className="text-4xl font-bold text-slate-900">{weekNumber}</div>
+            </div>
           </div>
         </div>
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white/80 border rounded-lg p-4">
-            <h3 className="font-semibold mb-2">Theo lớp</h3>
+          <div className="glass-card-subtle p-6">
+            <h3 className="font-semibold mb-4 text-slate-800">🏫 Theo lớp</h3>
             {overviewViolations === undefined ? (
-              <p className="text-sm text-slate-500">Đang tải...</p>
+              <p className="text-sm text-slate-600">Đang tải...</p>
             ) : overviewViolations.length === 0 ? (
-              <p className="text-sm text-slate-500">Không có vi phạm.</p>
+              <p className="text-sm text-slate-600">Không có vi phạm.</p>
             ) : (
-              <ul className="text-sm space-y-1 max-h-72 overflow-auto">
+              <ul className="text-sm space-y-2 max-h-72 overflow-auto">
                 {Object.entries((() => {
                   const m: Record<string, number> = {};
                   for (const v of overviewViolations as any) {
@@ -273,19 +277,22 @@ export default function AdminDashboard() {
                   }
                   return Object.fromEntries(Object.entries(m).sort((a,b) => b[1]-a[1]));
                 })()).map(([cls, count]) => (
-                  <li key={cls} className="flex justify-between"><span>{cls}</span><span className="font-semibold">{count}</span></li>
+                  <li key={cls} className="flex justify-between items-center p-2 rounded-lg bg-white/10">
+                    <span className="text-slate-700">{cls}</span>
+                    <span className="font-semibold text-slate-800 bg-white/20 px-2 py-1 rounded-full text-xs">{count}</span>
+                  </li>
                 ))}
               </ul>
             )}
           </div>
-          <div className="bg-white/80 border rounded-lg p-4">
-            <h3 className="font-semibold mb-2">Theo học sinh</h3>
+          <div className="glass-card-subtle p-6">
+            <h3 className="font-semibold mb-4 text-slate-800">👨‍🎓 Theo học sinh</h3>
             {overviewViolations === undefined ? (
-              <p className="text-sm text-slate-500">Đang tải...</p>
+              <p className="text-sm text-slate-600">Đang tải...</p>
             ) : overviewViolations.length === 0 ? (
-              <p className="text-sm text-slate-500">Không có vi phạm.</p>
+              <p className="text-sm text-slate-600">Không có vi phạm.</p>
             ) : (
-              <ul className="text-sm space-y-1 max-h-72 overflow-auto">
+              <ul className="text-sm space-y-2 max-h-72 overflow-auto">
                 {Object.entries((() => {
                   const m: Record<string, number> = {};
                   for (const v of overviewViolations as any) {
@@ -295,19 +302,22 @@ export default function AdminDashboard() {
                   }
                   return Object.fromEntries(Object.entries(m).sort((a,b) => b[1]-a[1]).slice(0, 20));
                 })()).map(([name, count]) => (
-                  <li key={name} className="flex justify-between"><span>{name}</span><span className="font-semibold">{count}</span></li>
+                  <li key={name} className="flex justify-between items-center p-2 rounded-lg bg-white/10">
+                    <span className="text-slate-700">{name}</span>
+                    <span className="font-semibold text-slate-800 bg-white/20 px-2 py-1 rounded-full text-xs">{count}</span>
+                  </li>
                 ))}
               </ul>
             )}
           </div>
-          <div className="bg-white/80 border rounded-lg p-4">
-            <h3 className="font-semibold mb-2">Theo người báo cáo</h3>
+          <div className="glass-card-subtle p-6">
+            <h3 className="font-semibold mb-4 text-slate-800">👮 Theo người báo cáo</h3>
             {overviewViolations === undefined ? (
-              <p className="text-sm text-slate-500">Đang tải...</p>
+              <p className="text-sm text-slate-600">Đang tải...</p>
             ) : overviewViolations.length === 0 ? (
-              <p className="text-sm text-slate-500">Không có vi phạm.</p>
+              <p className="text-sm text-slate-600">Không có vi phạm.</p>
             ) : (
-              <ul className="text-sm space-y-1 max-h-72 overflow-auto">
+              <ul className="text-sm space-y-2 max-h-72 overflow-auto">
                 {Object.entries((() => {
                   const m: Record<string, number> = {};
                   for (const v of overviewViolations as any) {
@@ -316,38 +326,41 @@ export default function AdminDashboard() {
                   }
                   return Object.fromEntries(Object.entries(m).sort((a,b) => b[1]-a[1]).slice(0, 20));
                 })()).map(([name, count]) => (
-                  <li key={name} className="flex justify-between"><span>{name}</span><span className="font-semibold">{count}</span></li>
+                  <li key={name} className="flex justify-between items-center p-2 rounded-lg bg-white/10">
+                    <span className="text-slate-700">{name}</span>
+                    <span className="font-semibold text-slate-800 bg-white/20 px-2 py-1 rounded-full text-xs">{count}</span>
+                  </li>
                 ))}
               </ul>
             )}
           </div>
         </div>
-        <div className="mt-6 bg-white/80 border rounded-lg p-4">
-          <h3 className="font-semibold mb-2">Chi tiết vi phạm</h3>
+        <div className="mt-6 glass-card-subtle p-6">
+          <h3 className="font-semibold mb-4 text-slate-800">📋 Chi tiết vi phạm</h3>
           {overviewViolations === undefined ? (
-            <p className="text-sm text-slate-500">Đang tải...</p>
+            <p className="text-sm text-slate-600">Đang tải...</p>
           ) : overviewViolations.length === 0 ? (
-            <p className="text-sm text-slate-500">Không có thông tin vi phạm.</p>
+            <p className="text-sm text-slate-600">Không có thông tin vi phạm.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-sm table-glass">
                 <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2 pr-4">Thời gian</th>
-                    <th className="py-2 pr-4">Lớp</th>
-                    <th className="py-2 pr-4">Đối tượng</th>
-                    <th className="py-2 pr-4">Loại</th>
-                    <th className="py-2 pr-4">Người báo cáo</th>
+                  <tr className="text-left">
+                    <th className="py-3 pr-4 text-slate-800">Thời gian</th>
+                    <th className="py-3 pr-4 text-slate-800">Lớp</th>
+                    <th className="py-3 pr-4 text-slate-800">Đối tượng</th>
+                    <th className="py-3 pr-4 text-slate-800">Loại</th>
+                    <th className="py-3 pr-4 text-slate-800">Người báo cáo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(overviewViolations as any).slice(0, 50).map((v: any) => (
-                    <tr key={v._id} className="border-b hover:bg-slate-50/60">
-                      <td className="py-2 pr-4">{format(toZonedTime(new Date(v.violationDate), TIME_ZONE), 'HH:mm')}</td>
-                      <td className="py-2 pr-4">{v.violatingClass}</td>
-                      <td className="py-2 pr-4">{v.targetType === 'student' ? (v.studentName || 'HS') : 'Lớp'}</td>
-                      <td className="py-2 pr-4">{v.violationType}</td>
-                      <td className="py-2 pr-4">{v.reporterName || 'Không rõ'}</td>
+                    <tr key={v._id} className="hover:bg-white/10 transition-colors">
+                      <td className="py-3 pr-4 text-slate-700">{format(toZonedTime(new Date(v.violationDate), TIME_ZONE), 'HH:mm')}</td>
+                      <td className="py-3 pr-4 text-slate-700">{v.violatingClass}</td>
+                      <td className="py-3 pr-4 text-slate-700">{v.targetType === 'student' ? (v.studentName || 'HS') : 'Lớp'}</td>
+                      <td className="py-3 pr-4 text-slate-700">{v.violationType}</td>
+                      <td className="py-3 pr-4 text-slate-700">{v.reporterName || 'Không rõ'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -359,9 +372,9 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'settings' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2">Cài đặt</h2>
-        <div className="bg-white/80 rounded-lg border border-slate-200/80 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          <label className="text-sm">Ngày bắt đầu học kỳ/tuần gốc:</label>
+        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Cài đặt</h2>
+        <div className="glass-card-subtle p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="text-sm text-slate-700">Ngày bắt đầu học kỳ/tuần gốc:</label>
           <input
             type="text"
             placeholder="dd/mm/yyyy"
@@ -377,15 +390,15 @@ export default function AdminDashboard() {
             className="auth-input-field min-w-[160px]"
           />
           <div className="flex items-center gap-2">
-            <span className="text-sm">Tuần học hiện tại:</span>
-            <span className="font-semibold">{weekNumber}</span>
+            <span className="text-sm text-slate-700">Tuần học hiện tại:</span>
+            <span className="font-semibold text-slate-800">{weekNumber}</span>
           </div>
         </div>
       </div>
       )}
       {activeSection === 'roster' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2">Danh sách học sinh</h2>
+        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Danh sách học sinh</h2>
         <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:items-center">
             <button
                 onClick={async () => {
@@ -394,7 +407,7 @@ export default function AdminDashboard() {
                         if (url) window.open(url, '_blank');
                     } catch (e) { toast.error((e as Error).message); }
                 }}
-                className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                className="btn-glass-primary w-full sm:w-auto"
             >
                 Tải mẫu danh sách HS
             </button>
@@ -419,39 +432,39 @@ export default function AdminDashboard() {
                         }
                     }}
                 />
-                <span className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700 cursor-pointer">Tải lên & nhập danh sách HS</span>
+                <span className="inline-block bg-gradient-to-r from-indigo-500/80 to-blue-600/80 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-semibold hover:from-indigo-600/90 hover:to-blue-700/90 cursor-pointer transition-all duration-300 shadow-xl hover:shadow-2xl border border-white/20">Tải lên & nhập danh sách HS</span>
             </label>
         </div>
-        <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-1 border rounded p-3">
-                <p className="text-sm font-medium mb-2">Chọn lớp</p>
+        <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 glass-card-subtle mt-4">
+            <div className="md:col-span-1 glass-card-subtle p-3">
+                <p className="text-sm font-medium mb-2 text-slate-800">Chọn lớp</p>
                 <div className="max-h-64 overflow-auto space-y-1">
                     {roster === undefined ? (
-                        <p className="text-sm text-slate-500">Đang tải...</p>
+                        <p className="text-sm text-slate-600">Đang tải...</p>
                     ) : roster.length === 0 ? (
-                        <p className="text-sm text-slate-500">Chưa có dữ liệu.</p>
+                        <p className="text-sm text-slate-600">Chưa có dữ liệu.</p>
                     ) : (
                         roster.map((c: any) => (
                             <button
                                 key={c.className}
                                 onClick={() => setSelectedRosterClass(c.className)}
-                                className={`w-full text-left px-2 py-1 rounded ${selectedRosterClass === c.className ? 'bg-slate-200' : 'hover:bg-slate-100'}`}
+                                className={`w-full text-left px-2 py-1 rounded-lg transition-all ${selectedRosterClass === c.className ? 'bg-white/30 text-slate-800' : 'hover:bg-white/10 text-slate-700 hover:text-slate-800'}`}
                             >
-                                {c.className} <span className="text-xs text-slate-500">({c.students.length})</span>
+                                {c.className} <span className="text-xs text-slate-600">({c.students.length})</span>
                             </button>
                         ))
                     )}
                 </div>
             </div>
             <div className="md:col-span-3">
-                <p className="text-sm font-medium mb-2">Học sinh</p>
-                <div className="max-h-96 overflow-auto border rounded p-3 bg-slate-50/50">
+                <p className="text-sm font-medium mb-2 text-slate-800">Học sinh</p>
+                <div className="max-h-96 overflow-auto glass-card-subtle p-3">
                     {selectedRosterClass && roster && (
                         (() => {
                             const cls = roster.find((c: any) => c.className === selectedRosterClass);
-                            if (!cls) return <p className="text-sm text-slate-500">Chưa chọn lớp.</p>;
+                            if (!cls) return <p className="text-sm text-slate-600">Chưa chọn lớp.</p>;
                             return (
-                                <ul className="list-disc list-inside text-sm space-y-1">
+                                <ul className="list-disc list-inside text-sm space-y-1 text-slate-700">
                                     {cls.students.map((s: string, idx: number) => (
                                         <li key={idx}>{s}</li>
                                     ))}
@@ -459,7 +472,7 @@ export default function AdminDashboard() {
                             );
                         })()
                     )}
-                    {!selectedRosterClass && <p className="text-sm text-slate-500">Chọn một lớp để xem danh sách học sinh.</p>}
+                    {!selectedRosterClass && <p className="text-sm text-slate-600">Chọn một lớp để xem danh sách học sinh.</p>}
                 </div>
             </div>
         </div>
@@ -467,10 +480,10 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'violations' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2">Quản lý Vi phạm</h2>
+        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Quản lý Vi phạm</h2>
 
-        <div className="my-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-4 p-4 bg-slate-50/80 rounded-lg">
+        <div className="my-4 glass-card-subtle p-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-4">
                 <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="auth-input-field">
                     <option value="">Tất cả các khối</option>
                     <option value="10">Khối 10</option>
@@ -516,16 +529,30 @@ export default function AdminDashboard() {
                 <button
                     onClick={handleExport}
                     disabled={isExporting}
-                    className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 disabled:bg-slate-400 transition-colors"
+                    className="btn-glass-primary w-full sm:w-auto"
                 >
-                    {isExporting ? "Đang xuất..." : "Xuất Excel"}
+                    {isExporting ? (
+                        <>
+                            <div className="form-loading-spinner mr-2"></div>
+                            Đang xuất...
+                        </>
+                    ) : (
+                        "📊 Xuất Excel"
+                    )}
                 </button>
                 <button
                     onClick={handleClearStorage}
                     disabled={isClearing}
-                    className="w-full sm:w-auto bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 disabled:bg-slate-400 transition-colors"
+                    className="w-full sm:w-auto bg-gradient-to-r from-red-500/80 to-red-600/80 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-semibold hover:from-red-600/90 hover:to-red-700/90 transition-all duration-300 border border-white/20 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isClearing ? 'Đang xóa...' : 'Xóa toàn bộ tệp lưu'}
+                    {isClearing ? (
+                        <>
+                            <div className="form-loading-spinner mr-2"></div>
+                            Đang xóa...
+                        </>
+                    ) : (
+                        '🗑️ Xóa toàn bộ tệp lưu'
+                    )}
                 </button>
             </div>
         </div>

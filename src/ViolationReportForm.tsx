@@ -134,45 +134,46 @@ export default function ViolationReportForm() {
   return (
     <div className="space-y-6">
       <AIViolationInputModal onBulkSubmitSuccess={resetForm} />
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-slate-800">Báo cáo vi phạm</h2>
-        </div>
-  
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
-          <label className="font-semibold block mb-3 text-slate-700">Đối tượng vi phạm</label>
-          <div className="flex space-x-6">
-            <label className="flex items-center cursor-pointer hover:text-primary transition-colors">
-              <input
-                type="radio"
-                name="targetType"
-                value="class"
-                checked={targetType === "class"}
-                onChange={() => setTargetType("class")}
-                disabled={isSubmitting}
-                className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
-              />
-              Lớp
-            </label>
-            <label className="flex items-center cursor-pointer hover:text-primary transition-colors">
-              <input
-                type="radio"
-                name="targetType"
-                value="student"
-                checked={targetType === "student"}
-                onChange={() => setTargetType("student")}
-                disabled={isSubmitting}
-                className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
-              />
-              Học sinh
-            </label>
+      <div className="relative">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-800">Báo cáo vi phạm</h2>
           </div>
-        </div>
+    
+          <div className="glass-card-subtle">
+            <label className="font-semibold block mb-3 text-slate-700">Đối tượng vi phạm</label>
+            <div className="flex space-x-6">
+              <label className="flex items-center cursor-pointer hover:text-slate-800 transition-colors">
+                <input
+                  type="radio"
+                  name="targetType"
+                  value="class"
+                  checked={targetType === "class"}
+                  onChange={() => setTargetType("class")}
+                  disabled={isSubmitting}
+                  className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
+                />
+                <span className="text-slate-700">Lớp</span>
+              </label>
+              <label className="flex items-center cursor-pointer hover:text-slate-800 transition-colors">
+                <input
+                  type="radio"
+                  name="targetType"
+                  value="student"
+                  checked={targetType === "student"}
+                  onChange={() => setTargetType("student")}
+                  disabled={isSubmitting}
+                  className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
+                />
+                <span className="text-slate-700">Học sinh</span>
+              </label>
+            </div>
+          </div>
   
         {targetType === "student" ? (
           <div className="relative">
             <input
-              className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
+              className="auth-input-field"
               placeholder="Tìm kiếm học sinh (ví dụ: Quốc Việt 12A1)"
               value={studentSearch}
               onChange={(e) => {
@@ -183,12 +184,12 @@ export default function ViolationReportForm() {
               required
             />
             {studentSuggestions && studentSuggestions.length > 0 && !selectedStudent && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+              <div className="absolute z-10 w-full mt-1 glass-card-subtle">
                 <ul className="py-1">
                   {(studentSuggestions as any[]).map((s, idx) => (
                     <li
                       key={idx}
-                      className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 cursor-pointer hover:bg-white/20 text-slate-700 transition-colors"
                       onClick={() => handleSelectStudent(s)}
                     >
                       {s.fullName} ({s.className})
@@ -200,7 +201,7 @@ export default function ViolationReportForm() {
           </div>
         ) : (
           <input
-            className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
+            className="auth-input-field"
             placeholder="Lớp vi phạm (ví dụ: 10A1)"
             value={violatingClass}
             onChange={(e) => setViolatingClass(e.target.value)}
@@ -209,7 +210,7 @@ export default function ViolationReportForm() {
           />
         )}
         <select
-          className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
+          className="auth-input-field"
           value={violationType}
           disabled={isSubmitting}
           onChange={(e) => setViolationType(e.target.value)}
@@ -227,17 +228,17 @@ export default function ViolationReportForm() {
   
         <div>
           <textarea
-            className="auth-input-field min-h-[120px] bg-slate-50 border-slate-200 shadow-inner"
+            className="auth-input-field min-h-[120px]"
             placeholder="Chi tiết vi phạm"
             value={details}
             onChange={(e) => setDetails(e.target.value)}
             disabled={isSubmitting}
             rows={3}
           />
-          <p className="text-xs text-slate-500 mt-1">Có thể bỏ trống với các lỗi "Đi muộn" hoặc "Vệ sinh muộn".</p>
+          <p className="text-xs text-slate-600 mt-1">Có thể bỏ trống với các lỗi "Đi muộn" hoặc "Vệ sinh muộn".</p>
         </div>
   
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="glass-card-subtle">
           <label className="font-semibold block mb-2 text-slate-700">Bằng chứng (tùy chọn, tối đa 15MB mỗi tệp)</label>
           <input
             type="file"
@@ -245,21 +246,32 @@ export default function ViolationReportForm() {
             multiple
             onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))}
             disabled={isSubmitting}
-            className="block w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
+            className="block w-full text-sm text-slate-700 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-white/20 file:text-primary hover:file:bg-white/30 transition-all"
           />
         </div>
   
-        <button type="submit" className="auth-button" disabled={isSubmitting}>
+        <button type="submit" className="auth-button relative" disabled={isSubmitting}>
           {isSubmitting ? (
             <>
-              <LoadingSpinner className="mr-2 h-4 w-4" />
+              <div className="form-loading-spinner mr-2"></div>
               Đang gửi...
             </>
           ) : (
             'Gửi Báo cáo'
           )}
         </button>
-      </form>
+        
+        {/* Loading Overlay */}
+        {isSubmitting && (
+          <div className="form-loading-overlay">
+            <div className="text-center">
+              <div className="form-loading-spinner mx-auto mb-4"></div>
+              <p className="text-slate-800 font-semibold">Đang xử lý báo cáo...</p>
+            </div>
+          </div>
+        )}
+        </form>
+      </div>
     </div>
   );
 }

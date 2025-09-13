@@ -13,12 +13,13 @@ export function SignOutButton() {
 
   return (
     <button
-      className="px-4 py-2 rounded-xl bg-red-100 text-red-700 border border-red-200 font-medium 
-hover:bg-red-200 hover:text-red-800 transition-all shadow-sm hover:shadow-md 
+      className="px-4 py-2 rounded-xl bg-white/20 backdrop-blur-sm text-slate-800 border border-white/30 font-medium 
+hover:bg-white/30 hover:shadow-lg transition-all duration-300 shadow-lg
 flex items-center gap-2"
       onClick={() => void signOut()}
     >
       <FiLogOut className="text-primary" />
+      <span className="hidden sm:inline">Đăng xuất</span>
     </button>
   );
 }
