@@ -464,6 +464,7 @@ export const bulkReportViolations = mutation({
             violatingClass: v.string(),
             violationType: v.string(),
             details: v.optional(v.string()),
+            evidenceFileIds: v.optional(v.array(v.id("_storage"))),
         })),
         customDate: v.optional(v.number()),
     },
@@ -516,7 +517,7 @@ export const bulkReportViolations = mutation({
                 violationDate: reportDate,
                 violationType: violation.violationType,
                 details: violation.details || "",
-                evidenceFileIds: [], // AI-parsed violations don't have evidence files
+                evidenceFileIds: violation.evidenceFileIds,
             });
             results.successCount++;
         }

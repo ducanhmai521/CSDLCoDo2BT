@@ -2,6 +2,7 @@ import { useState, useMemo, JSXElementConstructor, Key, ReactElement, ReactNode,
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
+import { Id } from "../convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ interface ParsedViolation {
   details: string | null;
   targetType: "student" | "class";
   originalText: string;
+  evidenceFiles?: File[];
 }
 
 export function AIViolationInputModal({
@@ -49,6 +51,7 @@ export function AIViolationInputModal({
 
   const parseWithAI = useAction(api.ai.parseViolationsWithAI);
   const bulkReportViolations = useMutation(api.violations.bulkReportViolations);
+  const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const allStudents = useQuery(api.users.getAllStudents);
   const myProfile = useQuery(api.users.getMyProfile);
 
@@ -184,6 +187,24 @@ export function AIViolationInputModal({
     setParsedViolations(updatedViolations);
   };
 
+  const handleFileChange = (index: number, files: FileList | null) => {
+    if (!files) return;
+    const updatedViolations = [...parsedViolations];
+    const newFiles = Array.from(files);
+    if (updatedViolations[index].evidenceFiles) {
+      updatedViolations[index].evidenceFiles?.push(...newFiles);
+    } else {
+      updatedViolations[index].evidenceFiles = newFiles;
+    }
+    setParsedViolations(updatedViolations);
+  };
+
+  const handleRemoveFile = (violationIndex: number, fileIndex: number) => {
+    const updatedViolations = [...parsedViolations];
+    updatedViolations[violationIndex].evidenceFiles?.splice(fileIndex, 1);
+    setParsedViolations(updatedViolations);
+  };
+
   const handleCopyReport = async (andSubmit = false) => {
     const formattedDate = customDate
       ? new Date(customDate).toLocaleDateString("vi-VN")
@@ -298,21 +319,134 @@ export function AIViolationInputModal({
     setCurrentView("input");
   };
 
-  const handleSubmit = async (fromCopy = false) => {
+const handleSubmit = async (fromCopy = false) => {
     if (!fromCopy) {
-       setIsSubmitting(true);
+      setIsSubmitting(true);
     }
     try {
-      const violationsToSubmit = parsedViolations.map((v) => ({
-        studentName: v.studentName || undefined,
-        violatingClass: v.violatingClass,
-        violationType: v.violationType,
-        details: v.details || undefined,
-        targetType: v.targetType,
-      }));
+      const attendanceViolationTypes = [
+        "Nghỉ học có phép",
+        "Đi học muộn có phép",
+        "Đi học muộn không phép",
+        "Nghỉ học không phép",
+      ];
+
+      const seenStudents = new Set<string>();
+      const violationsToSubmit: ParsedViolation[] = [];
+      const conflictingViolations: ParsedViolation[] = [];
+
+      const allViolations = [...parsedViolations];
+
+      const getSeverity = (violation: ParsedViolation) => {
+        const type = violation.violationType;
+        if (type === "Nghỉ học không phép") return 4;
+        if (type === "Đi học muộn không phép") return 3;
+        if (type === "Nghỉ học có phép") return 2;
+        if (type === "Đi học muộn có phép") return 1;
+        return 0;
+      };
+
+      allViolations.sort((a, b) => getSeverity(b) - getSeverity(a));
+
+      for (const violation of allViolations) {
+        if (
+          violation.studentName &&
+          attendanceViolationTypes.includes(violation.violationType)
+        ) {
+          if (seenStudents.has(violation.studentName)) {
+            conflictingViolations.push(violation);
+          } else {
+            violationsToSubmit.push(violation);
+            seenStudents.add(violation.studentName);
+          }
+        } else {
+          violationsToSubmit.push(violation);
+        }
+      }
+
+      if (conflictingViolations.length > 0) {
+        const duplicateList = conflictingViolations
+          .map((v) => `${v.studentName}: ${v.violationType}`)
+          .join("\n");
+        toast.warning(
+          `${conflictingViolations.length} báo cáo đi muộn/nghỉ bị trùng lặp đã được tự động loại bỏ.`,
+          {
+            description: (
+              <pre className="whitespace-pre-wrap text-xs">
+                {duplicateList}
+              </pre>
+            ),
+            duration: 10000,
+          }
+        );
+      }
+
+      if (violationsToSubmit.length === 0) {
+        if (parsedViolations.length > 0) {
+           toast.info(
+            "Không có báo cáo nào được gửi vì tất cả đều bị trùng lặp."
+          );
+        } else {
+          toast.info("Không có báo cáo nào để gửi.");
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
+      const hasViolationWithoutEvidence = violationsToSubmit.some(
+        (v) => !v.evidenceFiles || v.evidenceFiles.length === 0
+      );
+
+      if (hasViolationWithoutEvidence) {
+        const confirmed = window.confirm(
+          "Một hoặc nhiều báo cáo không có bằng chứng. Bạn sẽ phải tự chịu trách nhiệm nếu có tranh cãi. Tiếp tục?"
+        );
+        if (!confirmed) {
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      const violationsWithFileIds = await Promise.all(
+        violationsToSubmit.map(async (v) => {
+          let evidenceFileIds: Id<"_storage">[] = []; // Khai báo với kiểu đúng
+          if (v.evidenceFiles && v.evidenceFiles.length > 0) {
+            const uploadPromises = v.evidenceFiles.map(async (file) => {
+              try {
+                const postUrl = await generateUploadUrl();
+                const result = await fetch(postUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": file.type },
+                  body: file,
+                });
+                const { storageId } = await result.json();
+                return storageId;
+              } catch (error) {
+                toast.error(`Lỗi khi tải lên file: ${file.name}`);
+                console.error(error);
+                return null;
+              }
+            });
+            const successfulIds = (await Promise.all(uploadPromises)).filter(
+              (id): id is string => id !== null
+            );
+            // *** SỬA LỖI NẰM Ở ĐÂY ***
+            // Ép kiểu mảng string thành mảng Id<"_storage">
+            evidenceFileIds = successfulIds as Id<"_storage">[];
+          }
+          return {
+            studentName: v.studentName || undefined,
+            violatingClass: v.violatingClass,
+            violationType: v.violationType,
+            details: v.details || undefined,
+            targetType: v.targetType,
+            evidenceFileIds, // Bây giờ biến này đã có kiểu đúng
+          };
+        })
+      );
 
       const result = await bulkReportViolations({
-        violations: violationsToSubmit,
+        violations: violationsWithFileIds,
         customDate: customDate ?? undefined,
       });
 
@@ -335,20 +469,6 @@ export function AIViolationInputModal({
         );
       }
 
-      if (
-        result.successCount === 0 &&
-        result.duplicateCount === 0 &&
-        parsedViolations.length > 0
-      ) {
-        toast.info(
-          "Không có báo cáo nào được gửi vì tất cả đều bị trùng lặp."
-        );
-      } else if (parsedViolations.length === 0) {
-        toast.info("Không có báo cáo nào để gửi.");
-        setIsSubmitting(false);
-        return;
-      }
-
       setRawText("");
       setParsedViolations([]);
       setCustomDate(null);
@@ -359,7 +479,7 @@ export function AIViolationInputModal({
       toast.error("Lỗi khi gửi hàng loạt: " + (error as Error).message);
       console.error(error);
     } finally {
-       if (!fromCopy) {
+      if (!fromCopy) {
         setIsSubmitting(false);
       }
     }
@@ -518,6 +638,33 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                           className="w-full p-1 border rounded mt-1"
                         />
                       </div>
+                      <div className="md:col-span-2">
+                        <label className="text-sm font-medium">Bằng chứng (ảnh)</label>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(i, e.target.files)}
+                          className="w-full p-1 border rounded mt-1"
+                        />
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {v.evidenceFiles?.map((file, fileIndex) => (
+                            <div key={fileIndex} className="relative">
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`preview ${fileIndex}`}
+                                className="h-20 w-20 object-cover rounded"
+                              />
+                              <button
+                                onClick={() => handleRemoveFile(i, fileIndex)}
+                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
+                              >
+                                X
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                     <p className="text-sm text-gray-500 mt-2">
                       Dữ liệu gốc: {v.originalText}
@@ -534,16 +681,6 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
             <DialogFooter className="gap-2 md:gap-4">
               <Button variant="outline" onClick={handleBackToInput} className="py-6 px-4 text-base">
                 Quay lại
-              </Button>
-              <Button
-                onClick={() => handleCopyReport()}
-                variant="secondary"
-                className="py-6 px-4 text-base"
-                disabled={
-                  isParsing || isSubmitting || parsedViolations.length === 0
-                }
-              >
-                Copy mẫu báo cáo
               </Button>
                <Button
                 onClick={handleSubmitAndCopy}

@@ -41,6 +41,15 @@ export default function ViolationReportForm() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    if (selectedFiles.length === 0) {
+      const confirmed = window.confirm(
+        "Báo cáo không có bằng chứng. Bạn sẽ phải tự chịu trách nhiệm nếu có tranh cãi. Tiếp tục?"
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
     
     const evidenceFileIds: Id<"_storage">[] = [];
     if (selectedFiles.length > 0) {

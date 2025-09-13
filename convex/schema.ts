@@ -14,6 +14,7 @@ const applicationTables = {
       v.literal("pending")
     ),
     isSuperUser: v.optional(v.boolean()),
+    webVer: v.optional(v.number()),
   }).index("by_userId", ["userId"]),
 
   violations: defineTable({
@@ -62,7 +63,7 @@ const applicationTables = {
 
   settings: defineTable({
     key: v.string(),
-    value: v.string(),
+    value: v.any(),
   }).index("by_key", ["key"]),
 
   classes: defineTable({

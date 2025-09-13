@@ -7,6 +7,7 @@ import ProfileCreationForm from "./ProfileCreationForm";
 import { Doc } from "../convex/_generated/dataModel";
 import AdminDashboard from "./AdminDashboard";
 import GradeManagerDashboard from "./GradeManagerDashboard";
+import { ForceRefresh } from "./ForceRefresh";
 import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw } from "react-icons/fi";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PublicEmulationScoreTable from "./public/PublicEmulationScoreTable";
@@ -78,6 +79,7 @@ function App() {
             </div>
         </div>
       </footer>
+      <ForceRefresh />
     </div>
   );
     }

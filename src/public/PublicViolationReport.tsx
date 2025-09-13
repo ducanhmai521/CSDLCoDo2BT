@@ -99,16 +99,28 @@ const PublicViolationReport = () => {
                   <th className="border border-black p-2">Chi tiết vi phạm</th>
                   <th className="border border-black p-2">Điểm trừ</th>
                   <th className="border border-black p-2">Người báo cáo</th>
+                  <th className="border border-black p-2">Bằng chứng</th>
                 </tr>
               </thead>
               <tbody>
-                {dayViolations.map((v: { _id: Key | null | undefined; violatingClass: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; studentName: any; details: any; violationType: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; points: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; reporterName: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }, index: number) => (
+                {dayViolations.map((v: any, index: number) => (
                   <tr key={v._id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                     <td className="border border-black p-2 text-center">{v.violatingClass}</td>
                     <td className="border border-black p-2">{v.studentName || "-"}</td>
                     <td className="border border-black p-2">{v.details ? `${v.violationType}: ${v.details}`: v.violationType}</td>
                     <td className="border border-black p-2 text-center font-bold text-red-800 bg-red-100">{v.points}</td>
                     <td className="border border-black p-2">{v.reporterName}</td>
+                    <td className="border border-black p-2">
+                      {v.evidenceUrls && v.evidenceUrls.length > 0 ? (
+                        v.evidenceUrls.map((url: string | null, i: number) => (
+                          url && <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            Link {i + 1}
+                          </a>
+                        )).reduce((prev: any, curr: any) => [prev, ', ', curr])
+                      ) : (
+                        "-"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
