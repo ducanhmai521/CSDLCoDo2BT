@@ -53,6 +53,7 @@ export function AIViolationInputModal({
   const parseWithAI = useAction(api.ai.parseViolationsWithAI);
   const bulkReportViolations = useMutation(api.violations.bulkReportViolations);
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
+  const generateR2UploadUrl = useMutation(api.r2.generateR2UploadUrl);
   const allStudents = useQuery(api.users.getAllStudents);
   const myProfile = useQuery(api.users.getMyProfile);
 
@@ -349,35 +350,44 @@ export function AIViolationInputModal({
 
       const violationsWithFileIds = await Promise.all(
         violationsToSubmit.map(async (v) => {
-          let evidenceFileIds: Id<"_storage">[] = [];
+          let evidenceR2Keys: string[] = [];
           if (v.evidenceFiles && v.evidenceFiles.length > 0) {
             const compressionOptions = {
               maxSizeMB: 1,
-              maxWidthOrHeight: 1920,
+              maxWidthOrHeight: 1280,
               useWebWorker: true,
+              initialQuality: 0.8,
             };
 
             const uploadPromises = v.evidenceFiles.map(async (file) => {
               try {
                 const compressedFile = await imageCompression(file, compressionOptions);
-                const postUrl = await generateUploadUrl();
-                const result = await fetch(postUrl, {
-                  method: "POST",
+                const { uploadUrl, key } = await generateR2UploadUrl({
+                  fileName: compressedFile.name,
+                  contentType: compressedFile.type,
+                });
+                
+                const result = await fetch(uploadUrl, {
+                  method: "PUT",
                   headers: { "Content-Type": compressedFile.type },
                   body: compressedFile,
                 });
-                const { storageId } = await result.json();
-                return storageId;
+                
+                if (result.ok) {
+                  return key;
+                } else {
+                  throw new Error(`Upload failed with status: ${result.status}`);
+                }
               } catch (error) {
                 toast.error(`Lỗi khi xử lý tệp ${file.name}: ${(error as Error).message}`);
                 console.error(error);
                 return null;
               }
             });
-            const successfulIds = (await Promise.all(uploadPromises)).filter(
-              (id): id is string => id !== null
+            const successfulKeys = (await Promise.all(uploadPromises)).filter(
+              (key): key is string => key !== null
             );
-            evidenceFileIds = successfulIds as Id<"_storage">[];
+            evidenceR2Keys = successfulKeys;
           }
           return {
             studentName: v.studentName || undefined,
@@ -385,7 +395,7 @@ export function AIViolationInputModal({
             violationType: v.violationType,
             details: v.details || undefined,
             targetType: v.targetType,
-            evidenceFileIds,
+            evidenceR2Keys,
           };
         })
       );

@@ -25,7 +25,8 @@ const applicationTables = {
     violationDate: v.number(),
     violationType: v.string(),
     details: v.optional(v.string()),
-    evidenceFileIds: v.optional(v.array(v.id("_storage"))),
+    evidenceFileIds: v.optional(v.array(v.id("_storage"))), // Keep for backward compatibility
+    evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
     status: v.union(
       v.literal("reported"),
       v.literal("appealed"),

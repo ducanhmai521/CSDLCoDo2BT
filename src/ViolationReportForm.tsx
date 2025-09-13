@@ -24,6 +24,7 @@ export default function ViolationReportForm() {
   const studentSuggestions = useQuery(api.users.searchStudents, studentSearch ? { q: studentSearch } : "skip");
 
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
+  const generateR2UploadUrl = useMutation(api.r2.generateR2UploadUrl);
   const reportViolation = useMutation(api.violations.reportViolation);
 
   const resetForm = () => {
@@ -55,35 +56,44 @@ export default function ViolationReportForm() {
       }
     }
     
-    const evidenceFileIds: Id<"_storage">[] = [];
+    const evidenceR2Keys: string[] = [];
     if (selectedFiles.length > 0) {
         const compressionOptions = {
           maxSizeMB: 1,
-          maxWidthOrHeight: 1920,
+          maxWidthOrHeight: 1280,
           useWebWorker: true,
+          initialQuality: 0.8,
         };
 
         const uploadPromises = selectedFiles.map(async (file) => {
             try {
                 const compressedFile = await imageCompression(file, compressionOptions);
-                const postUrl = await generateUploadUrl();
-                const result = await fetch(postUrl, {
-                    method: "POST",
+                const { uploadUrl, key } = await generateR2UploadUrl({
+                    fileName: compressedFile.name,
+                    contentType: compressedFile.type,
+                });
+                
+                const result = await fetch(uploadUrl, {
+                    method: "PUT",
                     headers: { "Content-Type": compressedFile.type },
                     body: compressedFile,
                 });
-                const { storageId } = await result.json();
-                return storageId;
+                
+                if (result.ok) {
+                    return key;
+                } else {
+                    throw new Error(`Upload failed with status: ${result.status}`);
+                }
             } catch (error) {
                 toast.error(`Lỗi khi xử lý tệp ${file.name}: ${(error as Error).message}`);
                 return null;
             }
         });
         
-        const uploadedIds = (await Promise.all(uploadPromises)).filter(id => id !== null) as Id<"_storage">[];
-        evidenceFileIds.push(...uploadedIds);
+        const uploadedKeys = (await Promise.all(uploadPromises)).filter((key): key is string => key !== null);
+        evidenceR2Keys.push(...uploadedKeys);
 
-        if (uploadedIds.length !== selectedFiles.length) {
+        if (uploadedKeys.length !== selectedFiles.length) {
             toast.error("Một vài tệp đã không thể tải lên được. Vui lòng thử lại.");
             return;
         }
@@ -110,7 +120,7 @@ export default function ViolationReportForm() {
         violationDate: Date.now(),
         violationType,
         details: details || "",
-        evidenceFileIds,
+        evidenceR2Keys,
       });
       toast.success("Báo cáo vi phạm thành công!");
       resetForm();

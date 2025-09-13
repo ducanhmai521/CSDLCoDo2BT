@@ -81,7 +81,8 @@ export const reportViolation = mutation({
     violationDate: v.number(),
     violationType: v.string(),
     details: v.string(),
-    evidenceFileIds: v.optional(v.array(v.id("_storage"))),
+    evidenceFileIds: v.optional(v.array(v.id("_storage"))), // Keep for backward compatibility
+    evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -119,11 +120,15 @@ export const reportViolation = mutation({
       ...args,
       violatingClass: upperNoSpace,
     });
+    
+    // Handle legacy Convex storage files
     if (args.evidenceFileIds && args.evidenceFileIds.length > 0) {
       for (const fileId of args.evidenceFileIds) {
         await ctx.db.insert('storedFiles', { storageId: fileId, kind: 'evidence', timestamp: Date.now() });
       }
     }
+    
+    // R2 keys are stored directly in the violation record, no need for separate tracking
   },
 });
 
@@ -135,7 +140,28 @@ export type ViolationWithDetails = Doc<"violations"> & {
 
 async function resolveViolationDetails(ctx: QueryCtx, v: Doc<"violations">): Promise<ViolationWithDetails> {
     const reporterProfile = await ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', v.reporterId)).unique();
-    const evidenceUrls = v.evidenceFileIds ? await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId))) : [];
+    
+    // Get evidence URLs from both Convex storage (legacy) and R2
+    const evidenceUrls: (string | null)[] = [];
+    
+    // Legacy Convex storage URLs
+    if (v.evidenceFileIds && v.evidenceFileIds.length > 0) {
+        const convexUrls = await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId)));
+        evidenceUrls.push(...convexUrls);
+    }
+    
+    // R2 URLs
+    if (v.evidenceR2Keys && v.evidenceR2Keys.length > 0) {
+        const r2Urls = await Promise.all(v.evidenceR2Keys.map(async (key) => {
+            try {
+                return await ctx.runQuery(api.r2.getR2PublicUrl, { key });
+            } catch (error) {
+                console.error("Error getting R2 URL for key:", key, error);
+                return null;
+            }
+        }));
+        evidenceUrls.push(...r2Urls);
+    }
 
     const violationPointsMap = new Map<string, number>();
     VIOLATION_CATEGORIES.forEach(category => {
@@ -402,7 +428,28 @@ export const getPublicViolations = query({
         });
 
         const detailedViolations = await Promise.all(violations.map(async v => {
-            const evidenceUrls = v.evidenceFileIds ? await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId))) : [];
+            // Get evidence URLs from both Convex storage (legacy) and R2
+            const evidenceUrls: (string | null)[] = [];
+            
+            // Legacy Convex storage URLs
+            if (v.evidenceFileIds && v.evidenceFileIds.length > 0) {
+                const convexUrls = await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId)));
+                evidenceUrls.push(...convexUrls);
+            }
+            
+            // R2 URLs
+            if (v.evidenceR2Keys && v.evidenceR2Keys.length > 0) {
+                const r2Urls = await Promise.all(v.evidenceR2Keys.map(async (key) => {
+                    try {
+                        return await ctx.runQuery(api.r2.getR2PublicUrl, { key });
+                    } catch (error) {
+                        console.error("Error getting R2 URL for key:", key, error);
+                        return null;
+                    }
+                }));
+                evidenceUrls.push(...r2Urls);
+            }
+            
             return {
                 ...v,
                 reporterName: reporterProfileMap.get(v.reporterId) ?? 'Không rõ',
@@ -518,7 +565,8 @@ export const bulkReportViolations = mutation({
         violationType: v.string(),
         details: v.optional(v.string()),
         targetType: v.union(v.literal("student"), v.literal("class")),
-        evidenceFileIds: v.optional(v.array(v.id("_storage"))),
+        evidenceFileIds: v.optional(v.array(v.id("_storage"))), // Keep for backward compatibility
+        evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
       })
     ),
     customDate: v.optional(v.number()),
@@ -583,7 +631,8 @@ export const bulkReportViolations = mutation({
           violatingClass: upperNoSpace,
           grade,
           targetType: v.targetType,
-          evidenceFileIds: v.evidenceFileIds,
+          evidenceFileIds: v.evidenceFileIds, // Legacy Convex storage
+          evidenceR2Keys: v.evidenceR2Keys, // New R2 storage
           status: "reported",
         });
         successCount++;
