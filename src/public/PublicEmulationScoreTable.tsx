@@ -73,12 +73,12 @@ const PublicEmulationScoreTable = () => {
             </tr>
           )}
           {emulationScores?.map((score, index) => (
-            <tr key={score.className} className={index % 2 === 0 ? "bg-white" : "bg-gray-100"}>
-              <td className="border border-black p-2 text-center align-top">{index + 1}</td>
-              <td className="border border-black p-2 text-center align-top">{score.className}</td>
-              <td className="border border-black p-2 text-center align-top">{score.totalPoints}</td>
-              <td className="border border-black p-2 text-center align-top">{120 - score.totalPoints}</td>
-              <td className="border border-black p-2 align-top text-sm">
+            <tr key={score.className}>
+              <td className={`border border-black p-2 text-center align-top ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>{index + 1}</td>
+              <td className={`border border-black p-2 text-center align-top ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>{score.className}</td>
+              <td className={`border border-black p-2 text-center align-top font-bold ${score.totalPoints > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>{score.totalPoints > 0 ? `-${score.totalPoints}`: score.totalPoints}</td>
+              <td className={`border border-black p-2 text-center align-top font-bold bg-green-100 text-green-800`}>{120 - score.totalPoints}</td>
+              <td className={`border border-black p-2 align-top text-sm ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                 {score.violations.length > 0 ? (
                   <ul className="list-disc list-inside space-y-1">
                     {score.violations.map(v => (

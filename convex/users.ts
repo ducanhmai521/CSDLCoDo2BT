@@ -231,3 +231,26 @@ import { v } from "convex/values";
         }
       }
     });
+
+    export const switchRole = mutation({
+      handler: async (ctx) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) {
+          throw new Error("Bạn phải đăng nhập để thực hiện hành động này.");
+        }
+
+        const myProfile = await ctx.db
+          .query("userProfiles")
+          .withIndex("by_userId", (q) => q.eq("userId", userId))
+          .unique();
+
+        if (!myProfile || !myProfile.isSuperUser) {
+          throw new Error("Không có quyền truy cập.");
+        }
+
+        const newRole = myProfile.role === "admin" ? "gradeManager" : "admin";
+        await ctx.db.patch(myProfile._id, { role: newRole });
+
+        return newRole;
+      },
+    });

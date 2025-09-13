@@ -88,12 +88,12 @@ const PublicViolationReport = () => {
         const dayDate = new Date(dayTimestamp);
         return (
           <div key={dayTimestamp}>
-            <h2 className="text-xl font-semibold mb-2 text-center bg-gray-100 p-2 rounded">
+            <h2 className="text-xl font-semibold mb-2 text-center bg-purple-100 text-purple-800 p-2 rounded">
               {format(dayDate, "iiii, 'ngày' dd/MM/yyyy", { locale: vi })}
             </h2>
             <table className="w-full border-collapse border border-black">
               <thead>
-                <tr className="bg-gray-200">
+                <tr className="bg-green-100 text-green-800">
                   <th className="border border-black p-2">Lớp</th>
                   <th className="border border-black p-2">Học sinh</th>
                   <th className="border border-black p-2">Chi tiết vi phạm</th>
@@ -107,7 +107,7 @@ const PublicViolationReport = () => {
                     <td className="border border-black p-2 text-center">{v.violatingClass}</td>
                     <td className="border border-black p-2">{v.studentName || "-"}</td>
                     <td className="border border-black p-2">{v.details ? `${v.violationType}: ${v.details}`: v.violationType}</td>
-                    <td className="border border-black p-2 text-center">{v.points}</td>
+                    <td className="border border-black p-2 text-center font-bold text-red-800 bg-red-100">{v.points}</td>
                     <td className="border border-black p-2">{v.reporterName}</td>
                   </tr>
                 ))}

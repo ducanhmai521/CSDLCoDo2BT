@@ -1,4 +1,4 @@
-import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import { Authenticated, Unauthenticated, useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { SignInForm } from "./SignInForm";
 import { SignOutButton } from "./SignOutButton";
@@ -7,10 +7,7 @@ import ProfileCreationForm from "./ProfileCreationForm";
 import { Doc } from "../convex/_generated/dataModel";
 import AdminDashboard from "./AdminDashboard";
 import GradeManagerDashboard from "./GradeManagerDashboard";
-import { startOfDay, endOfDay, format } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
-import { useState } from "react";
-import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiLogOut } from "react-icons/fi";
+import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw } from "react-icons/fi";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PublicEmulationScoreTable from "./public/PublicEmulationScoreTable";
 import PublicViolationReport from "./public/PublicViolationReport";
@@ -28,6 +25,17 @@ export default function AppWrapper() {
 }
 
 function App() {
+  const myProfile = useQuery(api.users.getMyProfile);
+  const switchRole = useMutation(api.users.switchRole);
+
+  const handleSwitchRole = async () => {
+    try {
+      await switchRole();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-500/40 via-purple-400/30 to-blue-500/40 animated-gradient-bg bg-size-200 animate-gradient-slow">
       <header className="sticky top-0 z-10 bg-white/50 backdrop-blur-xl h-16 flex justify-between items-center border-b border-white/40 shadow-md px-4 md:px-8">
@@ -41,7 +49,18 @@ function App() {
           </div>
         </div>
         <Authenticated>
-          <SignOutButton />
+          <div className="flex items-center gap-4">
+            {myProfile?.isSuperUser && (
+              <button
+                onClick={handleSwitchRole}
+                className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
+                title="Switch Role"
+              >
+                <FiRefreshCw />
+              </button>
+            )}
+            <SignOutButton />
+          </div>
         </Authenticated>
       </header>
       

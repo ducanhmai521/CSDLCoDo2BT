@@ -13,6 +13,7 @@ const applicationTables = {
       v.literal("gradeManager"),
       v.literal("pending")
     ),
+    isSuperUser: v.optional(v.boolean()),
   }).index("by_userId", ["userId"]),
 
   violations: defineTable({

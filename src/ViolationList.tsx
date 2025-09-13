@@ -3,7 +3,7 @@ import { ViolationWithDetails } from "../convex/violations";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
-import { Id } from "../convex/_generated/dataModel";
+import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
 
 export default function ViolationList({ violations, isLoading, isAdminView = false }: { violations: ViolationWithDetails[] | undefined, isLoading: boolean, isAdminView?: boolean }) {
     const currentUser = useQuery(api.users.getLoggedInUser);
@@ -135,7 +135,15 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Loại vi phạm</label>
-                            <input className="auth-input-field w-full" value={editType} onChange={(e) => setEditType(e.target.value)} />
+                            <select className="auth-input-field w-full" value={editType} onChange={(e) => setEditType(e.target.value)}>
+                                {VIOLATION_CATEGORIES.map(category => (
+                                    <optgroup label={`${category.name} (-${category.points}đ)`} key={category.name}>
+                                        {category.violations.map(v => (
+                                            <option key={v} value={v}>{v}</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                            </select>
                         </div>
                     </div>
                     <label className="block text-sm font-medium text-slate-700 mb-1 mt-3">Chi tiết</label>
