@@ -1,4 +1,5 @@
 import { FormEvent, useState, useRef } from "react";
+import { LoadingSpinner } from "@/components/ui/spinner";
 import { normalizeClassName, isValidClassName } from "./lib/utils";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
@@ -6,6 +7,7 @@ import { toast } from "sonner";
 import { Id } from "../convex/_generated/dataModel";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
 import { AIViolationInputModal } from "./AIViolationInputModal"; // Import the new modal
+import imageCompression from 'browser-image-compression';
 
 const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(category => category.violations);
 
@@ -17,6 +19,7 @@ export default function ViolationReportForm() {
   const [violationType, setViolationType] = useState(ALL_VIOLATIONS[0]);
   const [details, setDetails] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studentSuggestions = useQuery(api.users.searchStudents, studentSearch ? { q: studentSearch } : "skip");
 
@@ -41,6 +44,7 @@ export default function ViolationReportForm() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     if (selectedFiles.length === 0) {
       const confirmed = window.confirm(
@@ -53,25 +57,36 @@ export default function ViolationReportForm() {
     
     const evidenceFileIds: Id<"_storage">[] = [];
     if (selectedFiles.length > 0) {
-        for (const file of selectedFiles) {
-            if (file.size > 15 * 1024 * 1024) {
-                toast.error(`Kích thước tệp ${file.name} không được vượt quá 15MB.`);
-                return;
-            }
-        }
+        const compressionOptions = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        };
 
         const uploadPromises = selectedFiles.map(async (file) => {
-            const postUrl = await generateUploadUrl();
-            const result = await fetch(postUrl, {
-                method: "POST",
-                headers: { "Content-Type": file.type },
-                body: file,
-            });
-            const { storageId } = await result.json();
-            return storageId;
+            try {
+                const compressedFile = await imageCompression(file, compressionOptions);
+                const postUrl = await generateUploadUrl();
+                const result = await fetch(postUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": compressedFile.type },
+                    body: compressedFile,
+                });
+                const { storageId } = await result.json();
+                return storageId;
+            } catch (error) {
+                toast.error(`Lỗi khi xử lý tệp ${file.name}: ${(error as Error).message}`);
+                return null;
+            }
         });
         
-        evidenceFileIds.push(...await Promise.all(uploadPromises));
+        const uploadedIds = (await Promise.all(uploadPromises)).filter(id => id !== null) as Id<"_storage">[];
+        evidenceFileIds.push(...uploadedIds);
+
+        if (uploadedIds.length !== selectedFiles.length) {
+            toast.error("Một vài tệp đã không thể tải lên được. Vui lòng thử lại.");
+            return;
+        }
     }
 
     try {
@@ -101,6 +116,8 @@ export default function ViolationReportForm() {
       resetForm();
     } catch (error) {
       toast.error((error as Error).message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -122,6 +139,7 @@ export default function ViolationReportForm() {
                 value="class"
                 checked={targetType === "class"}
                 onChange={() => setTargetType("class")}
+                disabled={isSubmitting}
                 className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
               />
               Lớp
@@ -133,6 +151,7 @@ export default function ViolationReportForm() {
                 value="student"
                 checked={targetType === "student"}
                 onChange={() => setTargetType("student")}
+                disabled={isSubmitting}
                 className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
               />
               Học sinh
@@ -150,6 +169,7 @@ export default function ViolationReportForm() {
                 setStudentSearch(e.target.value);
                 setSelectedStudent(null);
               }}
+              disabled={isSubmitting}
               required
             />
             {studentSuggestions && studentSuggestions.length > 0 && !selectedStudent && (
@@ -174,12 +194,14 @@ export default function ViolationReportForm() {
             placeholder="Lớp vi phạm (ví dụ: 10A1)"
             value={violatingClass}
             onChange={(e) => setViolatingClass(e.target.value)}
+            disabled={isSubmitting}
             required
           />
         )}
         <select
           className="auth-input-field bg-slate-50 border-slate-200 shadow-sm"
           value={violationType}
+          disabled={isSubmitting}
           onChange={(e) => setViolationType(e.target.value)}
         >
           {VIOLATION_CATEGORIES.map((category) => (
@@ -199,6 +221,7 @@ export default function ViolationReportForm() {
             placeholder="Chi tiết vi phạm"
             value={details}
             onChange={(e) => setDetails(e.target.value)}
+            disabled={isSubmitting}
             rows={3}
           />
           <p className="text-xs text-slate-500 mt-1">Có thể bỏ trống với các lỗi "Đi muộn" hoặc "Vệ sinh muộn".</p>
@@ -211,12 +234,20 @@ export default function ViolationReportForm() {
             ref={fileInputRef}
             multiple
             onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))}
+            disabled={isSubmitting}
             className="block w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
           />
         </div>
   
-        <button type="submit" className="auth-button">
-          Gửi Báo cáo
+        <button type="submit" className="auth-button" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <LoadingSpinner className="mr-2 h-4 w-4" />
+              Đang gửi...
+            </>
+          ) : (
+            'Gửi Báo cáo'
+          )}
         </button>
       </form>
     </div>

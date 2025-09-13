@@ -18,6 +18,7 @@ import { Input } from "./components/ui/input";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
 import { normalizeClassName } from "./lib/utils";
 import { stringSimilarity } from "string-similarity-js";
+import imageCompression from 'browser-image-compression';
 
 const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
   (category) => category.violations
@@ -319,76 +320,15 @@ export function AIViolationInputModal({
     setCurrentView("input");
   };
 
-const handleSubmit = async (fromCopy = false) => {
+  const handleSubmit = async (fromCopy = false) => {
     if (!fromCopy) {
       setIsSubmitting(true);
     }
     try {
-      const attendanceViolationTypes = [
-        "Nghỉ học có phép",
-        "Đi học muộn có phép",
-        "Đi học muộn không phép",
-        "Nghỉ học không phép",
-      ];
-
-      const seenStudents = new Set<string>();
-      const violationsToSubmit: ParsedViolation[] = [];
-      const conflictingViolations: ParsedViolation[] = [];
-
-      const allViolations = [...parsedViolations];
-
-      const getSeverity = (violation: ParsedViolation) => {
-        const type = violation.violationType;
-        if (type === "Nghỉ học không phép") return 4;
-        if (type === "Đi học muộn không phép") return 3;
-        if (type === "Nghỉ học có phép") return 2;
-        if (type === "Đi học muộn có phép") return 1;
-        return 0;
-      };
-
-      allViolations.sort((a, b) => getSeverity(b) - getSeverity(a));
-
-      for (const violation of allViolations) {
-        if (
-          violation.studentName &&
-          attendanceViolationTypes.includes(violation.violationType)
-        ) {
-          if (seenStudents.has(violation.studentName)) {
-            conflictingViolations.push(violation);
-          } else {
-            violationsToSubmit.push(violation);
-            seenStudents.add(violation.studentName);
-          }
-        } else {
-          violationsToSubmit.push(violation);
-        }
-      }
-
-      if (conflictingViolations.length > 0) {
-        const duplicateList = conflictingViolations
-          .map((v) => `${v.studentName}: ${v.violationType}`)
-          .join("\n");
-        toast.warning(
-          `${conflictingViolations.length} báo cáo đi muộn/nghỉ bị trùng lặp đã được tự động loại bỏ.`,
-          {
-            description: (
-              <pre className="whitespace-pre-wrap text-xs">
-                {duplicateList}
-              </pre>
-            ),
-            duration: 10000,
-          }
-        );
-      }
+      const violationsToSubmit = [...parsedViolations];
 
       if (violationsToSubmit.length === 0) {
-        if (parsedViolations.length > 0) {
-           toast.info(
-            "Không có báo cáo nào được gửi vì tất cả đều bị trùng lặp."
-          );
-        } else {
-          toast.info("Không có báo cáo nào để gửi.");
-        }
+        toast.info("Không có báo cáo nào để gửi.");
         setIsSubmitting(false);
         return;
       }
@@ -409,20 +349,27 @@ const handleSubmit = async (fromCopy = false) => {
 
       const violationsWithFileIds = await Promise.all(
         violationsToSubmit.map(async (v) => {
-          let evidenceFileIds: Id<"_storage">[] = []; // Khai báo với kiểu đúng
+          let evidenceFileIds: Id<"_storage">[] = [];
           if (v.evidenceFiles && v.evidenceFiles.length > 0) {
+            const compressionOptions = {
+              maxSizeMB: 1,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+            };
+
             const uploadPromises = v.evidenceFiles.map(async (file) => {
               try {
+                const compressedFile = await imageCompression(file, compressionOptions);
                 const postUrl = await generateUploadUrl();
                 const result = await fetch(postUrl, {
                   method: "POST",
-                  headers: { "Content-Type": file.type },
-                  body: file,
+                  headers: { "Content-Type": compressedFile.type },
+                  body: compressedFile,
                 });
                 const { storageId } = await result.json();
                 return storageId;
               } catch (error) {
-                toast.error(`Lỗi khi tải lên file: ${file.name}`);
+                toast.error(`Lỗi khi xử lý tệp ${file.name}: ${(error as Error).message}`);
                 console.error(error);
                 return null;
               }
@@ -430,8 +377,6 @@ const handleSubmit = async (fromCopy = false) => {
             const successfulIds = (await Promise.all(uploadPromises)).filter(
               (id): id is string => id !== null
             );
-            // *** SỬA LỖI NẰM Ở ĐÂY ***
-            // Ép kiểu mảng string thành mảng Id<"_storage">
             evidenceFileIds = successfulIds as Id<"_storage">[];
           }
           return {
@@ -440,7 +385,7 @@ const handleSubmit = async (fromCopy = false) => {
             violationType: v.violationType,
             details: v.details || undefined,
             targetType: v.targetType,
-            evidenceFileIds, // Bây giờ biến này đã có kiểu đúng
+            evidenceFileIds,
           };
         })
       );
@@ -468,6 +413,11 @@ const handleSubmit = async (fromCopy = false) => {
           }
         );
       }
+
+      if (result.successCount === 0 && result.duplicateCount > 0) {
+        toast.info("Không có báo cáo nào được gửi vì tất cả đều bị trùng lặp.");
+      }
+
 
       setRawText("");
       setParsedViolations([]);
@@ -707,5 +657,4 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
         )}
       </DialogContent>
     </Dialog>
-  );
-}
+  )}

@@ -29,7 +29,8 @@ const applicationTables = {
     status: v.union(
       v.literal("reported"),
       v.literal("appealed"),
-      v.literal("resolved")
+      v.literal("resolved"),
+      v.literal("pending")
     ),
     appealReason: v.optional(v.string()),
     grade: v.number(),
