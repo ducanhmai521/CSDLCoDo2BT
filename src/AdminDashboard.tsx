@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { startOfWeek, startOfDay, endOfDay, toDate, differenceInCalendarWeeks, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
+import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2 } from 'lucide-react';
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -187,18 +188,18 @@ export default function AdminDashboard() {
         </div>
         <aside className="hidden md:block w-60 shrink-0">
           <nav className="sticky top-20 space-y-2 glass-card-subtle p-4">
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}>📊 Tổng hợp</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}>⚠️ Quản lý Vi phạm</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}>🏆 Điểm thi đua</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}>👥 Danh sách học sinh</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}>✅ Xét duyệt thành viên</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}>⚙️ Cài đặt</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}><BarChart className="w-5 h-5 inline-block mr-1" /> Tổng hợp</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}><AlertTriangle className="w-5 h-5 inline-block mr-1" /> Quản lý Vi phạm</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}><Trophy className="w-5 h-5 inline-block mr-1" /> Điểm thi đua</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}><Users className="w-5 h-5 inline-block mr-1" /> Danh sách học sinh</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}><CheckCircle className="w-5 h-5 inline-block mr-1" /> Xét duyệt thành viên</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}><Settings className="w-5 h-5 inline-block mr-1" /> Cài đặt</button>
           </nav>
         </aside>
         <div className="flex-1 space-y-8">
           <div className="glass-card-subtle p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-700">
-              <div>🕐 Giờ hệ thống (GMT+7): <span className="font-semibold text-slate-800">{format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy HH:mm:ss')}</span></div>
+              <div><Clock className="w-5 h-5 inline-block mr-1" /> Giờ hệ thống (GMT+7): <span className="font-semibold text-slate-800">{format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy HH:mm:ss')}</span></div>
             </div>
           </div>
       {activeSection === 'emulation' && (
@@ -238,7 +239,7 @@ export default function AdminDashboard() {
       {activeSection === 'overview' && (
       <div className="w-full">
         <div className="glass-card">
-          <h2 className="text-2xl font-bold mb-6 text-slate-800">📊 Thông tin tổng hợp theo ngày</h2>
+          <h2 className="text-2xl font-bold mb-6 text-slate-800"><BarChart className="w-6 h-6 inline-block mr-2" /> Thông tin tổng hợp theo ngày</h2>
           <div className="flex flex-wrap items-center gap-3 mb-6">
             <label className="text-sm text-slate-700">Chọn ngày:</label>
             <input
@@ -263,7 +264,7 @@ export default function AdminDashboard() {
         </div>
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="glass-card-subtle p-6">
-            <h3 className="font-semibold mb-4 text-slate-800">🏫 Theo lớp</h3>
+            <h3 className="font-semibold mb-4 text-slate-800"><School className="w-5 h-5 inline-block mr-1" /> Theo lớp</h3>
             {overviewViolations === undefined ? (
               <p className="text-sm text-slate-600">Đang tải...</p>
             ) : overviewViolations.length === 0 ? (
@@ -286,7 +287,7 @@ export default function AdminDashboard() {
             )}
           </div>
           <div className="glass-card-subtle p-6">
-            <h3 className="font-semibold mb-4 text-slate-800">👨‍🎓 Theo học sinh</h3>
+            <h3 className="font-semibold mb-4 text-slate-800"><GraduationCap className="w-5 h-5 inline-block mr-1" /> Theo học sinh</h3>
             {overviewViolations === undefined ? (
               <p className="text-sm text-slate-600">Đang tải...</p>
             ) : overviewViolations.length === 0 ? (
@@ -311,7 +312,7 @@ export default function AdminDashboard() {
             )}
           </div>
           <div className="glass-card-subtle p-6">
-            <h3 className="font-semibold mb-4 text-slate-800">👮 Theo người báo cáo</h3>
+            <h3 className="font-semibold mb-4 text-slate-800"><UserCheck className="w-5 h-5 inline-block mr-1" /> Theo người báo cáo</h3>
             {overviewViolations === undefined ? (
               <p className="text-sm text-slate-600">Đang tải...</p>
             ) : overviewViolations.length === 0 ? (
@@ -336,7 +337,7 @@ export default function AdminDashboard() {
           </div>
         </div>
         <div className="mt-6 glass-card-subtle p-6">
-          <h3 className="font-semibold mb-4 text-slate-800">📋 Chi tiết vi phạm</h3>
+          <h3 className="font-semibold mb-4 text-slate-800"><Clipboard className="w-5 h-5 inline-block mr-1" /> Chi tiết vi phạm</h3>
           {overviewViolations === undefined ? (
             <p className="text-sm text-slate-600">Đang tải...</p>
           ) : overviewViolations.length === 0 ? (
@@ -537,7 +538,7 @@ export default function AdminDashboard() {
                             Đang xuất...
                         </>
                     ) : (
-                        "📊 Xuất Excel"
+                        <><Download className="w-5 h-5 inline-block mr-1" /> Xuất Excel</>
                     )}
                 </button>
                 <button
@@ -551,7 +552,7 @@ export default function AdminDashboard() {
                             Đang xóa...
                         </>
                     ) : (
-                        '🗑️ Xóa toàn bộ tệp lưu'
+                        <><Trash2 className="w-5 h-5 inline-block mr-1" /> Xóa toàn bộ tệp lưu</>
                     )}
                 </button>
             </div>

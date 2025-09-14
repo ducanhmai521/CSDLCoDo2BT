@@ -239,7 +239,7 @@ export default function ViolationReportForm() {
         </div>
   
         <div className="glass-card-subtle">
-          <label className="font-semibold block mb-2 text-slate-700">Bằng chứng (tùy chọn, tối đa 15MB mỗi tệp)</label>
+          <label className="font-semibold block mb-2 text-slate-700">Bằng chứng (tối đa 15MB mỗi tệp)</label>
           <input
             type="file"
             ref={fileInputRef}

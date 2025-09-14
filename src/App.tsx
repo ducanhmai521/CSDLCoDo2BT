@@ -75,7 +75,15 @@ function App() {
         <div className="max-w-7xl mx-auto px-4">
             <div>
               <p className="font-medium text-slate-800">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
-              <p className="text-slate-700">Phát triển bởi Mai Đức Anh</p>
+              <p className="text-slate-700"></p>
+              <p className="text-slate-700 mt-2">
+                <a href="https://github.com/ducanhmai521/CSDLCoDo2BT" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
+                  GitHub Repository
+                </a>
+                <a href="https://17022008.xyz" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
+                  Liên hệ Dev
+                </a>
+              </p>
             </div>
         </div>
       </footer>
@@ -196,7 +204,7 @@ function Content() {
       return (
         <div>
           <div className="glass-card mb-6">
-            <h1 className="text-3xl font-bold mb-2 text-slate-900">Xin chào, {profile.fullName}! 👋</h1>
+            <h1 className="text-3xl font-bold mb-2 text-slate-900">Xin chào, {profile.fullName}!</h1>
             <p className="text-slate-700 mb-4">
               Vai trò của bạn: <span className="font-semibold text-slate-800">{translateRole(profile.role)}</span>
               {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}

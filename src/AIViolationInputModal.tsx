@@ -489,7 +489,11 @@ export function AIViolationInputModal({
           Nhập bằng AI
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-6xl w-[95vw] h-[95vh] flex flex-col bg-white border border-gray-200 shadow-2xl">
+<DialogContent className="max-w-6xl w-[95vw] h-[95vh] flex flex-col 
+  bg-gradient-to-br from-white/80 via-purple-100/70 to-blue-100/70
+  backdrop-blur-lg 
+  border border-white/30 
+  shadow-2xl rounded-2xl">
         <DialogHeader className="pb-3 border-b border-gray-200">
           <DialogTitle className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
             Nhập liệu vi phạm hàng loạt bằng AI
@@ -574,15 +578,17 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
             <div className="ml-auto bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
              {parsedViolations.length} mục
            </div>
-          <Button
-          onClick={handleAddViolation}
-          className="ml-1 bg-green-500 hover:bg-green-600 text-white px-2 py-0.5 rounded-md text-xs font-medium flex items-center gap-0.5 transition-colors whitespace-nowrap"
-          >
-          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Thêm
-          </Button>
+<Button
+  onClick={handleAddViolation}
+  className="ml-1 bg-green-100 hover:bg-green-200 text-green-800 
+             px-2 py-0.5 rounded-full text-xs font-medium 
+             flex items-center gap-1 transition-colors whitespace-nowrap"
+  >
+  <svg className="h-1 w-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+  Thêm
+</Button>
           </div>
             
             <div className="flex-grow overflow-y-auto space-y-4 pr-2">
@@ -591,7 +597,7 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                   studentsByClass.get(normalizeClassName(v.violatingClass)) ||
                   studentOptions;
                 return (
-                  <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 space-y-4 shadow-sm">
+                  <div key={i} className="bg-white/30 backdrop-blur-md border border-white/10 rounded-xl p-3 space-y-2 shadow-lg">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-lg text-gray-800 break-words">
