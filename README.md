@@ -1,20 +1,29 @@
 # CSDL Cờ Đỏ THPTS2BT
 
-Đây là một nền tảng quản lý nền nếp sử dụng [Convex](https://convex.dev) làm backend.
+Đây là một nền tảng quản lý nền nếp sử dụng [Convex](https://convex.dev) làm backend, [Vite](https://vitejs.dev/) làm frontend và Cloudflare R2 để lưu trữ các file bằng chứng.
 Nhằm mục đích nâng cao hiệu quả quản lý nền nếp học sinh.
 
-## Cấu trúc dự án
+## Mục lục
+- [Lưu ý](#lưu-ý)
+- [Hướng dẫn deploy local (dev)](#hướng-dẫn-deploy-local-dev)
+  - [Điều kiện](#điều-kiện)
+  - [Chạy dự án local](#chạy-dự-án-local)
+- [Hướng dẫn triển khai Production](#hướng-dẫn-triển-khai-production)
+  - [Điều kiện](#điều-kiện-1)
+  - [1. Cài đặt Convex](#1-cài-đặt-convex)
+  - [2. Cài đặt Vercel](#2-cài-đặt-vercel)
+  - [5. GitHub Actions để deploy code lên Convex tự động khi commit](#5-github-actions-để-deploy-code-lên-convex-tự-động-khi-commit)
+- [Biến môi trường](#biến-môi-trường)
+  - [JWT](#jwt)
+  - [Gemini API](#gemini-api)
+  - [Cloudflare R2](#cloudflare-r2)
+- [Đổi tên, logo trường](#đổi-tên-logo-trường)
 
-Mã nguồn frontend được xây dựng bằng [Vite](https://vitejs.dev/).
-
-Mã nguồn backend được đặt trong thư mục `convex`.
-
-Lệnh `npm run dev` sẽ khởi động cả máy chủ frontend và backend.
 
 ## Lưu ý 
 
 *   Dự án này là dự án vibecode, có thể có lỗi và các sự tối ưu kém.
-*   Dự án này được thiết kế để hoạt động với các 24 lớp với tên là 10A1 -> 12A8, nếu cần sửa đổi (ví dụ 11A, B, C...) sẽ cần phải sửa lại kha khá hàm và cả prompt AI, các bạn sẽ phải tự sửa đổi nếu muốn adapt 😔. Bạn vẫn có thể sử dụng code của mình nếu trường của bạn không có đủ 24 lớp như mẫu nhưng tên lớp vẫn fit trong khoảng đó (ví dụ 10A1 -> 12A7 vẫn ok)
+*   Dự án này được thiết kế để hoạt động với các 24 lớp với tên là 10A1 -> 12A8, nếu cần sửa đổi (ví dụ 11A, B, C...) sẽ cần phải sửa lại kha khá file, các bạn sẽ phải tự sửa đổi nếu muốn adapt 😔. Bạn vẫn có thể sử dụng code của mình nếu trường của bạn không có đủ 24 lớp như mẫu nhưng tên lớp vẫn fit trong khoảng đó (ví dụ 10A1 -> 12A7 vẫn ok)
 *   Bạn có thể thoải mái fork repo của mình và sửa đổi code để sử dụng cho trường của bạn. Nếu bạn phát triển được tính năng nào hay ho thì báo mình để cập nhật vào repo gốc nhé hẹ hẹ (hứa sẽ credit đầy đủ) 😊
 
 ## Hướng dẫn deploy local (dev)
@@ -50,10 +59,15 @@ Các bước để chạy dự án trên máy tính của bạn cho mục đích
 4.  **Cấu hình biến môi trường cho Backend:**
     *   Trong khi `npx convex dev` đang chạy, mở trình duyệt và truy cập vào Convex dashboard của project.
     *   Vào tab "Settings" -> "Environment Variables".
-    *   Thêm các biến môi trường sau (tương tự như hướng dẫn triển khai production ở dưới):
+    *   Thêm các biến môi trường sau (tham khảo cách lấy các key ở dưới):
         *   `JWT_PRIVATE_KEY`
         *   `JWKS`
         *   `GEMINI_API_KEY`
+        *   `R2_ACCOUNT_ID`
+        *   `R2_ACCESS_KEY_ID`
+        *   `R2_SECRET_ACCESS_KEY`
+        *   `R2_BUCKET_NAME`
+        *   `R2_PUBLIC_URL`
 
 6.  **Chạy dự án:**
     *   Mở một cửa sổ terminal.
@@ -63,7 +77,7 @@ Các bước để chạy dự án trên máy tính của bạn cho mục đích
     ```
     Trang web của bạn bây giờ sẽ có thể truy cập được tại `http://localhost:5173` (hoặc một cổng khác nếu 5173 đã được sử dụng).
 
-## Hướng dẫn triển khai
+## Hướng dẫn triển khai Production
 
 Các bước để triển khai production web.
 
@@ -95,7 +109,17 @@ Các bước để triển khai production web.
         *   `VITE_CONVEX_URL`: URL của deployment Convex production của bạn.
         *   `CONVEX_DEPLOYMENT_KEY`: Key deploy Convex bạn đã sao chép ở bước trước.
 
-### 3. JWT
+### 5. GitHub Actions để deploy code lên Convex tự động khi commit
+
+Để tự động deploy code lên Convex khi commit bạn có thể dùng GitHub Actions. Repo đã có sẵn file yml workflows, bạn chỉ cần thêm deploy key của dự án Convex vào Github Repo.
+
+1.  **Tạo Workflow GitHub Actions:**
+    *   Ở repo của bạn, vào tab "Settings" -> "Secrets and variables" -> "Actions".
+    *   Thêm biến `CONVEX_DEPLOY_KEY` vào "Repository secrets".
+
+## Biến môi trường
+
+### JWT
 
 Nền tảng sử dụng Convex Auth.
 
@@ -104,24 +128,51 @@ Nền tảng sử dụng Convex Auth.
     *   **Quan trọng:** JWS (JSON Web Signature) algorithm phải được đặt là `RS256`.
 
 2.  **Cấu hình Backend Convex:**
-    *   Lưu `JWT_PRIVATE_KEY` và `JWKS` vào Environment Variables trong cài đặt của project Convex (nhớ là chọn production thay vì development cloud).
+    *   Lưu `JWT_PRIVATE_KEY` và `JWKS` vào Environment Variables trong cài đặt của project Convex (nhớ chú ý môi trường production hay development cloud).
 
-### 4. Gemini API
+### Gemini API
 
 Nền tảng sử dụng Gemini API (2.5-flash-lite) để hỗ trợ việc chuẩn hóa dữ liệu nhập vào.
 
 1. **Lấy API key ở Google AI Studio:**
     *   Truy cập [Google AI Studio](https://aistudio.google.com/).
     *   Tạo một API key.
-    *   Lưu API key vào biến môi trường `GEMINI_API_KEY` trong cài đặt của project Convex (nhớ là chọn production thay vì development cloud).
+    *   Lưu API key vào biến môi trường `GEMINI_API_KEY`.
 
-### 5. GitHub Actions để deploy code lên Convex tự động khi commit
+### Cloudflare R2
 
-Để tự động deploy code lên Convex khi commit bạn có thể dùng GitHub Actions. Repo đã có sẵn file yml workflows, bạn chỉ cần thêm deploy key của dự án Convex vào Github Repo.
+### Bước 1: Tạo R2 Bucket
+1. Đăng nhập vào Cloudflare Dashboard
+2. Vào R2 Object Storage
+3. Tạo bucket mới cho việc lưu trữ ảnh bằng chứng
 
-1.  **Tạo Workflow GitHub Actions:**
-    *   Ở repo của bạn, vào tab "Settings" -> "Secrets and variables" -> "Actions".
-    *   Thêm biến CONVEX_DEPLOY_KEY vào "Repository secrets".
+### Bước 2: Tạo R2 API Token
+1. Vào R2 Object Storage > Manage R2 API tokens
+2. Tạo token mới với quyền:
+   - Object:Read, Object:Write
+   - Bucket:Read (cho bucket bạn đã tạo)
+
+### Bước 3: Cấu hình Environment Variables
+Thêm các biến môi trường sau vào biến môi trường của dự án Convex của bạn:
+
+```
+R2_ACCOUNT_ID=your_r2_account_id
+R2_ACCESS_KEY_ID=your_r2_access_key_id
+R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
+R2_BUCKET_NAME=your_r2_bucket_name
+R2_PUBLIC_URL=https://your_r2_public_domain.com
+```
+
+### Bước 4: Cấu hình Public Access
+Nếu bạn muốn ảnh có thể truy cập công khai:
+1. Vào R2 Object Storage > Settings
+2. Bật "Public access"
+3. Cấu hình custom domain nếu cần
+
+### Lưu ý
+- `R2_ACCOUNT_ID`: Tìm trong Cloudflare Dashboard > R2 > Overview
+- `R2_PUBLIC_URL`: URL công khai để truy cập ảnh (nên dùng custom domain nếu triển khai production)
+- Đảm bảo bucket có quyền public read nếu bạn muốn ảnh hiển thị trực tiếp
 
 ## Đổi tên, logo trường
 
