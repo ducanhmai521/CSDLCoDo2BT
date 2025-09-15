@@ -32,11 +32,17 @@ export const generateR2UploadUrl = mutation({
   handler: async (ctx, args) => {
     const key = `evidence/${Date.now()}-${args.fileName}`;
     
-    const command = new PutObjectCommand({
+    const commandParams: any = {
       Bucket: R2_BUCKET_NAME,
       Key: key,
       ContentType: args.contentType,
-    });
+    };
+
+    if (args.contentType.startsWith("video/")) {
+      commandParams.ContentDisposition = "inline";
+    }
+    
+    const command = new PutObjectCommand(commandParams);
 
     try {
       const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
