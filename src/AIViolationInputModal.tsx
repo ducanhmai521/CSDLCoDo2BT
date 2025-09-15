@@ -477,35 +477,46 @@ export function AIViolationInputModal({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" className="w-full py-6 text-lg font-semibold shadow-md hover:shadow-lg transition-all bg-gradient-to-r from-primary to-primary/80 rounded-2xl">
-          <svg
-            className="h-5 w-5 mr-2"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-            />
-          </svg>
-          Nhập bằng AI
-        </Button>
+<Button
+  variant="default"
+  className="w-full py-6 text-lg font-semibold 
+             relative overflow-hidden rounded-2xl 
+             bg-gradient-to-r from-primary via-purple-500 to-primary/80 
+             text-white shadow-[0_0_20px_rgba(139,92,246,0.6)] 
+             hover:shadow-[0_0_35px_rgba(139,92,246,0.9)] 
+             transition-all duration-500"
+>
+  <span className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 opacity-60 blur-xl animate-pulse" />
+  <span className="relative flex items-center justify-center">
+    <svg
+      className="h-5 w-5 mr-2 drop-shadow-md"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+      />
+    </svg>
+    Nhập liệu hàng loạt
+  </span>
+</Button>
       </DialogTrigger>
-<DialogContent className="max-w-6xl w-[95vw] h-[95vh] flex flex-col 
+<DialogContent className="max-w-lg w-[95vw] max-h-[90vh] flex flex-col 
   bg-gradient-to-br from-white/80 via-purple-100/70 to-blue-100/70
   backdrop-blur-lg 
   border border-white/30 
   shadow-2xl rounded-2xl">
         <DialogHeader className="pb-3 border-b border-gray-200">
           <DialogTitle className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-            Nhập liệu vi phạm hàng loạt bằng AI
+            Nhập liệu vi phạm hàng loạt
           </DialogTitle>
         </DialogHeader>
         {currentView === "input" ? (
-          <div className="flex flex-col space-y-4 flex-grow overflow-hidden">
+          <div className="flex flex-col space-y-4 flex-grow overflow-auto p-1">
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-800">Dán danh sách vi phạm</h3>
@@ -515,7 +526,7 @@ export function AIViolationInputModal({
                   placeholder="Ví dụ:
 Ngô Xuân lộc 11a8 (sai dp, dép lê)
 10a8 vệ sinh muộn"
-                  className="min-h-[300px] md:min-h-[400px] resize-none w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500"
+                  className="min-h-[200px] md:min-h-[250px] resize-none w-full p-4 border border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-500/70 focus:border-transparent transition-all text-gray-900 placeholder-gray-500"
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
                   disabled={isParsing || isSubmitting}
@@ -538,7 +549,7 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                 </label>
                 <Input
                   type="date"
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-500/70 focus:border-transparent transition-all text-gray-900"
                   onChange={(e) => {
                     const selectedDate = e.target.value
                       ? new Date(e.target.value).getTime()
@@ -549,11 +560,11 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
               </div>
             )}
             
-            <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+            <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200 mt-auto">
               <DialogClose asChild>
                 <Button variant="ghost" className="w-full sm:w-auto text-gray-600 hover:text-gray-800">Hủy</Button>
               </DialogClose>
-                            <Button
+              <Button
                 onClick={handleParse}
                 disabled={isParsing || isSubmitting || !allStudents}
                 className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-xl flex items-center gap-2 transition-all"
@@ -565,12 +576,17 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                   </>
                 ) : (
                   <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                       />
                     </svg>
                     Phân tích bằng AI
@@ -585,12 +601,12 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Tự nhập thủ công
+                Nhập thủ công
               </Button>
             </DialogFooter>
           </div>
         ) : (
-          <div className="flex flex-col space-y-4 flex-grow overflow-hidden">
+          <div className="flex flex-col space-y-4 flex-grow overflow-auto">
             <div className="flex items-center gap-1 text-sm">
               <h3 className="font-medium text-gray-800 whitespace-nowrap">
                  Kiểm tra & chỉnh sửa

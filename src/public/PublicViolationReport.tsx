@@ -181,7 +181,7 @@ const PublicViolationReport = () => {
                                               rel="noopener noreferrer" 
                                               className="text-blue-600 hover:underline text-sm block text-center py-1"
                                             >
-                                              Xem full size
+                                              Xem kích thước gốc (toàn màn hình)
                                             </a>
                                           </div>
                                         );
