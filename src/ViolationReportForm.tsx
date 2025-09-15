@@ -67,16 +67,21 @@ export default function ViolationReportForm() {
 
         const uploadPromises = selectedFiles.map(async (file) => {
             try {
-                const compressedFile = await imageCompression(file, compressionOptions);
+                let fileToUpload = file;
+                // Only compress images, not videos
+                if (file.type.startsWith('image/')) {
+                    fileToUpload = await imageCompression(file, compressionOptions);
+                }
+
                 const { uploadUrl, key } = await generateR2UploadUrl({
-                    fileName: compressedFile.name,
-                    contentType: compressedFile.type,
+                    fileName: fileToUpload.name,
+                    contentType: fileToUpload.type,
                 });
                 
                 const result = await fetch(uploadUrl, {
                     method: "PUT",
-                    headers: { "Content-Type": compressedFile.type },
-                    body: compressedFile,
+                    headers: { "Content-Type": fileToUpload.type },
+                    body: fileToUpload,
                 });
                 
                 if (result.ok) {
