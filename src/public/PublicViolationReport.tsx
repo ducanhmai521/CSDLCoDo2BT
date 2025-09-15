@@ -2,7 +2,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { useState, useEffect, useMemo, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay } from "date-fns";
 
 const PublicViolationReport = () => {
@@ -53,6 +53,8 @@ const PublicViolationReport = () => {
 
   // Sắp xếp các ngày theo thứ tự thời gian
   const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
+
+  const [showEvidences, setShowEvidences] = useState<{ [key: string]: boolean[] }>({});
 
   return (
     <div className="p-4 space-y-6">
@@ -112,11 +114,97 @@ const PublicViolationReport = () => {
                     <td className="border border-black p-2">{v.reporterName}</td>
                     <td className="border border-black p-2">
                       {v.evidenceUrls && v.evidenceUrls.length > 0 ? (
-                        v.evidenceUrls.map((url: string | null, i: number) => (
-                          url && <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                            Link {i + 1}
-                          </a>
-                        )).reduce((prev: any, curr: any) => [prev, ', ', curr])
+                        <div className="space-y-1">
+                          {v.evidenceUrls.map((url: string | null, i: number) => {
+                            if (!url) return null;
+                            
+                            const extension = url.split('.').pop()?.toLowerCase() || '';
+                            const isShown = showEvidences[v._id]?.[i] || false;
+                            
+                            return (
+                              <div key={i}>
+                                <button 
+                                  onClick={() => {
+                                    const newShows = { ...showEvidences };
+                                    if (!newShows[v._id]) {
+                                      newShows[v._id] = Array(v.evidenceUrls.length).fill(false);
+                                    }
+                                    newShows[v._id][i] = !newShows[v._id][i];
+                                    setShowEvidences(newShows);
+                                  }} 
+                                  className="text-blue-600 hover:underline text-sm"
+                                >
+                                  {isShown ? 'Ẩn' : 'Xem'} bằng chứng {i + 1}
+                                </button>
+                                {isShown && (
+                                  <>
+                                    {(() => {
+                                      // Video extensions
+                                      const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
+                                      if (videoExtensions.includes(extension)) {
+                                        return (
+                                          <div className="border rounded-lg overflow-hidden mt-1">
+                                            <video 
+                                              src={url} 
+                                              controls 
+                                              className="w-full max-h-64 object-contain"
+                                              preload="metadata"
+                                            >
+                                              Trình duyệt của bạn không hỗ trợ video.
+                                            </video>
+                                            <a 
+                                              href={url} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer" 
+                                              className="text-blue-600 hover:underline text-sm block text-center py-1"
+                                            >
+                                              Tải video về nếu không xem được
+                                            </a>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Image extensions
+                                      const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                                      if (imageExtensions.includes(extension)) {
+                                        return (
+                                          <div className="border rounded-lg overflow-hidden mt-1">
+                                            <img 
+                                              src={url} 
+                                              alt={`Bằng chứng ${i + 1}`} 
+                                              className="w-full max-h-64 object-contain"
+                                              loading="lazy"
+                                            />
+                                            <a 
+                                              href={url} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer" 
+                                              className="text-blue-600 hover:underline text-sm block text-center py-1"
+                                            >
+                                              Xem full size
+                                            </a>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      // Fallback for other files
+                                      return (
+                                        <a 
+                                          href={url} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer" 
+                                          className="text-blue-600 hover:underline block mt-1 text-sm"
+                                        >
+                                          Xem bằng chứng {i + 1} ({extension.toUpperCase()})
+                                        </a>
+                                      );
+                                    })()}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       ) : (
                         "-"
                       )}

@@ -42,6 +42,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
     const canEdit = isAdmin || (myUserId && violation.reporterId === myUserId);
     const [showLogs, setShowLogs] = useState(false);
     const logs = useQuery(api.violations.getViolationLogs, isAdminView ? { violationId: violation._id } : "skip");
+    const [showEvidences, setShowEvidences] = useState<boolean[]>(violation.evidenceUrls ? Array(violation.evidenceUrls.length).fill(false) : []);
 
     const handleAppeal = async () => {
         if (!appealReason.trim()) {
@@ -162,15 +163,93 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
             {violation.evidenceUrls && violation.evidenceUrls.length > 0 && (
                 <div className="mt-2">
                     <p className="font-semibold">Bằng chứng:</p>
-                    <ul className="list-disc list-inside">
-                        {violation.evidenceUrls.map((url, index) => (
-                            url && <li key={index}>
-                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                    Xem bằng chứng {index + 1}
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
+                    <div className="space-y-2">
+                        {violation.evidenceUrls.map((url, index) => {
+                            if (!url) return null;
+                            
+                            const extension = url.split('.').pop()?.toLowerCase() || '';
+                            
+                            return (
+                                <div key={index}>
+                                    <button 
+                                        onClick={() => {
+                                            const newShows = [...showEvidences];
+                                            newShows[index] = !newShows[index];
+                                            setShowEvidences(newShows);
+                                        }} 
+                                        className="text-primary hover:underline text-sm"
+                                    >
+                                        {showEvidences[index] ? 'Ẩn' : 'Xem'} bằng chứng {index + 1}
+                                    </button>
+                                    {showEvidences[index] && (
+                                        <>
+                                            {(() => {
+                                                // Video extensions
+                                                const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
+                                                if (videoExtensions.includes(extension)) {
+                                                    return (
+                                                        <div className="border rounded-lg overflow-hidden mt-1">
+                                                            <video 
+                                                                src={url} 
+                                                                controls 
+                                                                className="w-full max-h-64 object-contain"
+                                                                preload="metadata"
+                                                            >
+                                                                Trình duyệt của bạn không hỗ trợ video.
+                                                            </video>
+                                                            <a 
+                                                                href={url} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer" 
+                                                                className="text-primary hover:underline text-sm block text-center py-1"
+                                                            >
+                                                                Tải video về nếu không xem được
+                                                            </a>
+                                                        </div>
+                                                    );
+                                                }
+                                                
+                                                // Image extensions
+                                                const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                                                if (imageExtensions.includes(extension)) {
+                                                    return (
+                                                        <div className="border rounded-lg overflow-hidden mt-1">
+                                                            <img 
+                                                                src={url} 
+                                                                alt={`Bằng chứng ${index + 1}`} 
+                                                                className="w-full max-h-64 object-contain"
+                                                                loading="lazy"
+                                                            />
+                                                            <a 
+                                                                href={url} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer" 
+                                                                className="text-primary hover:underline text-sm block text-center py-1"
+                                                            >
+                                                                Xem full size
+                                                            </a>
+                                                        </div>
+                                                    );
+                                                }
+                                                
+                                                // Fallback for other files
+                                                return (
+                                                    <a 
+                                                        href={url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="text-primary hover:underline block mt-1"
+                                                    >
+                                                        Xem bằng chứng {index + 1} ({extension.toUpperCase()})
+                                                    </a>
+                                                );
+                                            })()}
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
             {violation.status === 'appealed' && <p className="mt-2 text-amber-700"><strong>Lý do kháng cáo:</strong> {violation.appealReason}</p>}
