@@ -35,8 +35,6 @@ export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState<'overview' | 'violations' | 'emulation' | 'roster' | 'users' | 'settings' >('overview');
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
   const saveSetting = useMutation(api.users.setSetting);
-  const clearStoredFiles = useAction(api.adminTools.clearStoredFiles);
-  const [isClearing, setIsClearing] = useState(false);
   const exportRosterTemplate = useAction(api.adminTools.exportRosterTemplate);
   const importRoster = useAction(api.adminTools.importRoster);
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
@@ -118,19 +116,6 @@ export default function AdminDashboard() {
         const start = toZonedTime(startDate, TIME_ZONE).getTime();
         const end = endOfDay(toZonedTime(endDate, TIME_ZONE)).getTime();
         setDateRange({ start, end });
-    }
-  };
-
-  const handleClearStorage = async () => {
-    if (!window.confirm('Xóa tất cả tệp đã lưu trong hệ thống (evidence & excel)?')) return;
-    setIsClearing(true);
-    try {
-      await clearStoredFiles({ kind: 'all' as any });
-      toast.success('Đã xóa toàn bộ tệp đã lưu.');
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setIsClearing(false);
     }
   };
 
@@ -539,20 +524,6 @@ export default function AdminDashboard() {
                         </>
                     ) : (
                         <><Download className="w-5 h-5 inline-block mr-1" /> Xuất Excel</>
-                    )}
-                </button>
-                <button
-                    onClick={handleClearStorage}
-                    disabled={isClearing}
-                    className="w-full sm:w-auto bg-gradient-to-r from-red-500/80 to-red-600/80 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-semibold hover:from-red-600/90 hover:to-red-700/90 transition-all duration-300 border border-white/20 shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {isClearing ? (
-                        <>
-                            <div className="form-loading-spinner mr-2"></div>
-                            Đang xóa...
-                        </>
-                    ) : (
-                        <><Trash2 className="w-5 h-5 inline-block mr-1" /> Xóa toàn bộ tệp lưu</>
                     )}
                 </button>
             </div>

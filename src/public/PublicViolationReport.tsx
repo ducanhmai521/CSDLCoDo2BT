@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -7,8 +7,12 @@ import { startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay } from "d
 
 const PublicViolationReport = () => {
   const baseDateStr = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
-
   const [weekNumber, setWeekNumber] = useState(1);
+  const [showReporterInput, setShowReporterInput] = useState(false);
+  const [reporterPassword, setReporterPassword] = useState("");
+  const [isReporterAuthenticated, setIsReporterAuthenticated] = useState(false);
+  const checkPassword = useMutation(api.reporters.checkReporterPassword);
+
 
   useEffect(() => {
     if (baseDateStr) {
@@ -18,6 +22,14 @@ const PublicViolationReport = () => {
       setWeekNumber(weeks);
     }
   }, [baseDateStr]);
+
+  useEffect(() => {
+    if (weekNumber === 172) {
+      setShowReporterInput(true);
+    } else {
+      setShowReporterInput(false);
+    }
+  }, [weekNumber]);
 
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
 
@@ -56,20 +68,44 @@ const PublicViolationReport = () => {
 
   const [showEvidences, setShowEvidences] = useState<{ [key: string]: boolean[] }>({});
 
+  const handlePasswordSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const isValid = await checkPassword({ password: reporterPassword });
+      if (isValid) {
+        setIsReporterAuthenticated(true);
+        setShowReporterInput(false);
+      } else {
+        alert("Sai mật khẩu!");
+      }
+    }
+  };
+
   return (
     <div className="p-4 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-center mb-2">CSDL CỜ ĐỎ THPTS2BT | BÁO CÁO VI PHẠM</h1>
+              <h2 className="text-xl font-bold text-center mb-2">Đây chỉ là bảng tổng hợp các báo cáo được gửi tới hệ thống, có thể có sai sót, không phải danh sách lỗi cuối</h2>
         <div className="flex justify-center items-center mb-4 gap-4">
           <label>Tuần học:</label>
           <input 
             type="number" 
             value={weekNumber} 
-            onChange={(e) => setWeekNumber(parseInt(e.target.value) || 1)} 
+            onChange={(e) => setWeekNumber(parseInt(e.target.value))} 
             className="border p-1 w-20 text-center"
-            min={1}
           />
         </div>
+        {showReporterInput && (
+          <div className="flex justify-center items-center mb-4 gap-2">
+            <label>Mật khẩu:</label>
+            <input
+              type="password"
+              value={reporterPassword}
+              onChange={(e) => setReporterPassword(e.target.value)}
+              onKeyDown={handlePasswordSubmit}
+              className="border p-1 w-40 text-center"
+            />
+          </div>
+        )}
         {dateRange ? (
           <p className="text-center text-gray-600">
             (Tuần từ {format(new Date(dateRange.start), "dd/MM/yyyy")} đến {format(new Date(dateRange.end), "dd/MM/yyyy")})
@@ -100,7 +136,7 @@ const PublicViolationReport = () => {
                   <th className="border border-black p-2">Học sinh</th>
                   <th className="border border-black p-2">Chi tiết vi phạm</th>
                   <th className="border border-black p-2">Điểm trừ</th>
-                  <th className="border border-black p-2">Người báo cáo</th>
+                  {isReporterAuthenticated && <th className="border border-black p-2">Người báo cáo</th>}
                   <th className="border border-black p-2">Bằng chứng</th>
                 </tr>
               </thead>
@@ -111,7 +147,7 @@ const PublicViolationReport = () => {
                     <td className="border border-black p-2">{v.studentName || "-"}</td>
                     <td className="border border-black p-2">{v.details ? `${v.violationType}: ${v.details}`: v.violationType}</td>
                     <td className="border border-black p-2 text-center font-bold text-red-800 bg-red-100">{v.points}</td>
-                    <td className="border border-black p-2">{v.reporterName}</td>
+                    {isReporterAuthenticated && <td className="border border-black p-2">{v.reporterName}</td>}
                     <td className="border border-black p-2">
                       {v.evidenceUrls && v.evidenceUrls.length > 0 ? (
                         <div className="space-y-1">

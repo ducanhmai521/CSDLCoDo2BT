@@ -39,6 +39,7 @@ const PublicEmulationScoreTable = () => {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold text-center mb-2">CSDL CỜ ĐỎ THPTS2BT | BẢNG ĐIỂM THI ĐUA THÔ</h1>
+      <h2 className="text-xl font-bold text-center mb-2">Đây chỉ là bảng điểm thi đua thô được tạo nên bởi các báo cáo được gửi tới hệ thống, không phải bảng điểm chuẩn cuối</h2>
       <div className="flex justify-center items-center mb-4 gap-4">
         <label>Tuần học:</label>
         <input 
