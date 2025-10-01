@@ -9,6 +9,8 @@ const PublicEmulationScoreTable = () => {
   const baseDateStr = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
 
   const [weekNumber, setWeekNumber] = useState(1);
+  const [weekInput, setWeekInput] = useState('1');
+  const [weekError, setWeekError] = useState<string | null>(null);
 
   useEffect(() => {
     if (baseDateStr) {
@@ -16,25 +18,46 @@ const PublicEmulationScoreTable = () => {
       const now = new Date();
       const weeks = differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
       setWeekNumber(weeks);
+      setWeekInput(weeks.toString());
     }
   }, [baseDateStr]);
 
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
 
   useEffect(() => {
-    if (baseDateStr) {
+    if (baseDateStr && !weekError) {
       const base = new Date(baseDateStr);
       const monday = startOfWeek(base, { weekStartsOn: 1 });
       const start = new Date(monday.getTime() + (weekNumber - 1) * 7 * 24 * 60 * 60 * 1000);
       const end = endOfWeek(start, { weekStartsOn: 1 });
       setDateRange({ start: start.getTime(), end: end.getTime() });
+    } else {
+      setDateRange(undefined);
     }
-  }, [weekNumber, baseDateStr]);
+  }, [weekNumber, baseDateStr, weekError]);
 
   const emulationScores = useQuery(
     api.violations.getPublicEmulationScores,
-    dateRange ? { start: dateRange.start, end: dateRange.end } : {}
+    dateRange ? { start: dateRange.start, end: dateRange.end } : "skip"
   );
+
+  const handleWeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setWeekInput(val);
+
+    if (val.trim() === '') {
+      setWeekError('Tuần không được để trống');
+      return;
+    }
+
+    const num = parseInt(val, 10);
+    if (isNaN(num) || num <= 0) {
+      setWeekError('Tuần phải là một số dương hợp lệ');
+    } else {
+      setWeekError(null);
+      setWeekNumber(num);
+    }
+  };
 
   return (
     <div className="p-4">
@@ -43,13 +66,13 @@ const PublicEmulationScoreTable = () => {
       <div className="flex justify-center items-center mb-4 gap-4">
         <label>Tuần học:</label>
         <input 
-          type="number" 
-          value={weekNumber} 
-          onChange={(e) => setWeekNumber(parseInt(e.target.value) || 1)} 
-          className="border p-1 w-20 text-center"
-          min={1}
+          type="text" 
+          value={weekInput} 
+          onChange={handleWeekChange} 
+          className={`border p-1 w-20 text-center ${weekError ? 'border-red-500' : 'border-gray-300'}`}
         />
       </div>
+      {weekError && <p className="text-center text-red-500 text-sm -mt-2 mb-2">{weekError}</p>}
       {dateRange ? (
         <p className="text-center mb-4">
           (Tuần từ {format(new Date(dateRange.start), "dd/MM/yyyy")} đến {format(new Date(dateRange.end), "dd/MM/yyyy")})
