@@ -12,6 +12,7 @@ export const VIOLATION_CATEGORIES = [
     violations: [
       "Sai đồng phục/đầu tóc,...",
       "Đi học muộn có phép",
+      "Sử dụng điện thoại sai mục đích",
       "Thiếu dụng cụ vệ sinh/đồ dùng học tập/ghế chào cờ",
       "Để xe không đúng quy định",
       "Cờ đỏ trực muộn 3 phút trở lên",
