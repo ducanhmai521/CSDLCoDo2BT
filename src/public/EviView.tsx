@@ -38,19 +38,28 @@ const EviView = () => {
     if (videoExtensions.includes(fileType)) {
       return (
         <div className="border rounded-lg overflow-hidden mt-4 max-w-3xl mx-auto">
-          <video 
-            src={fileUrl} 
-            controls 
-            className="w-full object-contain"
-            preload="auto"
-            autoPlay
-            playsInline
-            controlsList="nodownload"
-            disablePictureInPicture
-            disableRemotePlayback
-          >
-            Trình duyệt của bạn không hỗ trợ video.
-          </video>
+          <div className="relative">
+            <video 
+              controls 
+              className="w-full object-contain"
+              preload="auto"
+              playsInline
+              controlsList="nodownload"
+              disablePictureInPicture
+              disableRemotePlayback
+              onError={(e) => console.error("Video error:", e)}
+            >
+              {/* Sử dụng source thay vì src để có thể thiết lập type */}
+              <source 
+                src={fileUrl} 
+                type={`video/${fileType === 'mov' ? 'quicktime' : fileType}`} 
+              />
+              Trình duyệt của bạn không hỗ trợ video.
+            </video>
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 text-center">
+              Lưu ý: Video lớn có thể mất thời gian để tải. Nếu video bị dừng, hãy tải về để xem.
+            </div>
+          </div>
         </div>
       );
     }
