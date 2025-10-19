@@ -12,6 +12,7 @@ import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw 
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PublicEmulationScoreTable from "./public/PublicEmulationScoreTable";
 import PublicViolationReport from "./public/PublicViolationReport";
+import EviView from "./public/EviView";
 
 export default function AppWrapper() {
   return (
@@ -20,6 +21,7 @@ export default function AppWrapper() {
         <Route path="/" element={<App />} />
         <Route path="/bang-diem-thi-dua-tho" element={<PublicEmulationScoreTable />} />
         <Route path="/bang-bao-cao-vi-pham" element={<PublicViolationReport />} />
+        <Route path="/eviview/*" element={<EviView />} />
       </Routes>
     </BrowserRouter>
   );
