@@ -57,8 +57,17 @@ const EviView = () => {
               Trình duyệt của bạn không hỗ trợ video.
             </video>
             <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 text-center">
-              Lưu ý: Video lớn có thể mất thời gian để tải. Nếu video bị dừng, hãy tải về để xem.
+              Nếu video bị dừng, hãy tải về để xem.
             </div>
+          </div>
+          <div className="mt-2 text-center">
+            <a 
+              href={fileUrl || '#'} 
+              download={filePath?.split('/').pop() || 'video'}
+              className="inline-block px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+            >
+              Tải video về để xem
+            </a>
           </div>
         </div>
       );
@@ -75,6 +84,15 @@ const EviView = () => {
             className="w-full object-contain"
             loading="lazy"
           />
+          <div className="mt-2 text-center">
+            <a 
+              href={fileUrl || '#'} 
+              download={filePath?.split('/').pop() || 'image'}
+              className="inline-block px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+            >
+              Tải ảnh về
+            </a>
+          </div>
         </div>
       );
     }
@@ -84,6 +102,15 @@ const EviView = () => {
       <div className="mt-4 text-center">
         <p className="text-lg">File: {filePath}</p>
         <p className="text-sm text-gray-500">Loại file: {fileType.toUpperCase()}</p>
+        <div className="mt-2">
+          <a 
+            href={fileUrl || '#'} 
+            download={filePath?.split('/').pop() || 'file'}
+            className="inline-block px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+          >
+            Tải file về
+          </a>
+        </div>
       </div>
     );
   };
@@ -103,17 +130,6 @@ const EviView = () => {
                 {filePath?.split('/').pop() || 'File'}
               </h2>
               {renderFileContent()}
-            </div>
-            <div className="mt-4">
-              <a 
-                href={fileUrl || '#'} 
-                download
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                Tải về
-              </a>
             </div>
           </>
         )}
