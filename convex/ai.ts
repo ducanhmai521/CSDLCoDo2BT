@@ -39,6 +39,7 @@ export const parseViolationsWithAI = action({
           - Return the student name as it appears in the text. Do not try to find the full name.
           - Class names should be normalized to uppercase (e.g., "11a8" -> "11A8").
           - Each student can only violate 1 error type at once (no duplicate entry for same student with same error, one student still can violate mutiple error if they are different in type.)
+          - If user dont mention whether a student's "Nghỉ học", "Đi muộn" is "Có phép" or not, choose "Có phép". If user said something general like "vắng", choose "Nghỉ có phép."
 
       2.  **Extract Checked Classes**: Look for a line starting with "ktra:", "ktr:", "check:", or similar keywords, which indicates a list of classes that were checked. Extract these class names.
           - The classes might be comma-separated and some might be partial (e.g., "12a1,2,3,6"). You need to expand them based on the first class mentioned (e.g., "12a1,2,3,6" becomes "12A1", "12A2", "12A3", "12A6").
@@ -95,4 +96,5 @@ export const parseViolationsWithAI = action({
       throw new Error("Failed to parse violations using AI.");
     }
   },
+
 });
