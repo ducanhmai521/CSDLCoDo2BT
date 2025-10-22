@@ -75,7 +75,7 @@ const PublicEmulationScoreTable = () => {
               </div>
               <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
                 <p className="text-xs text-slate-500">
-                  Không phải bảng điểm chuẩn cuối được dùng để xét thi đua.
+                  Không phải bảng điểm chuẩn cuối được dùng để xét thi đua (còn thiếu điểm đánh giá giờ học, điểm thưởng).
                 </p>
                 <Link 
                   to="/bang-bao-cao-vi-pham" 

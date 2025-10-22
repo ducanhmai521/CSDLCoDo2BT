@@ -314,10 +314,6 @@ const PublicViolationReport = () => {
                                 <div className="flex flex-col gap-1">
                                   {v.evidenceUrls.map((url: string | null, i: number) => {
                                     if (!url) return null;
-                                    
-                                    const extension = url.split('.').pop()?.toLowerCase() || '';
-                                    const isShown = showEvidences[v._id]?.[i] || false;
-                                    
                                     return (
                                       <div key={i}>
                                         <button 
