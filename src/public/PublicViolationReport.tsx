@@ -73,6 +73,7 @@ const PublicViolationReport = () => {
 
   const [showEvidences, setShowEvidences] = useState<{ [key: string]: boolean[] }>({});
   const [modalMedia, setModalMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
+  const [isMediaLoading, setIsMediaLoading] = useState(true);
 
   const handlePasswordSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -124,19 +125,27 @@ const PublicViolationReport = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          <div className="max-w-7xl max-h-full w-full h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-7xl max-h-full w-full h-full flex items-center justify-center relative" onClick={(e) => e.stopPropagation()}>
+            {isMediaLoading && (
+              <div className="absolute">
+                <Loader2 className="w-12 h-12 text-indigo-400 animate-spin" />
+                <div className="absolute inset-0 w-12 h-12 border-4 border-indigo-200/50 rounded-full animate-pulse"></div>
+              </div>
+            )}
             {modalMedia.type === 'image' ? (
               <img 
                 src={modalMedia.url} 
                 alt="Bằng chứng" 
-                className="max-w-full max-h-full object-contain"
+                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${isMediaLoading ? 'opacity-0' : 'opacity-100'}`}
+                onLoad={() => setIsMediaLoading(false)}
               />
             ) : (
               <video 
                 src={modalMedia.url} 
                 controls 
                 autoPlay
-                className="max-w-full max-h-full object-contain"
+                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${isMediaLoading ? 'opacity-0' : 'opacity-100'}`}
+                onLoadedData={() => setIsMediaLoading(false)}
               >
                 Trình duyệt của bạn không hỗ trợ video.
               </video>
@@ -318,6 +327,7 @@ const PublicViolationReport = () => {
                                       <div key={i}>
                                         <button 
                                           onClick={() => {
+                                            setIsMediaLoading(true); // Reset loading state
                                             const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
                                             const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
                                             const extension = url.split('.').pop()?.toLowerCase() || '';
