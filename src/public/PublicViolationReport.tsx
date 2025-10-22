@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { useState, useEffect, useMemo } from "react";
 import { startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay } from "date-fns";
-import { ChevronDown, ChevronUp, Eye, EyeOff, Calendar, AlertCircle, FileText, Loader2, Trophy } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, EyeOff, Calendar, AlertCircle, FileText, Loader2, Trophy, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const PublicViolationReport = () => {
@@ -108,6 +108,16 @@ const PublicViolationReport = () => {
   const toggleDay = (day: number) => {
     setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
   };
+  
+  const closeModal = () => setModalMedia(null);
+  
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only close if the click is on the backdrop itself, not on a child element.
+    if (e.target === e.currentTarget) {
+      closeModal();
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -115,15 +125,15 @@ const PublicViolationReport = () => {
       {modalMedia && (
         <div 
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
-          onClick={() => setModalMedia(null)}
+          onClick={handleBackdropClick} // Use robust backdrop click handler
         >
           <button
-            onClick={() => setModalMedia(null)}
-            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
+            onClick={closeModal}
+            // Increase tappable area and provide visual feedback
+            className="absolute top-2 right-2 text-white p-2 rounded-full hover:bg-white/20 transition-colors"
+            aria-label="Đóng"
           >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-6 h-6" />
           </button>
           <div className="max-w-7xl max-h-full w-full h-full flex items-center justify-center relative" onClick={(e) => e.stopPropagation()}>
             {isMediaLoading && (
