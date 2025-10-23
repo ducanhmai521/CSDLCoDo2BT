@@ -4,8 +4,19 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { useState, useEffect, useMemo } from "react";
 import { startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay } from "date-fns";
-import { ChevronDown, ChevronUp, Eye, EyeOff, Calendar, AlertCircle, FileText, Loader2, Trophy, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Calendar, AlertCircle, FileText, Loader2, Trophy, X, User, Users, FileWarning } from "lucide-react";
 import { Link } from "react-router-dom";
+
+// Define a richer type for our modal state
+type ModalMedia = {
+  url: string;
+  type: 'image' | 'video';
+  violationInfo: {
+    student: string;
+    class: string;
+    details: string;
+  }
+}
 
 const PublicViolationReport = () => {
   const baseDateStr = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
@@ -18,6 +29,12 @@ const PublicViolationReport = () => {
   const checkPassword = useMutation(api.reporters.checkReporterPassword);
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
 
+  // State for modal content and visibility
+  const [modalMedia, setModalMedia] = useState<ModalMedia | null>(null);
+  const [isMediaLoading, setIsMediaLoading] = useState(true);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+
   useEffect(() => {
     if (baseDateStr) {
       const base = new Date(baseDateStr);
@@ -27,6 +44,15 @@ const PublicViolationReport = () => {
       setWeekInput(weeks.toString());
     }
   }, [baseDateStr]);
+
+  useEffect(() => {
+    // This effect handles the fade-in animation
+    if (modalMedia) {
+      // Use a tiny timeout to allow the component to mount with initial styles before transitioning
+      const timer = setTimeout(() => setIsModalVisible(true), 10);
+      return () => clearTimeout(timer);
+    }
+  }, [modalMedia]);
 
   useEffect(() => {
     if (weekNumber === 172) {
@@ -71,10 +97,6 @@ const PublicViolationReport = () => {
 
   const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
 
-  const [showEvidences, setShowEvidences] = useState<{ [key: string]: boolean[] }>({});
-  const [modalMedia, setModalMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
-  const [isMediaLoading, setIsMediaLoading] = useState(true);
-
   const handlePasswordSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const isValid = await checkPassword({ password: reporterPassword });
@@ -84,6 +106,45 @@ const PublicViolationReport = () => {
       } else {
         alert("Sai mật khẩu!");
       }
+    }
+  };
+  
+  const handleOpenModal = (violation: any, url: string) => {
+    setIsMediaLoading(true);
+    const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const extension = url.split('.').pop()?.toLowerCase() || '';
+    
+    let type: 'image' | 'video' | null = null;
+    if (videoExtensions.includes(extension)) type = 'video';
+    else if (imageExtensions.includes(extension)) type = 'image';
+    else {
+      window.open(url, '_blank');
+      return;
+    }
+
+    setModalMedia({
+      url,
+      type,
+      violationInfo: {
+        student: violation.studentName || "Không có tên",
+        class: violation.violatingClass,
+        details: violation.details ? `${violation.violationType}: ${violation.details}` : violation.violationType
+      }
+    });
+  };
+
+  const handleCloseModal = () => {
+    setIsModalVisible(false); // Trigger fade-out animation
+    // Wait for animation to finish before removing from DOM
+    setTimeout(() => {
+      setModalMedia(null);
+    }, 300); // Should match the transition duration
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      handleCloseModal();
     }
   };
 
@@ -108,59 +169,76 @@ const PublicViolationReport = () => {
   const toggleDay = (day: number) => {
     setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
   };
-  
-  const closeModal = () => setModalMedia(null);
-  
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only close if the click is on the backdrop itself, not on a child element.
-    if (e.target === e.currentTarget) {
-      closeModal();
-    }
-  };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Modal for Full Screen Media */}
+      {/* Modal for Full Screen Media with Animations */}
       {modalMedia && (
         <div 
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
-          onClick={handleBackdropClick} // Use robust backdrop click handler
+          className={`fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out cursor-pointer ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
+          onClick={handleBackdropClick}
         >
+          {/* Close Button with larger tappable area */}
           <button
-            onClick={closeModal}
-            // Increase tappable area and provide visual feedback
-            className="absolute top-2 right-2 text-white p-2 rounded-full hover:bg-white/20 transition-colors"
+            onClick={handleCloseModal}
+            className="absolute top-2 right-2 z-50 text-white flex items-center justify-center w-10 h-10 rounded-full bg-black/20 hover:bg-white/20 transition-colors"
             aria-label="Đóng"
           >
             <X className="w-6 h-6" />
           </button>
-          <div className="max-w-7xl max-h-full w-full h-full flex items-center justify-center relative" onClick={(e) => e.stopPropagation()}>
+          
+          <div 
+            className={`transform-gpu transition-all duration-300 ease-in-out max-w-7xl max-h-full w-full h-full flex items-center justify-center relative cursor-default ${isModalVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             {isMediaLoading && (
               <div className="absolute">
                 <Loader2 className="w-12 h-12 text-indigo-400 animate-spin" />
                 <div className="absolute inset-0 w-12 h-12 border-4 border-indigo-200/50 rounded-full animate-pulse"></div>
               </div>
             )}
-            {modalMedia.type === 'image' ? (
-              <img 
-                src={modalMedia.url} 
-                alt="Bằng chứng" 
-                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${isMediaLoading ? 'opacity-0' : 'opacity-100'}`}
-                onLoad={() => setIsMediaLoading(false)}
-              />
-            ) : (
-              <video 
-                src={modalMedia.url} 
-                controls 
-                autoPlay
-                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${isMediaLoading ? 'opacity-0' : 'opacity-100'}`}
-                onLoadedData={() => setIsMediaLoading(false)}
-              >
-                Trình duyệt của bạn không hỗ trợ video.
-              </video>
-            )}
+            
+            {/* Media Content with fade-in on load */}
+            <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ease-in-out ${isMediaLoading ? 'opacity-0' : 'opacity-100'}`}>
+              {modalMedia.type === 'image' ? (
+                <img 
+                  src={modalMedia.url} 
+                  alt="Bằng chứng" 
+                  className="max-w-full max-h-full object-contain"
+                  onLoad={() => setIsMediaLoading(false)}
+                />
+              ) : (
+                <video 
+                  src={modalMedia.url} 
+                  controls 
+                  autoPlay
+                  className="max-w-full max-h-full object-contain"
+                  onLoadedData={() => setIsMediaLoading(false)}
+                >
+                  Trình duyệt của bạn không hỗ trợ video.
+                </video>
+              )}
+            </div>
+            
+            {/* Violation Info Box */}
+            <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 w-auto max-w-[90%] bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-lg text-center text-sm transition-all duration-300 ease-in-out ${!isMediaLoading ? 'opacity-100' : 'opacity-0'}`}>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-slate-300" />
+                  <span>{modalMedia.violationInfo.student}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-slate-300" />
+                  <span>{modalMedia.violationInfo.class}</span>
+                </div>
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-white/20 text-xs text-slate-200 flex items-center justify-center gap-2">
+                 <FileWarning className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                 <span className="text-left">{modalMedia.violationInfo.details}</span>
+              </div>
+            </div>
           </div>
+          
           <a 
             href={modalMedia.url} 
             download
@@ -194,7 +272,7 @@ const PublicViolationReport = () => {
                   className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-md hover:bg-amber-100 transition-colors text-xs font-medium"
                 >
                   <Trophy className="w-3 h-3" />
-                  <span>Xem bảng điểm thi đua</span>
+                  <span>Xem bảng điểm thi đua thô</span>
                 </Link>
               </div>
             </div>
@@ -297,7 +375,7 @@ const PublicViolationReport = () => {
                           <th className="px-2 py-2 text-left font-semibold text-slate-700 w-16">Lớp</th>
                           <th className="px-2 py-2 text-left font-semibold text-slate-700">Học sinh</th>
                           <th className="px-2 py-2 text-left font-semibold text-slate-700">Chi tiết vi phạm</th>
-                          <th className="px-2 py-2 text-center font-semibold text-slate-700 w-16">Điểm</th>
+                          <th className="px-2 py-2 text-center font-semibold text-slate-700 w-16">Điểm trừ</th>
                           {isReporterAuthenticated && (
                             <th className="px-2 py-2 text-left font-semibold text-slate-700">Báo cáo</th>
                           )}
@@ -305,7 +383,7 @@ const PublicViolationReport = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {dayViolations.map((v: any, index: number) => (
+                        {dayViolations.map((v: any) => (
                           <tr key={v._id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-2 py-2 text-center font-medium text-slate-900">
                               {v.violatingClass}
@@ -336,20 +414,7 @@ const PublicViolationReport = () => {
                                     return (
                                       <div key={i}>
                                         <button 
-                                          onClick={() => {
-                                            setIsMediaLoading(true); // Reset loading state
-                                            const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
-                                            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-                                            const extension = url.split('.').pop()?.toLowerCase() || '';
-                                            
-                                            if (videoExtensions.includes(extension)) {
-                                              setModalMedia({ url, type: 'video' });
-                                            } else if (imageExtensions.includes(extension)) {
-                                              setModalMedia({ url, type: 'image' });
-                                            } else {
-                                              window.open(url, '_blank');
-                                            }
-                                          }} 
+                                          onClick={() => handleOpenModal(v, url)}
                                           className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-xs"
                                         >
                                           <Eye className="w-3 h-3" />
