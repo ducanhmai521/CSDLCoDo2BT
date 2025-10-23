@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay } from "date-fns";
 import { 
   ChevronDown, ChevronUp, Eye, Calendar, AlertCircle, 
-  FileText, Loader2, Trophy, X, User, Users, FileWarning 
+  FileText, Loader2, Trophy, X, User, Users, FileWarning, Download
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -43,7 +43,6 @@ const PublicViolationReport = () => {
   const [isInteracting, setIsInteracting] = useState(false);
   const [startInteraction, setStartInteraction] = useState({ x: 0, y: 0 });
   const initialPinchDistance = useRef(0);
-  const imageRef = useRef<HTMLImageElement>(null);
 
   // Convex Hooks
   const baseDateStr = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
@@ -219,17 +218,27 @@ const PublicViolationReport = () => {
           {/* Static UI Overlay */}
           <button onClick={handleCloseModal} className="absolute top-2 right-2 z-50 text-white flex items-center justify-center w-10 h-10 rounded-full bg-black/20 hover:bg-white/20 transition-colors" aria-label="Đóng"><X className="w-6 h-6" /></button>
           
-          <a href={modalMedia.url} download target="_blank" rel="noopener noreferrer" className="absolute bottom-4 right-4 z-50 bg-white text-slate-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium">Tải xuống</a>
-          
-          <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 w-auto max-w-[90%] bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-lg text-center text-sm transition-all duration-300 ease-in-out z-50 ${!isMediaLoading ? 'opacity-100' : 'opacity-0'}`}>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300" /><span>{modalMedia.violationInfo.student}</span></div>
-              <div className="flex items-center gap-2"><Users className="w-4 h-4 text-slate-300" /><span>{modalMedia.violationInfo.class}</span></div>
+          <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 w-auto max-w-[95%] md:max-w-xl bg-black/60 backdrop-blur-sm text-white rounded-lg text-sm transition-all duration-300 ease-in-out z-50 overflow-hidden ${!isMediaLoading ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="p-3">
+              <div className="flex items-center justify-center gap-4">
+                <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300" /><span>{modalMedia.violationInfo.student}</span></div>
+                <div className="flex items-center gap-2"><Users className="w-4 h-4 text-slate-300" /><span>{modalMedia.violationInfo.class}</span></div>
+              </div>
+              <div className="mt-2 pt-2 border-t border-white/20 text-xs text-slate-200 flex items-center justify-center gap-2">
+                <FileWarning className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                <span className="text-left">{modalMedia.violationInfo.details}</span>
+              </div>
             </div>
-            <div className="mt-1.5 pt-1.5 border-t border-white/20 text-xs text-slate-200 flex items-center justify-center gap-2">
-              <FileWarning className="w-4 h-4 text-slate-300 flex-shrink-0" />
-              <span className="text-left">{modalMedia.violationInfo.details}</span>
-            </div>
+            <a 
+              href={modalMedia.url} 
+              download 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="w-full bg-white/10 hover:bg-white/20 transition-colors py-2 text-xs font-semibold flex items-center justify-center gap-2 border-t border-white/20"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Tải xuống
+            </a>
           </div>
           
           {/* Media Container */}
@@ -244,8 +253,8 @@ const PublicViolationReport = () => {
             <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ease-in-out ${isMediaLoading ? 'opacity-0' : 'opacity-100'}`}>
               {modalMedia.type === 'image' ? (
                 <div
-                  className="w-full h-full flex items-center justify-center overflow-hidden"
-                  style={{ touchAction: 'none' }}
+                  className="w-full h-full"
+                  style={{ touchAction: 'none', cursor: isInteracting ? 'grabbing' : 'grab' }}
                   onWheel={handleWheel}
                   onMouseDown={handleMouseDown}
                   onDoubleClick={resetTransform}
@@ -253,19 +262,17 @@ const PublicViolationReport = () => {
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleInteractionEnd}
                 >
-                  <img 
-                    ref={imageRef}
-                    src={modalMedia.url} 
-                    alt="Bằng chứng" 
-                    className="max-w-none max-h-none"
-                    style={{
-                      width: 'auto',
-                      height: 'auto',
-                      transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                      cursor: isInteracting ? 'grabbing' : 'grab',
-                    }}
-                    onLoad={() => setIsMediaLoading(false)}
-                  />
+                  <div 
+                    className="w-full h-full"
+                    style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}
+                  >
+                    <img 
+                      src={modalMedia.url} 
+                      alt="Bằng chứng" 
+                      className="w-full h-full object-contain"
+                      onLoad={() => setIsMediaLoading(false)}
+                    />
+                  </div>
                 </div>
               ) : (
                 <video 
@@ -296,7 +303,7 @@ const PublicViolationReport = () => {
                 <p className="text-xs text-slate-500">Có thể có sai sót, không phải danh sách lỗi cuối để xét thi đua.</p>
                 <Link to="/bang-diem-thi-dua-tho" className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-md hover:bg-amber-100 transition-colors text-xs font-medium">
                   <Trophy className="w-3 h-3" />
-                  <span>Xem bảng điểm thi đua</span>
+                  <span>Xem bảng điểm thi đua thô</span>
                 </Link>
               </div>
             </div>
@@ -368,7 +375,7 @@ const PublicViolationReport = () => {
                           <th className="px-2 py-2 text-left font-semibold text-slate-700 w-16">Lớp</th>
                           <th className="px-2 py-2 text-left font-semibold text-slate-700">Học sinh</th>
                           <th className="px-2 py-2 text-left font-semibold text-slate-700">Chi tiết vi phạm</th>
-                          <th className="px-2 py-2 text-center font-semibold text-slate-700 w-16">Điểm</th>
+                          <th className="px-2 py-2 text-center font-semibold text-slate-700 w-16">Điểm trừ</th>
                           {isReporterAuthenticated && (<th className="px-2 py-2 text-left font-semibold text-slate-700">Báo cáo</th>)}
                           <th className="px-2 py-2 text-center font-semibold text-slate-700 w-20">BC</th>
                         </tr>
