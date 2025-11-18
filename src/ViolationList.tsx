@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { ViolationWithDetails } from "../convex/violations";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
+import { Loader2, X, Trash2, AlertTriangle } from "lucide-react";
 
 export default function ViolationList({ violations, isLoading, isAdminView = false }: { violations: ViolationWithDetails[] | undefined, isLoading: boolean, isAdminView?: boolean }) {
     const currentUser = useQuery(api.users.getLoggedInUser);
@@ -30,7 +31,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
     const [appealReason, setAppealReason] = useState("");
     const appealViolation = useMutation(api.violations.appealViolation);
     const resolveViolation = useMutation(api.violations.resolveViolation);
-    const deleteViolation = useMutation(api.violations.deleteViolation);
+    const deleteViolation = useAction(api.violations.deleteViolation);
     const editViolation = useMutation(api.violations.editViolation);
     const [isEditing, setIsEditing] = useState(false);
     const [editDetails, setEditDetails] = useState(violation.details || "");
@@ -43,6 +44,11 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
     const [showLogs, setShowLogs] = useState(false);
     const logs = useQuery(api.violations.getViolationLogs, isAdminView ? { violationId: violation._id } : "skip");
     const [showEvidences, setShowEvidences] = useState<boolean[]>(violation.evidenceUrls ? Array(violation.evidenceUrls.length).fill(false) : []);
+    
+    // Delete modal state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteProgress, setDeleteProgress] = useState<string[]>([]);
 
     const handleAppeal = async () => {
         if (!appealReason.trim()) {
@@ -68,13 +74,35 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
     }
 
     const handleDelete = async () => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa báo cáo này không? Hành động này không thể hoàn tác.")) {
-            try {
-                await deleteViolation({ violationId: violation._id });
-                toast.success("Đã xóa báo cáo vi phạm.");
-            } catch (error) {
-                toast.error((error as Error).message);
+        setIsDeleting(true);
+        setDeleteProgress([]);
+        
+        try {
+            // Show evidence files being deleted
+            const evidenceCount = (violation.evidenceR2Keys?.length || 0) + (violation.evidenceFileIds?.length || 0);
+            if (evidenceCount > 0) {
+                setDeleteProgress(prev => [...prev, `Đang xóa ${evidenceCount} file bằng chứng...`]);
+                
+                // Show individual file names if available
+                if (violation.evidenceR2Keys && violation.evidenceR2Keys.length > 0) {
+                    violation.evidenceR2Keys.forEach(key => {
+                        const fileName = key.split('/').pop() || key;
+                        setDeleteProgress(prev => [...prev, `Xóa: ${fileName}`]);
+                    });
+                }
             }
+            
+            setDeleteProgress(prev => [...prev, "Đang xóa báo cáo vi phạm..."]);
+            await deleteViolation({ violationId: violation._id });
+            
+            setDeleteProgress(prev => [...prev, "✓ Hoàn tất!"]);
+            setTimeout(() => {
+                toast.success("Đã xóa báo cáo vi phạm.");
+                setShowDeleteModal(false);
+            }, 500);
+        } catch (error) {
+            toast.error((error as Error).message);
+            setIsDeleting(false);
         }
     }
 
@@ -288,7 +316,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                     </button>
                 )}
                 {isAdminView && (
-                     <button onClick={handleDelete} className="text-sm font-semibold text-red-600 hover:text-red-700">
+                     <button onClick={() => setShowDeleteModal(true)} className="text-sm font-semibold text-red-600 hover:text-red-700">
                         Xóa
                     </button>
                 )}
@@ -326,6 +354,96 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                             ))}
                         </ul>
                     )}
+                </div>
+            )}
+            
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-300">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 opacity-100">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-slate-900">Xác nhận xóa</h3>
+                            </div>
+                            {!isDeleting && (
+                                <button 
+                                    onClick={() => setShowDeleteModal(false)}
+                                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="p-6">
+                            {!isDeleting ? (
+                                <>
+                                    <p className="text-slate-700 mb-4">
+                                        Bạn có chắc chắn muốn xóa báo cáo vi phạm này không?
+                                    </p>
+                                    <div className="bg-slate-50 rounded-lg p-4 mb-4 space-y-2 text-sm">
+                                        <div><span className="font-medium">Lớp:</span> {violation.violatingClass}</div>
+                                        {violation.studentName && (
+                                            <div><span className="font-medium">Học sinh:</span> {violation.studentName}</div>
+                                        )}
+                                        <div><span className="font-medium">Vi phạm:</span> {violation.violationType}</div>
+                                        {((violation.evidenceR2Keys?.length || 0) + (violation.evidenceFileIds?.length || 0)) > 0 && (
+                                            <div className="flex items-center gap-2 text-amber-700 bg-amber-50 p-2 rounded mt-2">
+                                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                                <span>
+                                                    Sẽ xóa {(violation.evidenceR2Keys?.length || 0) + (violation.evidenceFileIds?.length || 0)} file bằng chứng
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-red-600 font-medium">
+                                        Hành động này không thể hoàn tác!
+                                    </p>
+                                </>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                                        <span className="font-medium text-slate-900">Đang xóa...</span>
+                                    </div>
+                                    <div className="bg-slate-50 rounded-lg p-4 max-h-60 overflow-y-auto">
+                                        {deleteProgress.map((msg, idx) => (
+                                            <div 
+                                                key={idx} 
+                                                className={`text-sm py-1 ${msg.startsWith('✓') ? 'text-green-600 font-medium' : 'text-slate-600'}`}
+                                            >
+                                                {msg}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Footer */}
+                        {!isDeleting && (
+                            <div className="flex gap-3 p-6 border-t border-slate-200">
+                                <button
+                                    onClick={() => setShowDeleteModal(false)}
+                                    className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={handleDelete}
+                                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Xóa
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

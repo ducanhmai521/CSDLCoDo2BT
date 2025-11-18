@@ -1,8 +1,8 @@
 import { VIOLATION_CATEGORIES } from "./violationPoints";
 import { v } from "convex/values";
-import { mutation, query, QueryCtx } from "./_generated/server";
+import { mutation, query, QueryCtx, internalMutation, internalQuery, action } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 
 const ATTENDANCE_VIOLATIONS = [
@@ -276,20 +276,88 @@ export const resolveViolation = mutation({
     }
 });
 
-export const deleteViolation = mutation({
+// Internal mutation to delete violation from database
+export const deleteViolationFromDb = internalMutation({
+    args: { 
+        violationId: v.id("violations"),
+        evidenceFileIds: v.optional(v.array(v.id("_storage"))),
+    },
+    returns: v.null(),
+    handler: async (ctx, args) => {
+        // Delete legacy Convex storage files
+        if (args.evidenceFileIds && args.evidenceFileIds.length > 0) {
+            await Promise.all(args.evidenceFileIds.map(fileId => ctx.storage.delete(fileId)));
+        }
+        
+        await ctx.db.delete(args.violationId);
+        return null;
+    }
+});
+
+// Public action to delete violation and all its evidence
+export const deleteViolation = action({
     args: { violationId: v.id("violations") },
+    returns: v.null(),
     handler: async (ctx, args) => {
         const myProfile = await ctx.runQuery(api.users.getMyProfile);
         if (myProfile?.role !== 'admin') {
             throw new Error("Bạn không có quyền thực hiện hành động này.");
         }
         
-        const violation = await ctx.db.get(args.violationId);
-        if (violation?.evidenceFileIds) {
-            await Promise.all(violation.evidenceFileIds.map(fileId => ctx.storage.delete(fileId)));
+        const violation = await ctx.runQuery(internal.violations.getViolationById, { 
+            violationId: args.violationId 
+        });
+        
+        if (!violation) {
+            throw new Error("Không tìm thấy vi phạm.");
+        }
+        
+        // Delete R2 evidence files
+        if (violation.evidenceR2Keys && violation.evidenceR2Keys.length > 0) {
+            await Promise.all(violation.evidenceR2Keys.map(key => 
+                ctx.runAction(internal.r2Actions.deleteR2Object, { key })
+            ));
         }
 
-        await ctx.db.delete(args.violationId);
+        // Delete violation from database (including legacy Convex storage files)
+        await ctx.runMutation(internal.violations.deleteViolationFromDb, { 
+            violationId: args.violationId,
+            evidenceFileIds: violation.evidenceFileIds,
+        });
+        
+        return null;
+    }
+});
+
+// Internal query to get violation by ID
+export const getViolationById = internalQuery({
+    args: { violationId: v.id("violations") },
+    returns: v.union(
+        v.object({
+            _id: v.id("violations"),
+            _creationTime: v.number(),
+            reporterId: v.id("users"),
+            targetType: v.union(v.literal("student"), v.literal("class")),
+            studentName: v.optional(v.string()),
+            violatingClass: v.string(),
+            violationDate: v.number(),
+            violationType: v.string(),
+            details: v.optional(v.string()),
+            evidenceFileIds: v.optional(v.array(v.id("_storage"))),
+            evidenceR2Keys: v.optional(v.array(v.string())),
+            status: v.union(
+                v.literal("reported"),
+                v.literal("appealed"),
+                v.literal("resolved"),
+                v.literal("pending")
+            ),
+            appealReason: v.optional(v.string()),
+            grade: v.number(),
+        }),
+        v.null()
+    ),
+    handler: async (ctx, args) => {
+        return await ctx.db.get(args.violationId);
     }
 });
 
@@ -695,8 +763,6 @@ export const getOverviewForDate = query({
         };
     }
 });
-
-import { internalMutation } from "./_generated/server";
 
 export const populateClassesTable = internalMutation({
   handler: async (ctx) => {
