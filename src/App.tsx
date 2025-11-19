@@ -13,6 +13,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PublicEmulationScoreTable from "./public/PublicEmulationScoreTable";
 import PublicViolationReport from "./public/PublicViolationReport";
 import EviView from "./public/EviView";
+import PublicAbsenceRequest from "./public/PublicAbsenceRequest";
 
 export default function AppWrapper() {
   return (
@@ -21,6 +22,7 @@ export default function AppWrapper() {
         <Route path="/" element={<App />} />
         <Route path="/bang-diem-thi-dua-tho" element={<PublicEmulationScoreTable />} />
         <Route path="/bang-bao-cao-vi-pham" element={<PublicViolationReport />} />
+        <Route path="/xin-phep" element={<PublicAbsenceRequest />} />
         <Route path="/eviview/*" element={<EviView />} />
       </Routes>
     </BrowserRouter>
@@ -71,7 +73,7 @@ function App() {
         <Content />
       </main>
       
-      <Toaster position="top-center" richColors />
+      <Toaster position="bottom-center" richColors />
       
       <footer className="py-6 text-center text-sm text-slate-700 border-t border-white/40 mt-8 nav-glass">
         <div className="max-w-7xl mx-auto px-4">

@@ -188,6 +188,14 @@ export default function ViolationReportForm() {
               disabled={isSubmitting}
               required
             />
+            {studentSearch.trim() && studentSuggestions === undefined && !selectedStudent && (
+              <div className="absolute z-10 w-full mt-1 glass-card-subtle">
+                <div className="px-3 py-3 text-center text-slate-600">
+                  <div className="form-loading-spinner mx-auto mb-2"></div>
+                  <p className="text-xs">Đang tìm kiếm...</p>
+                </div>
+              </div>
+            )}
             {studentSuggestions && studentSuggestions.length > 0 && !selectedStudent && (
               <div className="absolute z-10 w-full mt-1 glass-card-subtle">
                 <ul className="py-1">
@@ -201,6 +209,13 @@ export default function ViolationReportForm() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {studentSuggestions && studentSuggestions.length === 0 && studentSearch.trim() && !selectedStudent && (
+              <div className="absolute z-10 w-full mt-1 glass-card-subtle">
+                <div className="px-3 py-2 text-center text-slate-600 text-sm">
+                  Không tìm thấy học sinh
+                </div>
               </div>
             )}
           </div>

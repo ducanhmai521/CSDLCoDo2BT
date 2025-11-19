@@ -37,6 +37,7 @@ export default function AdminDashboard() {
   const saveSetting = useMutation(api.users.setSetting);
   const exportRosterTemplate = useAction(api.adminTools.exportRosterTemplate);
   const importRoster = useAction(api.adminTools.importRoster);
+  const setupPublicAbsenceSystemUser = useAction(api.adminTools.setupPublicAbsenceSystemUser);
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const roster = useQuery(api.users.listRoster);
@@ -357,28 +358,52 @@ export default function AdminDashboard() {
       </div>
       )}
       {activeSection === 'settings' && (
-      <div className="w-full">
+      <div className="w-full space-y-6">
         <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Cài đặt</h2>
-        <div className="glass-card-subtle p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          <label className="text-sm text-slate-700">Ngày bắt đầu học kỳ/tuần gốc:</label>
-          <input
-            type="text"
-            placeholder="dd/mm/yyyy"
-            value={formatDateDDMMYYYY(weekBaseDate)}
-            onChange={async (e) => {
-              const v = e.target.value;
-              const parsed = parseDDMMYYYY(v);
-              if (!parsed) return;
-              const iso = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000).toISOString().slice(0,10);
-              setWeekBaseDate(iso);
-              try { await saveSetting({ key: 'weekBaseDate', value: iso }); } catch (err) { toast.error((err as Error).message); }
-            }}
-            className="auth-input-field min-w-[160px]"
-          />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-700">Tuần học hiện tại:</span>
-            <span className="font-semibold text-slate-800">{weekNumber}</span>
+        
+        <div className="glass-card-subtle p-4">
+          <h3 className="text-lg font-semibold mb-3 text-slate-800">Tuần học</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <label className="text-sm text-slate-700">Ngày bắt đầu học kỳ/tuần gốc:</label>
+            <input
+              type="text"
+              placeholder="dd/mm/yyyy"
+              value={formatDateDDMMYYYY(weekBaseDate)}
+              onChange={async (e) => {
+                const v = e.target.value;
+                const parsed = parseDDMMYYYY(v);
+                if (!parsed) return;
+                const iso = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+                setWeekBaseDate(iso);
+                try { await saveSetting({ key: 'weekBaseDate', value: iso }); } catch (err) { toast.error((err as Error).message); }
+              }}
+              className="auth-input-field min-w-[160px]"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-700">Tuần học hiện tại:</span>
+              <span className="font-semibold text-slate-800">{weekNumber}</span>
+            </div>
           </div>
+        </div>
+
+        <div className="glass-card-subtle p-4">
+          <h3 className="text-lg font-semibold mb-3 text-slate-800">Form xin phép công khai</h3>
+          <p className="text-sm text-slate-600 mb-3">
+            Cấu hình system user để form xin phép công khai có thể hoạt động. Chỉ cần chạy một lần.
+          </p>
+          <button
+            onClick={async () => {
+              try {
+                const result = await setupPublicAbsenceSystemUser({} as any);
+                toast.success(result.message);
+              } catch (err) {
+                toast.error((err as Error).message);
+              }
+            }}
+            className="btn-glass-primary"
+          >
+            <Settings className="w-5 h-5 inline-block mr-1" /> Cấu hình System User
+          </button>
         </div>
       </div>
       )}

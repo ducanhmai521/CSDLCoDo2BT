@@ -66,3 +66,45 @@ export const importRoster = action({
   }
 });
 
+export const setupPublicAbsenceSystemUser = action({
+  args: {},
+  handler: async (ctx): Promise<{ success: boolean; message: string; systemUserId: string }> => {
+    const myProfile = await ctx.runQuery(api.users.getMyProfile);
+    if (myProfile?.role !== "admin") {
+      throw new Error("Bạn không có quyền thực hiện hành động này.");
+    }
+    
+    // Check if system user already exists
+    const existingSetting: string | null = await ctx.runQuery(api.users.getSetting, { 
+      key: "publicAbsenceSystemUserId" 
+    });
+    
+    if (existingSetting) {
+      return {
+        success: true,
+        message: "System user đã được cấu hình trước đó",
+        systemUserId: existingSetting,
+      };
+    }
+    
+    // Use the first admin user as the system user
+    // This is the simplest approach and maintains referential integrity
+    const adminProfile = await ctx.runQuery(api.users.getMyProfile);
+    if (!adminProfile || !adminProfile.userId) {
+      throw new Error("Không tìm thấy admin user");
+    }
+    
+    // Store the system user ID in settings
+    await ctx.runMutation(api.users.setSetting, {
+      key: "publicAbsenceSystemUserId",
+      value: adminProfile.userId,
+    });
+    
+    return {
+      success: true,
+      message: "Đã cấu hình system user thành công",
+      systemUserId: adminProfile.userId,
+    };
+  }
+});
+
