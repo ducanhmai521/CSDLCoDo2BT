@@ -312,7 +312,7 @@ const PublicAbsenceRequest = () => {
   return (
     <div className="min-h-screen animated-gradient-bg">
       {/* Header - Floating Island */}
-      <div className="sticky top-4 z-10">
+      <div className="pt-4 mb-4">
         <div className="max-w-4xl mx-auto px-4">
           <div className="glass-card rounded-3xl px-4 py-3">
           {/* School Info, Title and Time */}
@@ -407,7 +407,21 @@ const PublicAbsenceRequest = () => {
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="glass-card">
-          {!canSubmit && (
+          {/* Loading State */}
+          {currentTime === null && (
+            <div className="mb-6 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 backdrop-blur-sm border border-blue-300/50 rounded-2xl p-5 flex items-start gap-3 shadow-lg">
+              <div className="form-loading-spinner flex-shrink-0"></div>
+              <div>
+                <p className="font-bold text-blue-900 text-lg">Đang tải thông tin...</p>
+                <p className="text-sm text-blue-800 mt-2 font-medium">
+                  Vui lòng chờ trong giây lát
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {/* Locked State */}
+          {currentTime !== null && !canSubmit && (
             <div className="mb-6 bg-gradient-to-r from-red-500/20 to-rose-500/20 backdrop-blur-sm border border-red-300/50 rounded-2xl p-5 flex items-start gap-3 shadow-lg">
               <AlertCircle className="w-6 h-6 text-red-700 flex-shrink-0 mt-0.5" />
               <div>

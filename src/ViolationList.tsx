@@ -132,7 +132,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                 <div>
                     <p className="font-bold text-lg">{violation.violatingClass} - <span className="font-normal">{violation.violationType}</span></p>
                     <p className="text-sm text-slate-600">
-                        {new Date(violation.violationDate).toLocaleString('vi-VN')} bởi {violation.reporterName}
+                        {new Date(violation.violationDate).toLocaleString('vi-VN')} bởi {(violation as any).requesterName || violation.reporterName}
                     </p>
                 </div>
                 <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColor(violation.status)}`}>

@@ -35,6 +35,7 @@ const applicationTables = {
     ),
     appealReason: v.optional(v.string()),
     grade: v.number(),
+    requesterName: v.optional(v.string()), // Name of person who submitted the absence request
   })
     .index("by_grade", ["grade"])
     .index("by_violatingClass", ["violatingClass"]),

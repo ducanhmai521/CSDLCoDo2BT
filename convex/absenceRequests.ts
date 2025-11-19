@@ -314,6 +314,7 @@ export const submitPublicAbsenceRequest = mutation({
         grade,
         evidenceFileIds: [],
         evidenceR2Keys: student.evidenceR2Keys,
+        requesterName: trimmedRequesterName,
       });
 
       successfulStudents.push(`${trimmedStudentName} (${upperNoSpace})`);
