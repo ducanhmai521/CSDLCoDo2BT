@@ -353,6 +353,7 @@ export const getViolationById = internalQuery({
             ),
             appealReason: v.optional(v.string()),
             grade: v.number(),
+            requesterName: v.optional(v.string()),
         }),
         v.null()
     ),
