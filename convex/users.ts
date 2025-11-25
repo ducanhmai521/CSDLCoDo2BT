@@ -134,9 +134,52 @@ import { v } from "convex/values";
     });
 
     export const getAllStudents = query({
+      args: {},
+      returns: v.array(v.object({
+        _id: v.id("studentRoster"),
+        _creationTime: v.number(),
+        fullName: v.string(),
+        className: v.string(),
+      })),
       handler: async (ctx) => {
         const students = await ctx.db.query("studentRoster").collect();
         return students;
+      },
+    });
+
+    export const getAllUserProfiles = query({
+      args: {},
+      returns: v.array(v.object({
+        userId: v.id("users"),
+        fullName: v.string(),
+        className: v.string(),
+        role: v.union(
+          v.literal("pending"),
+          v.literal("gradeManager"),
+          v.literal("admin")
+        ),
+      })),
+      handler: async (ctx) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) {
+          return [];
+        }
+        const myProfile = await ctx.db
+          .query("userProfiles")
+          .withIndex("by_userId", (q) => q.eq("userId", userId))
+          .unique();
+        
+        if (!myProfile?.isSuperUser) {
+          return [];
+        }
+        
+        const profiles = await ctx.db.query("userProfiles").collect();
+        return profiles.map(p => ({
+          userId: p.userId,
+          fullName: p.fullName,
+          className: p.className,
+          role: p.role,
+        }));
       },
     });
 

@@ -30,6 +30,7 @@ const PublicViolationReport = () => {
   const [reporterPassword, setReporterPassword] = useState("");
   const [isReporterAuthenticated, setIsReporterAuthenticated] = useState(false);
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
+  const [expandedDetails, setExpandedDetails] = useState<{ [key: string]: boolean }>({});
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
   
   // Modal State
@@ -159,6 +160,8 @@ const PublicViolationReport = () => {
   };
 
   const toggleDay = (day: number) => setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
+  
+  const toggleDetails = (violationId: string) => setExpandedDetails(prev => ({ ...prev, [violationId]: !prev[violationId] }));
 
   // --- Zoom & Pan Handlers ---
   const handleWheel = (e: React.WheelEvent) => {
@@ -292,40 +295,37 @@ const PublicViolationReport = () => {
 
       {/* Compact Sticky Header */}
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-3 py-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div className="flex-1 text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-2">
-                <FileText className="w-5 h-5 text-indigo-500" />
-                <h1 className="text-lg sm:text-xl font-bold text-slate-800 leading-tight">BÁO CÁO VI PHẠM THPTS2BT</h1>
-              </div>
-              <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
-                <p className="text-xs text-slate-500">Có thể có sai sót, không phải danh sách lỗi cuối để xét thi đua.</p>
-                <Link to="/bang-diem-thi-dua-tho" className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-md hover:bg-amber-100 transition-colors text-xs font-medium">
-                  <Trophy className="w-3 h-3" />
-                  <span>Xem bảng điểm thi đua thô</span>
-                </Link>
-              </div>
+        <div className="max-w-7xl mx-auto px-2 sm:px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 flex-shrink-0" />
+              <h1 className="text-sm sm:text-lg font-bold text-slate-800 leading-tight">BÁO CÁO VI PHẠM THPTS2BT</h1>
+              <span className="text-[10px] sm:text-xs text-slate-500">•</span>
+              <p className="text-[10px] sm:text-xs text-slate-500 leading-tight">Có thể có sai sót</p>
+              <Link to="/bang-diem-thi-dua-tho" className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 bg-amber-50 text-amber-600 rounded hover:bg-amber-100 transition-colors text-[10px] sm:text-xs font-medium">
+                <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span>Bảng điểm thô</span>
+              </Link>
             </div>
-            <div className="flex items-center gap-3 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-              <Calendar className="w-4 h-4 text-slate-600" />
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Tuần:</label>
-                <input type="text" value={weekInput} onChange={handleWeekChange} className={`border px-2 py-1 w-16 text-center text-sm rounded ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} />
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-200 flex-shrink-0">
+              <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 flex-shrink-0" />
+              <div className="flex items-center gap-1 sm:gap-2">
+                <label className="text-xs sm:text-sm font-medium text-slate-700">Tuần:</label>
+                <input type="text" value={weekInput} onChange={handleWeekChange} className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-12 sm:w-16 text-center text-xs sm:text-sm rounded ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} />
               </div>
-              {dateRange && (<span className="text-xs text-slate-600 hidden sm:inline">({format(new Date(dateRange.start), "dd/MM/yyyy")} - {format(new Date(dateRange.end), "dd/MM/yyyy")})</span>)}
+              {dateRange && (<span className="text-[10px] sm:text-xs text-slate-600 hidden md:inline whitespace-nowrap">({format(new Date(dateRange.start), "dd/MM")} - {format(new Date(dateRange.end), "dd/MM")})</span>)}
             </div>
           </div>
           {weekError && (
-            <div className="mt-2 flex items-center gap-1 text-red-600 text-xs">
+            <div className="mt-1 sm:mt-2 flex items-center justify-center gap-1 text-red-600 text-[10px] sm:text-xs">
               <AlertCircle className="w-3 h-3" />
               <span>{weekError}</span>
             </div>
           )}
           {showReporterInput && (
-            <div className="mt-2 flex justify-center items-center gap-2">
-              <label className="text-sm font-medium text-slate-700">Mật khẩu:</label>
-              <input type="password" value={reporterPassword} onChange={(e) => setReporterPassword(e.target.value)} onKeyDown={handlePasswordSubmit} className="border border-slate-300 px-2 py-1 w-40 text-center text-sm rounded" />
+            <div className="mt-1 sm:mt-2 flex justify-center items-center gap-2">
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Mật khẩu:</label>
+              <input type="password" value={reporterPassword} onChange={(e) => setReporterPassword(e.target.value)} onKeyDown={handlePasswordSubmit} className="border border-slate-300 px-2 py-1 w-32 sm:w-40 text-center text-xs sm:text-sm rounded" />
             </div>
           )}
         </div>
@@ -372,47 +372,70 @@ const PublicViolationReport = () => {
                     <table className="w-full text-xs sm:text-sm">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="px-2 py-2 text-left font-semibold text-slate-700 w-16">Lớp</th>
-                          <th className="px-2 py-2 text-left font-semibold text-slate-700">Học sinh</th>
-                          <th className="px-2 py-2 text-left font-semibold text-slate-700">Chi tiết vi phạm</th>
-                          <th className="px-2 py-2 text-center font-semibold text-slate-700 w-16">Điểm trừ</th>
-                          {isReporterAuthenticated && (<th className="px-2 py-2 text-left font-semibold text-slate-700">Báo cáo</th>)}
-                          <th className="px-2 py-2 text-center font-semibold text-slate-700 w-20">BC</th>
+                          <th className="px-1.5 py-2 text-left font-semibold text-slate-700 w-12 sm:w-14">Lớp</th>
+                          <th className="px-1.5 py-2 text-left font-semibold text-slate-700">Học sinh</th>
+                          <th className="px-1.5 py-2 text-left font-semibold text-slate-700">Chi tiết vi phạm</th>
+                          <th className="px-1.5 py-2 text-center font-semibold text-slate-700 w-14 sm:w-16">Điểm trừ</th>
+                          {isReporterAuthenticated && (<th className="px-1.5 py-2 text-left font-semibold text-slate-700">Báo cáo</th>)}
+                          <th className="px-1.5 py-2 text-center font-semibold text-slate-700 w-16 sm:w-20">BC</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {dayViolations.map((v: any) => (
-                          <tr key={v._id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-2 py-2 text-center font-medium text-slate-900">{v.violatingClass}</td>
-                            <td className="px-2 py-2 text-slate-800">{v.studentName || "-"}</td>
-                            <td className="px-2 py-2 text-slate-700">
-                              <div className="font-medium text-slate-900">{v.details ? `${v.violationType}: ${v.details}`: v.violationType}</div>
-                            </td>
-                            <td className="px-2 py-2 text-center">
-                              <span className="inline-flex items-center justify-center min-w-[2.5rem] h-6 bg-red-100 text-red-700 font-bold rounded text-sm px-2">{v.points}</span>
-                            </td>
-                            {isReporterAuthenticated && (<td className="px-2 py-2 text-slate-700">{(v as any).requesterName || v.reporterName}</td>)}
-                            <td className="px-2 py-2">
-                              {v.evidenceUrls && v.evidenceUrls.length > 0 ? (
-                                <div className="flex flex-col gap-1">
-                                  {v.evidenceUrls.map((url: string | null, i: number) => {
-                                    if (!url) return null;
-                                    return (
-                                      <div key={i}>
-                                        <button onClick={() => handleOpenModal(v, url)} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-xs">
-                                          <Eye className="w-3 h-3" />
-                                          <span>Xem {i + 1}</span>
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
+                        {dayViolations.map((v: any) => {
+                          const isDetailExpanded = expandedDetails[v._id];
+                          const hasDetails = v.details && v.details.trim() !== '';
+                          
+                          return (
+                            <tr key={v._id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-1.5 py-2 text-center font-medium text-slate-900 text-xs sm:text-sm">{v.violatingClass}</td>
+                              <td className="px-1.5 py-2 text-slate-800 text-xs sm:text-sm">{v.studentName || "-"}</td>
+                              <td className="px-1.5 py-2 text-slate-700">
+                                <div className="font-medium text-slate-900 text-xs sm:text-sm">
+                                  {v.violationType}
+                                  {hasDetails && (
+                                    <>
+                                      <button 
+                                        onClick={() => toggleDetails(v._id)}
+                                        className="ml-1 text-blue-600 hover:text-blue-700 inline-flex items-center"
+                                      >
+                                        {isDetailExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                      </button>
+                                      {isDetailExpanded && (
+                                        <div className="mt-1 text-xs text-slate-600 border-l-2 border-slate-300 pl-2">
+                                          {v.details}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
-                              ) : (
-                                <span className="text-slate-400">-</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="px-1.5 py-2 text-center">
+                                <span className="inline-flex items-center justify-center min-w-[2rem] sm:min-w-[2.5rem] h-5 sm:h-6 bg-red-100 text-red-700 font-bold rounded text-xs sm:text-sm px-1.5 sm:px-2">{v.points}</span>
+                              </td>
+                              {isReporterAuthenticated && (<td className="px-1.5 py-2 text-slate-700 text-xs sm:text-sm">{(v as any).requesterName || v.reporterName}</td>)}
+                              <td className="px-1.5 py-2">
+                                {v.evidenceUrls && v.evidenceUrls.length > 0 ? (
+                                  <div className="flex flex-col gap-1">
+                                    {v.evidenceUrls.map((url: string | null, i: number) => {
+                                      if (!url) return null;
+                                      return (
+                                        <div key={i}>
+                                          <button onClick={() => handleOpenModal(v, url)} className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-xs">
+                                            <Eye className="w-3 h-3" />
+                                            <span className="hidden sm:inline">Xem {i + 1}</span>
+                                            <span className="sm:hidden">{i + 1}</span>
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

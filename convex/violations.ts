@@ -639,6 +639,7 @@ export const bulkReportViolations = mutation({
       })
     ),
     customDate: v.optional(v.number()),
+    customReporterId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -655,10 +656,14 @@ export const bulkReportViolations = mutation({
       throw new Error("You do not have permission to report violations.");
     }
 
+    // Check if user is superUser for custom reporter override
+    const reporterId = (myProfile.isSuperUser && args.customReporterId) 
+      ? args.customReporterId 
+      : userId;
+
     const duplicates: string[] = [];
     let successCount = 0;
-    const violationDate =
-      args.customDate ?? new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+    const violationDate = args.customDate ?? Date.now();
 
     for (const v of args.violations) {
       const isDuplicate = await checkForDuplicate(ctx, {
@@ -692,7 +697,7 @@ export const bulkReportViolations = mutation({
         const grade = parseInt(classMatch[1], 10);
 
         await ctx.db.insert("violations", {
-          reporterId: userId,
+          reporterId: reporterId,
           violationDate,
           violationType: v.violationType,
           details: v.details,

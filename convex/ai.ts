@@ -22,46 +22,118 @@ export const parseViolationsWithAI = action({
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
 
     const prompt = `
-      You are an assistant for a school's disciplinary system. Your task is to parse a raw text input containing a list of student or class violations and convert it into a structured JSON format.
+Bạn là trợ lý cho hệ thống kỷ luật của trường học. Nhiệm vụ của bạn là phân tích văn bản thô chứa danh sách vi phạm của học sinh hoặc lớp và chuyển đổi thành định dạng JSON có cấu trúc.
 
-      Here is the list of all possible violation types:
-      ${ALL_VIOLATIONS.join(", ")}
+⚠️ QUY TẮC QUAN TRỌNG NHẤT:
+- Format dòng: "[Tên học sinh] [Lớp] [Vi phạm]" hoặc "[Lớp] [Vi phạm]"
+- Mọi từ TRƯỚC tên lớp (10A1, 11B2, 12C3...) đều là TÊN HỌC SINH
+- Ví dụ: "Trường 12A1 đi muộn" → "Trường" là TÊN HỌC SINH, KHÔNG phải "trường học"
+- Ví dụ: "Hùng 11B2 tóc" → "Hùng" là TÊN HỌC SINH
+- Ví dụ: "10A8 vệ sinh muộn" → KHÔNG có tên học sinh (vi phạm cấp lớp)
 
-      Now, parse the following raw text.
-      1.  **Extract Violations**: For each entry, identify the student's name (or null if it's a class-level violation), their class, the violation type, and specific details. If a single line contains multiple student names, create a separate violation entry for each student, ensuring all other details (class, violation type, details, originalText) are correctly associated with each student.  If a single line contains multiple violation/student, create a separate violation entry for each violation with same student name, ensuring all other details (class, violation type, details, originalText) are correctly associated with each entry.
-          - If an entry is for a class (e.g., "10a8 vệ sinh muộn"), the student name should be null.
-          - **violationType**: This MUST be one of the exact strings from the provided list. Map common abbreviations or descriptions to the correct violation type (e.g., "sai dp", "dép lê", or "đeo khuyên tai" should all be mapped to "Sai đồng phục/đầu tóc,...").
-          - **details**: This should be the specific detail of the violation mentioned in the text. For example, if the input is "bùi hiếu 11a7 đeo khuyên tai", the detail is "Đeo khuyên tai". If the input is just "10a8 vệ sinh muộn" with no extra detail, this field should be an empty string. Make sure to standardize the detail to make it look professional if needed (e.g: captial characters, use of words like "vs muộn" to "Vệ sinh muộn"; "tóc" to "Đầu tóc"; "khuyên tai" to "Đeo khuyên tai")
-          - **originalText**: The exact original line from the raw text that this violation was parsed from.
-          - Return the student name as it appears in the text. Do not try to find the full name.
-          - Class names should be normalized to uppercase (e.g., "11a8" -> "11A8").
-          - Each student can only violate 1 error type at once (no duplicate entry for same student with same error, one student still can violate mutiple error if they are different in type.)
-          - If user dont mention whether a student's "Nghỉ học", "Đi muộn" is "Có phép" or not, choose "Có phép". If user said something like "vắng", choose "Nghỉ có phép.". If something like "xin đi muộn", choose "Đi muộn có phép."
+DANH SÁCH CÁC LOẠI VI PHẠM HỢP LỆ:
+${ALL_VIOLATIONS.join(", ")}
 
-      2.  **Extract Checked Classes**: Look for a line starting with "ktra:", "ktr:", "check:", or similar keywords, which indicates a list of classes that were checked. Extract these class names.
-          - The classes might be comma-separated and some might be partial (e.g., "12a1,2,3,6"). You need to expand them based on the first class mentioned (e.g., "12a1,2,3,6" becomes "12A1", "12A2", "12A3", "12A6").
-          - Normalize all class names to uppercase.
+HƯỚNG DẪN PHÂN TÍCH:
 
-      Raw text:
-      "${rawText}"
+1. TRÍCH XUẤT VI PHẠM:
+   - Với mỗi dòng, xác định: tên học sinh (hoặc null nếu là vi phạm cấp lớp), lớp, loại vi phạm, và chi tiết cụ thể
+   - Nếu một dòng có nhiều tên học sinh, tạo một mục vi phạm riêng cho mỗi học sinh
+   - Nếu một dòng có nhiều vi phạm cho cùng một học sinh, tạo một mục riêng cho mỗi vi phạm
+   
+   FORMAT NHẬN DẠNG:
+   - "[Tên học sinh] [Lớp] [Vi phạm]" → Vi phạm cá nhân
+   - "[Lớp] [Vi phạm]" → Vi phạm cấp lớp (không có tên học sinh)
+   
+   VÍ DỤ CỤ THỂ:
+   - "Nguyễn Văn A 10A1 sai đồng phục" → studentName: "Nguyễn Văn A", violatingClass: "10A1"
+   - "Trường 12A1 đi muộn" → studentName: "Trường", violatingClass: "12A1" (Trường là TÊN HỌC SINH, không phải "trường học")
+   - "Hùng 11B2 tóc" → studentName: "Hùng", violatingClass: "11B2"
+   - "Nguyễn Văn A, Trần Thị B 10A1 sai đồng phục" → 2 mục vi phạm riêng biệt
+   - "Lê Văn C 11A2 đi muộn, sai đồng phục" → 2 mục vi phạm riêng biệt
+   - "10A8 vệ sinh muộn" → 1 mục vi phạm cấp lớp (studentName = null)
+   
+   LƯU Ý QUAN TRỌNG:
+   - Bất kỳ từ nào TRƯỚC tên lớp (format [Khối][Chữ][Số] như 10A1, 11B2, 12C3) đều là TÊN HỌC SINH
+   - Tên học sinh có thể là 1 từ (Trường, Hùng, An) hoặc nhiều từ (Nguyễn Văn A, Trần Thị B)
+   - KHÔNG nhầm lẫn tên học sinh với các từ khác như "trường học", "lớp học"
 
-      Return a single JSON object with the following structure:
-      {
-        "violations": [
-          {
-            "studentName": "string | null",
-            "violatingClass": "string",
-            "violationType": "string",
-            "details": "string",
-            "originalText": "string"
-          }
-        ],
-        "checkedClasses": ["string"]
-      }
-      If no checked classes are found, return an empty array for "checkedClasses".
+2. QUY TẮC CHO CÁC TRƯỜNG:
+   
+   a) studentName:
+      - Giữ nguyên tên như trong văn bản, KHÔNG cố tìm tên đầy đủ
+      - Viết hoa chữ cái đầu mỗi từ (ví dụ: "nguyễn văn a" → "Nguyễn Văn A", "trường" → "Trường")
+      - Nếu là vi phạm cấp lớp (không có tên trước lớp) → null
+      - QUY TẮC: Mọi từ TRƯỚC tên lớp (10A1, 11B2, etc.) đều là tên học sinh
+        * "Trường 12A1 đi muộn" → studentName: "Trường" (ĐÚNG)
+        * "Hùng 11B2 tóc" → studentName: "Hùng" (ĐÚNG)
+        * "An 10A5 sai dp" → studentName: "An" (ĐÚNG)
+   
+   b) violatingClass:
+      - Chuẩn hóa thành chữ IN HOA (ví dụ: "11a8" → "11A8")
+      - Format: [Khối][Chữ cái][Số] (ví dụ: "10A1", "11B5", "12C3")
+   
+   c) violationType:
+      - PHẢI là một trong các chuỗi CHÍNH XÁC từ danh sách trên
+      - Ánh xạ các từ viết tắt/mô tả phổ biến:
+        * "sai dp", "dép lê", "tóc", "đầu tóc", "khuyên tai" → "Sai đồng phục/đầu tóc,..."
+        * "vs muộn", "vệ sinh muộn", "vs trễ" → "Vệ sinh muộn"
+        * "muộn", "đi muộn", "trễ" → "Đi học muộn có phép" (nếu không nói rõ "không phép")
+        * "vắng", "nghỉ" → "Nghỉ học có phép" (nếu không nói rõ "không phép")
+        * "xin muộn", "xin đi muộn" → "Đi học muộn có phép"
+        * "xin nghỉ", "xin vắng" → "Nghỉ học có phép"
+        * "muộn không phép", "đi muộn kp" → "Đi học muộn/nghỉ học không phép"
+        * "vắng không phép", "nghỉ kp" → "Đi học muộn/nghỉ học không phép"
+   
+   d) details:
+      - Chi tiết cụ thể của vi phạm được đề cập trong văn bản
+      - Chuẩn hóa để trông chuyên nghiệp:
+        * Viết hoa chữ cái đầu
+        * "vs muộn" → "Vệ sinh muộn"
+        * "tóc" → "Đầu tóc"
+        * "khuyên tai" → "Đeo khuyên tai"
+        * "dép lê" → "Đi dép lê"
+        * "sai dp" → "Sai đồng phục"
+      - Nếu không có chi tiết cụ thể → chuỗi rỗng ""
+   
+   e) originalText:
+      - Dòng văn bản GỐC CHÍNH XÁC mà vi phạm này được phân tích từ đó
+
+3. QUY TẮC QUAN TRỌNG:
+   - Mỗi học sinh chỉ có thể vi phạm 1 lỗi cùng loại tại một thời điểm (không trùng lặp)
+   - Một học sinh vẫn có thể có nhiều vi phạm nếu chúng khác loại
+   - Mặc định "Có phép" nếu không nói rõ "không phép" hoặc "kp"
+
+4. TRÍCH XUẤT LỚP ĐÃ KIỂM TRA:
+   - Tìm dòng bắt đầu với: "ktra:", "ktr:", "check:", "kiểm tra:", hoặc tương tự
+   - Trích xuất tên các lớp từ dòng đó
+   - Mở rộng các lớp viết tắt:
+     * "12a1,2,3,6" → ["12A1", "12A2", "12A3", "12A6"]
+     * "10a1, 10a2, 11b3" → ["10A1", "10A2", "11B3"]
+   - Chuẩn hóa tất cả tên lớp thành CHỮ IN HOA
+
+VĂN BẢN CẦN PHÂN TÍCH:
+"${rawText}"
+
+TRẢ VỀ MỘT ĐỐI TƯỢNG JSON DUY NHẤT VỚI CẤU TRÚC SAU:
+{
+  "violations": [
+    {
+      "studentName": "string | null",
+      "violatingClass": "string",
+      "violationType": "string",
+      "details": "string",
+      "originalText": "string"
+    }
+  ],
+  "checkedClasses": ["string"]
+}
+
+Nếu không tìm thấy lớp đã kiểm tra, trả về mảng rỗng cho "checkedClasses".
+CHỈ TRẢ VỀ JSON, KHÔNG CÓ TEXT GIẢI THÍCH THÊM.
     `;
 
     try {
