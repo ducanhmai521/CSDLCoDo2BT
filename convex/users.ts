@@ -5,6 +5,24 @@ import { v } from "convex/values";
 
     export const getMyProfile = query({
       args: {},
+      returns: v.union(
+        v.object({
+          _id: v.id("userProfiles"),
+          _creationTime: v.number(),
+          userId: v.id("users"),
+          fullName: v.string(),
+          className: v.string(),
+          grade: v.number(),
+          role: v.union(
+            v.literal("admin"),
+            v.literal("gradeManager"),
+            v.literal("pending")
+          ),
+          isSuperUser: v.optional(v.boolean()),
+          webVer: v.optional(v.number()),
+        }),
+        v.null()
+      ),
       handler: async (ctx) => {
         const userId = await getAuthUserId(ctx);
         if (!userId) {
@@ -23,6 +41,7 @@ import { v } from "convex/values";
         fullName: v.string(),
         className: v.string(),
       },
+      returns: v.null(),
       handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
         if (!userId) {
@@ -44,13 +63,18 @@ import { v } from "convex/values";
         }
         const grade = parseInt(gradeMatch[1], 10);
 
+        // CHỈ cho phép tạo profile với role "pending"
+        // KHÔNG cho phép user tự set isSuperUser hoặc role khác
         await ctx.db.insert("userProfiles", {
           userId,
           fullName: args.fullName,
           className: args.className,
           grade,
           role: "pending",
+          // isSuperUser KHÔNG được set ở đây - chỉ có thể set thủ công qua dashboard
         });
+        
+        return null;
       },
     });
 
@@ -84,6 +108,7 @@ import { v } from "convex/values";
       args: {
         profileId: v.id("userProfiles"),
       },
+      returns: v.null(),
       handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
         if (!userId) {
@@ -103,14 +128,21 @@ import { v } from "convex/values";
           throw new Error("Không tìm thấy hồ sơ.");
         }
         
+        // KHÔNG cho phép verify chính mình
+        if (profile.userId === userId) {
+          throw new Error("Không thể verify chính mình.");
+        }
+        
+        // KHÔNG cho phép thay đổi isSuperUser của người khác
+        // CHỈ cho phép thay đổi role
         const admins = await ctx.db.query("userProfiles").filter(q => q.eq(q.field("role"), "admin")).collect();
         if (admins.length === 0) {
           await ctx.db.patch(args.profileId, { role: "admin" });
         } else {
-          await ctx.db.patch(args.profileId, {
-            role: "gradeManager",
-          });
+          await ctx.db.patch(args.profileId, { role: "gradeManager" });
         }
+        
+        return null;
       },
     });
 
@@ -276,6 +308,8 @@ import { v } from "convex/values";
     });
 
     export const switchRole = mutation({
+      args: {},
+      returns: v.union(v.literal("admin"), v.literal("gradeManager")),
       handler: async (ctx) => {
         const userId = await getAuthUserId(ctx);
         if (!userId) {
@@ -292,6 +326,9 @@ import { v } from "convex/values";
         }
 
         const newRole = myProfile.role === "admin" ? "gradeManager" : "admin";
+        
+        // CHỈ cho phép thay đổi role, KHÔNG cho phép thay đổi bất kỳ field nào khác
+        // Đặc biệt là isSuperUser
         await ctx.db.patch(myProfile._id, { role: newRole });
 
         return newRole;
