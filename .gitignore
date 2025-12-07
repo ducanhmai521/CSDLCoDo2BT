@@ -1,0 +1,45 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+dist-ssr
+
+# Environment variables
+*.local
+.env
+.env.local
+
+# IDE and Editor directories
+.vscode/
+.idea/
+.cursor/
+.kiro/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Executables and binaries
+*.exe
+*.dll
+*.so
+*.dylib
+codedump.exe
+
+# Ignored for the template, you probably want to remove it:
+package-lock.json

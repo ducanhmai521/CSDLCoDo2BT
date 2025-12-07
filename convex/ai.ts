@@ -9,116 +9,91 @@ const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
   (category) => category.violations
 );
 
-export const parseViolationsWithAI = action({
+// Mode for "Cờ đỏ" - attendance checking with violations
+export const parseAttendanceWithAI = action({
   args: {
     rawText: v.string(),
   },
+  returns: v.object({
+    violations: v.array(v.object({
+      studentName: v.union(v.string(), v.null()),
+      violatingClass: v.string(),
+      violationType: v.string(),
+      details: v.string(),
+      originalText: v.string(),
+    })),
+    checkedClasses: v.array(v.string()),
+    attendanceByClass: v.record(v.string(), v.object({
+      absentStudents: v.array(v.string()),
+      lateStudents: v.array(v.string()),
+    })),
+  }),
   handler: async (ctx, { rawText }) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error(
-        "Missing GEMINI_API_KEY environment variable. Please add it to your .env.local file."
-      );
+      throw new Error("Missing GEMINI_API_KEY environment variable.");
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
 
     const prompt = `
-Bạn là trợ lý cho hệ thống kỷ luật của trường học. Nhiệm vụ của bạn là phân tích văn bản thô chứa danh sách vi phạm của học sinh hoặc lớp và chuyển đổi thành định dạng JSON có cấu trúc.
+Bạn là trợ lý phân tích báo cáo CỜ ĐỎ của trường học. Cờ đỏ đi từng lớp để kiểm tra sĩ số và vi phạm.
 
-⚠️ QUY TẮC QUAN TRỌNG NHẤT:
-- Format dòng: "[Tên học sinh] [Lớp] [Vi phạm]" hoặc "[Lớp] [Vi phạm]"
-- Mọi từ TRƯỚC tên lớp (10A1, 11B2, 12C3...) đều là TÊN HỌC SINH
-- Ví dụ: "Trường 12A1 đi muộn" → "Trường" là TÊN HỌC SINH, KHÔNG phải "trường học"
-- Ví dụ: "Hùng 11B2 tóc" → "Hùng" là TÊN HỌC SINH
-- Ví dụ: "10A8 vệ sinh muộn" → KHÔNG có tên học sinh (vi phạm cấp lớp)
-
-DANH SÁCH CÁC LOẠI VI PHẠM HỢP LỆ:
+DANH SÁCH VI PHẠM HỢP LỆ:
 ${ALL_VIOLATIONS.join(", ")}
 
-HƯỚNG DẪN PHÂN TÍCH:
+NHIỆM VỤ:
+1. Xác định các lớp đã kiểm tra
+2. Với mỗi lớp, trích xuất:
+   - Học sinh vắng/nghỉ (tự động gán "Nghỉ học có phép")
+   - Học sinh đi muộn (tự động gán "Đi học muộn có phép")
+   - Các vi phạm khác (sai đồng phục, vệ sinh muộn, etc.)
 
-1. TRÍCH XUẤT VI PHẠM:
-   - Với mỗi dòng, xác định: tên học sinh (hoặc null nếu là vi phạm cấp lớp), lớp, loại vi phạm, và chi tiết cụ thể
-   - Nếu một dòng có nhiều tên học sinh, tạo một mục vi phạm riêng cho mỗi học sinh
-   - Nếu một dòng có nhiều vi phạm cho cùng một học sinh, tạo một mục riêng cho mỗi vi phạm
-   
-   FORMAT NHẬN DẠNG:
-   - "[Tên học sinh] [Lớp] [Vi phạm]" → Vi phạm cá nhân
-   - "[Lớp] [Vi phạm]" → Vi phạm cấp lớp (không có tên học sinh)
-   
-   VÍ DỤ CỤ THỂ:
-   - "Nguyễn Văn A 10A1 sai đồng phục" → studentName: "Nguyễn Văn A", violatingClass: "10A1"
-   - "Trường 12A1 đi muộn" → studentName: "Trường", violatingClass: "12A1" (Trường là TÊN HỌC SINH, không phải "trường học")
-   - "Hùng 11B2 tóc" → studentName: "Hùng", violatingClass: "11B2"
-   - "Nguyễn Văn A, Trần Thị B 10A1 sai đồng phục" → 2 mục vi phạm riêng biệt
-   - "Lê Văn C 11A2 đi muộn, sai đồng phục" → 2 mục vi phạm riêng biệt
-   - "10A8 vệ sinh muộn" → 1 mục vi phạm cấp lớp (studentName = null)
-   
-   LƯU Ý QUAN TRỌNG:
-   - Bất kỳ từ nào TRƯỚC tên lớp (format [Khối][Chữ][Số] như 10A1, 11B2, 12C3) đều là TÊN HỌC SINH
-   - Tên học sinh có thể là 1 từ (Trường, Hùng, An) hoặc nhiều từ (Nguyễn Văn A, Trần Thị B)
-   - KHÔNG nhầm lẫn tên học sinh với các từ khác như "trường học", "lớp học"
+⚠️ QUY TẮC QUAN TRỌNG NHẤT:
+- MỖI HỌC SINH PHẢI CÓ MỘT VI PHẠM RIÊNG BIỆT
+- KHÔNG BAO GIỜ để studentName = null khi có tên học sinh
+- Nếu có nhiều học sinh cùng vi phạm → TẠO NHIỀU MỤC VI PHẠM RIÊNG
 
-2. QUY TẮC CHO CÁC TRƯỜNG:
-   
-   a) studentName:
-      - Giữ nguyên tên như trong văn bản, KHÔNG cố tìm tên đầy đủ
-      - Viết hoa chữ cái đầu mỗi từ (ví dụ: "nguyễn văn a" → "Nguyễn Văn A", "trường" → "Trường")
-      - Nếu là vi phạm cấp lớp (không có tên trước lớp) → null
-      - QUY TẮC: Mọi từ TRƯỚC tên lớp (10A1, 11B2, etc.) đều là tên học sinh
-        * "Trường 12A1 đi muộn" → studentName: "Trường" (ĐÚNG)
-        * "Hùng 11B2 tóc" → studentName: "Hùng" (ĐÚNG)
-        * "An 10A5 sai dp" → studentName: "An" (ĐÚNG)
-   
-   b) violatingClass:
-      - Chuẩn hóa thành chữ IN HOA (ví dụ: "11a8" → "11A8")
-      - Format: [Khối][Chữ cái][Số] (ví dụ: "10A1", "11B5", "12C3")
-   
-   c) violationType:
-      - PHẢI là một trong các chuỗi CHÍNH XÁC từ danh sách trên
-      - Ánh xạ các từ viết tắt/mô tả phổ biến:
-        * "sai dp", "dép lê", "tóc", "đầu tóc", "khuyên tai" → "Sai đồng phục/đầu tóc,..."
-        * "vs muộn", "vệ sinh muộn", "vs trễ" → "Vệ sinh muộn"
-        * "muộn", "đi muộn", "trễ" → "Đi học muộn có phép" (nếu không nói rõ "không phép")
-        * "vắng", "nghỉ" → "Nghỉ học có phép" (nếu không nói rõ "không phép")
-        * "xin muộn", "xin đi muộn" → "Đi học muộn có phép"
-        * "xin nghỉ", "xin vắng" → "Nghỉ học có phép"
-        * "muộn không phép", "đi muộn kp" → "Đi học muộn/nghỉ học không phép"
-        * "vắng không phép", "nghỉ kp" → "Đi học muộn/nghỉ học không phép"
-   
-   d) details:
-      - Chi tiết cụ thể của vi phạm được đề cập trong văn bản
-      - Chuẩn hóa để trông chuyên nghiệp:
-        * Viết hoa chữ cái đầu
-        * "vs muộn" → "Vệ sinh muộn"
-        * "tóc" → "Đầu tóc"
-        * "khuyên tai" → "Đeo khuyên tai"
-        * "dép lê" → "Đi dép lê"
-        * "sai dp" → "Sai đồng phục"
-      - Nếu không có chi tiết cụ thể → chuỗi rỗng ""
-   
-   e) originalText:
-      - Dòng văn bản GỐC CHÍNH XÁC mà vi phạm này được phân tích từ đó
+FORMAT LINH HOẠT - AI CẦN HIỂU:
+- "10A1: vắng: An, Bình" → TẠO 2 VI PHẠM:
+  * {studentName: "An", violatingClass: "10A1", violationType: "Nghỉ học có phép"}
+  * {studentName: "Bình", violatingClass: "10A1", violationType: "Nghỉ học có phép"}
+  
+- "10A1 vắng An Bình" → TẠO 2 VI PHẠM (tương tự trên)
 
-3. QUY TẮC QUAN TRỌNG:
-   - Mỗi học sinh chỉ có thể vi phạm 1 lỗi cùng loại tại một thời điểm (không trùng lặp)
-   - Một học sinh vẫn có thể có nhiều vi phạm nếu chúng khác loại
-   - Mặc định "Có phép" nếu không nói rõ "không phép" hoặc "kp"
+- "10A1: An, Bình vắng" → TẠO 2 VI PHẠM (tương tự trên)
 
-4. TRÍCH XUẤT LỚP ĐÃ KIỂM TRA:
-   - Tìm dòng bắt đầu với: "ktra:", "ktr:", "check:", "kiểm tra:", hoặc tương tự
-   - Trích xuất tên các lớp từ dòng đó
-   - Mở rộng các lớp viết tắt:
-     * "12a1,2,3,6" → ["12A1", "12A2", "12A3", "12A6"]
-     * "10a1, 10a2, 11b3" → ["10A1", "10A2", "11B3"]
-   - Chuẩn hóa tất cả tên lớp thành CHỮ IN HOA
+- "10A1 nghỉ: An, Bình" → TẠO 2 VI PHẠM (tương tự trên)
 
-VĂN BẢN CẦN PHÂN TÍCH:
+- "10A1: muộn: Cường" → TẠO 1 VI PHẠM:
+  * {studentName: "Cường", violatingClass: "10A1", violationType: "Đi học muộn có phép"}
+
+- "10A1 Cường muộn" → TẠO 1 VI PHẠM (tương tự trên)
+
+- "10A1: Dũng sai dp" → TẠO 1 VI PHẠM:
+  * {studentName: "Dũng", violatingClass: "10A1", violationType: "Sai đồng phục/đầu tóc,..."}
+
+- "10A1 vs muộn" → TẠO 1 VI PHẠM CẤP LỚP (KHÔNG có tên học sinh):
+  * {studentName: null, violatingClass: "10A1", violationType: "Vệ sinh muộn"}
+
+- "10A1 đủ" hoặc "10A1 ok" → Không có vắng, không có vi phạm
+
+QUY TẮC PHÂN TÍCH:
+1. Tên lớp: Chuẩn hóa thành IN HOA (10a1 → 10A1)
+2. Tên học sinh: Viết hoa chữ cái đầu mỗi từ
+3. Từ khóa vắng/nghỉ: "vắng", "nghỉ", "absent", "v"
+4. Từ khóa muộn: "muộn", "trễ", "late", "m"
+5. Vi phạm khác: Ánh xạ sang loại vi phạm chuẩn
+   - "sai dp", "dp", "đồng phục" → "Sai đồng phục/đầu tóc,..."
+   - "tóc", "đầu tóc" → "Sai đồng phục/đầu tóc,..."
+   - "vs muộn", "vệ sinh muộn" → "Vệ sinh muộn"
+6. ⚠️ NHIỀU HỌC SINH: Nếu có danh sách tên (An, Bình, Cường) → TẠO VI PHẠM RIÊNG CHO MỖI NGƯỜI
+
+VĂN BẢN:
 "${rawText}"
 
-TRẢ VỀ MỘT ĐỐI TƯỢNG JSON DUY NHẤT VỚI CẤU TRÚC SAU:
+TRẢ VỀ JSON:
 {
   "violations": [
     {
@@ -129,36 +104,166 @@ TRẢ VỀ MỘT ĐỐI TƯỢNG JSON DUY NHẤT VỚI CẤU TRÚC SAU:
       "originalText": "string"
     }
   ],
-  "checkedClasses": ["string"]
+  "checkedClasses": ["10A1", "10A2"],
+  "attendanceByClass": {
+    "10A1": {
+      "absentStudents": ["Nguyễn Văn An"],
+      "lateStudents": ["Trần Văn Bình"]
+    }
+  }
 }
 
-Nếu không tìm thấy lớp đã kiểm tra, trả về mảng rỗng cho "checkedClasses".
-CHỈ TRẢ VỀ JSON, KHÔNG CÓ TEXT GIẢI THÍCH THÊM.
-    `;
+VÍ DỤ CỤ THỂ:
+Input: "10A7 nguyễn, đường nghỉ"
+Output:
+{
+  "violations": [
+    {
+      "studentName": "Nguyễn",
+      "violatingClass": "10A7",
+      "violationType": "Nghỉ học có phép",
+      "details": "",
+      "originalText": "10A7 nguyễn, đường nghỉ"
+    },
+    {
+      "studentName": "Đường",
+      "violatingClass": "10A7",
+      "violationType": "Nghỉ học có phép",
+      "details": "",
+      "originalText": "10A7 nguyễn, đường nghỉ"
+    }
+  ],
+  "checkedClasses": ["10A7"],
+  "attendanceByClass": {
+    "10A7": {
+      "absentStudents": ["Nguyễn", "Đường"],
+      "lateStudents": []
+    }
+  }
+}
+
+LƯU Ý:
+- ⚠️ MỖI HỌC SINH = 1 VI PHẠM RIÊNG (studentName PHẢI có giá trị)
+- Vi phạm cấp lớp (KHÔNG có tên học sinh): studentName = null
+- CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM
+`;
 
     try {
       const result = await model.generateContent(prompt);
       const response = await result.response;
       let text = response.text();
 
-      // Clean the response to get only the JSON part
       if (text.includes("```json")) {
-        text = text.substring(
-          text.indexOf("```json") + 7,
-          text.lastIndexOf("```")
-        );
+        text = text.substring(text.indexOf("```json") + 7, text.lastIndexOf("```"));
+      } else if (text.includes("```")) {
+        text = text.substring(text.indexOf("```") + 3, text.lastIndexOf("```"));
+      }
+
+      const parsedData = JSON.parse(text);
+      return {
+        violations: parsedData.violations || [],
+        checkedClasses: parsedData.checkedClasses || [],
+        attendanceByClass: parsedData.attendanceByClass || {},
+      };
+    } catch (error) {
+      console.error("Error calling Gemini API:", error);
+      throw new Error("Failed to parse attendance using AI.");
+    }
+  },
+});
+
+// Mode for "Lớp trực tuần" - violations only (gate duty)
+export const parseViolationsWithAI = action({
+  args: {
+    rawText: v.string(),
+  },
+  returns: v.object({
+    violations: v.array(v.object({
+      studentName: v.union(v.string(), v.null()),
+      violatingClass: v.string(),
+      violationType: v.string(),
+      details: v.string(),
+      originalText: v.string(),
+    })),
+    checkedClasses: v.array(v.string()),
+  }),
+  handler: async (ctx, { rawText }) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Missing GEMINI_API_KEY environment variable.");
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+
+    const prompt = `
+Bạn là trợ lý phân tích báo cáo LỚP TRỰC TUẦN. Lớp trực tuần đứng cổng trường kiểm tra vi phạm của học sinh vào trường.
+
+DANH SÁCH VI PHẠM HỢP LỆ:
+${ALL_VIOLATIONS.join(", ")}
+
+FORMAT LINH HOẠT - AI CẦN HIỂU NHIỀU CÁCH VIẾT:
+✅ CÓ TÊN HỌC SINH:
+- "An 10A1 sai dp" → An, lớp 10A1, sai đồng phục
+- "10A1 An sai dp" → An, lớp 10A1, sai đồng phục
+- "An sai dp 10A1" → An, lớp 10A1, sai đồng phục
+- "Nguyễn Văn An 10A1 tóc dài" → Nguyễn Văn An, lớp 10A1
+- "10A1 Bình, Cường tóc" → 2 vi phạm riêng (Bình và Cường)
+- "An 10A1 muộn" → An đi muộn có phép (mặc định)
+- "An 10A1 muộn kp" → An đi muộn không phép
+
+✅ VI PHẠM CẤP LỚP (không có tên):
+- "10A1 vs muộn" → Lớp 10A1 vệ sinh muộn
+- "10A1 vệ sinh muộn" → Lớp 10A1 vệ sinh muộn
+
+QUY TẮC:
+1. Tên lớp: Nhận dạng pattern [Khối][Chữ][Số] (10A1, 11B2, 12C3)
+2. Tên học sinh: Bất kỳ từ nào KHÔNG phải tên lớp và KHÔNG phải vi phạm
+3. Viết hoa: Tên lớp IN HOA, tên học sinh viết hoa chữ cái đầu
+4. Ánh xạ vi phạm:
+   - "sai dp", "dp", "đồng phục", "dép lê", "tóc" → "Sai đồng phục/đầu tóc,..."
+   - "vs muộn", "vệ sinh muộn" → "Vệ sinh muộn"
+   - "muộn", "trễ" (không có "kp") → "Đi học muộn có phép"
+   - "muộn kp", "muộn không phép" → "Đi học muộn/nghỉ học không phép"
+5. Nhiều học sinh cùng vi phạm → Tạo mục riêng cho mỗi người
+
+VĂN BẢN:
+"${rawText}"
+
+TRẢ VỀ JSON:
+{
+  "violations": [
+    {
+      "studentName": "string | null",
+      "violatingClass": "string",
+      "violationType": "string",
+      "details": "string",
+      "originalText": "string"
+    }
+  ],
+  "checkedClasses": []
+}
+
+CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
+`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text();
+
+      if (text.includes("```json")) {
+        text = text.substring(text.indexOf("```json") + 7, text.lastIndexOf("```"));
       } else if (text.includes("```")) {
         text = text.substring(text.indexOf("```") + 3, text.lastIndexOf("```"));
       }
 
       const parsedData = JSON.parse(text);
 
-      // Handle cases where the AI might return the old array format
       if (Array.isArray(parsedData)) {
         return { violations: parsedData, checkedClasses: [] };
       }
 
-      // Ensure the new structure is correct, with defaults
       return {
         violations: parsedData.violations || [],
         checkedClasses: parsedData.checkedClasses || [],
@@ -168,6 +273,5 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ TEXT GIẢI THÍCH THÊM.
       throw new Error("Failed to parse violations using AI.");
     }
   },
-
 });
 

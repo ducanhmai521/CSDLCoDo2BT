@@ -34,6 +34,8 @@ interface ParsedViolation {
   evidenceFiles?: File[];
 }
 
+type InputMode = "attendance" | "violations";
+
 export function AIViolationInputModal({
   onBulkSubmitSuccess,
 }: {
@@ -44,14 +46,17 @@ export function AIViolationInputModal({
     []
   );
   const [checkedClasses, setCheckedClasses] = useState<string[]>([]);
+  const [attendanceByClass, setAttendanceByClass] = useState<Record<string, { absentStudents: string[]; lateStudents: string[] }>>({});
   const [customDate, setCustomDate] = useState<number | null>(null);
   const [customReporterId, setCustomReporterId] = useState<Id<"users"> | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<"input" | "results">("input");
+  const [inputMode, setInputMode] = useState<InputMode>("violations");
 
-  const parseWithAI = useAction(api.ai.parseViolationsWithAI);
+  const parseViolationsWithAI = useAction(api.ai.parseViolationsWithAI);
+  const parseAttendanceWithAI = useAction(api.ai.parseAttendanceWithAI);
   const bulkReportViolations = useMutation(api.violations.bulkReportViolations);
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const generateR2UploadUrl = useMutation(api.r2.generateR2UploadUrl);
@@ -106,7 +111,7 @@ export function AIViolationInputModal({
 
   const handleParse = async () => {
     if (!rawText.trim()) {
-      toast.error("Vui lòng nhập danh sách vi phạm.");
+      toast.error("Vui lòng nhập danh sách.");
       return;
     }
     if (!allStudents) {
@@ -116,7 +121,9 @@ export function AIViolationInputModal({
 
     setIsParsing(true);
     try {
-      const result = await parseWithAI({ rawText });
+      const result = inputMode === "attendance" 
+        ? await parseAttendanceWithAI({ rawText })
+        : await parseViolationsWithAI({ rawText });
 
       const matchedResults = result.violations.map((v: any) => {
         let matchedViolation: ParsedViolation = {
@@ -158,6 +165,11 @@ export function AIViolationInputModal({
 
       setParsedViolations(matchedResults);
       setCheckedClasses(result.checkedClasses);
+      
+      if (inputMode === "attendance" && 'attendanceByClass' in result) {
+        setAttendanceByClass(result.attendanceByClass as Record<string, { absentStudents: string[]; lateStudents: string[] }>);
+      }
+      
       setCurrentView("results");
       toast.success(`Đã phân tích xong ${matchedResults.length} mục.`);
     } catch (error) {
@@ -522,14 +534,60 @@ export function AIViolationInputModal({
         {currentView === "input" ? (
           <div className="flex flex-col space-y-3 flex-grow overflow-auto p-1">
             <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="text-sm font-semibold text-gray-800">Chế độ nhập liệu</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <button
+                  onClick={() => setInputMode("attendance")}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    inputMode === "attendance"
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    <span className="text-xs font-semibold">Cờ đỏ</span>
+                    <span className="text-[10px] text-center">Sĩ số + Vi phạm</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setInputMode("violations")}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    inputMode === "violations"
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="text-xs font-semibold">Trực tuần</span>
+                    <span className="text-[10px] text-center">Chỉ vi phạm</span>
+                  </div>
+                </button>
+              </div>
+              
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-gray-800">Dán danh sách vi phạm</h3>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  {inputMode === "attendance" ? "Dán báo cáo sĩ số" : "Dán danh sách vi phạm"}
+                </h3>
               </div>
               <div className="relative">
                 <Textarea
-                  placeholder="Ví dụ:
-Ngô Xuân lộc 11a8 (sai dp, dép lê)
-10a8 vệ sinh muộn"
+                  placeholder={inputMode === "attendance" 
+                    ? `Ví dụ (Cờ đỏ):
+10A1: vắng An, Bình; muộn Cường
+10A2 đủ
+10A3: Dũng sai dp, vs muộn`
+                    : `Ví dụ (Trực tuần):
+An 10A1 sai dp
+Bình 10A2 tóc
+10A3 vs muộn`}
                   className="min-h-[150px] md:min-h-[180px] resize-none w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm text-gray-900 placeholder-gray-500"
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
@@ -642,20 +700,55 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
           </div>
         ) : (
           <div className="flex flex-col space-y-2 flex-grow overflow-auto">
-            <div className="flex items-center gap-2 text-sm pb-2 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-800 whitespace-nowrap">
-                 Kiểm tra & chỉnh sửa
+            {inputMode === "attendance" && Object.keys(attendanceByClass).length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2">
+                <h4 className="text-xs font-semibold text-blue-900 mb-1.5">Tổng hợp sĩ số</h4>
+                <div className="space-y-1 text-[10px]">
+                  {Object.entries(attendanceByClass).map(([className, data]) => {
+                    const classStudents = allStudents?.filter(s => 
+                      normalizeClassName(s.className) === normalizeClassName(className)
+                    ) || [];
+                    const totalStudents = classStudents.length;
+                    const absentCount = data.absentStudents.length;
+                    const presentCount = totalStudents - absentCount;
+                    
+                    return (
+                      <div key={className} className="bg-white rounded px-2 py-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-800">{className}:</span>
+                          <span className="text-gray-600 font-medium">{presentCount}/{totalStudents}</span>
+                        </div>
+                        {(absentCount > 0 || data.lateStudents.length > 0) && (
+                          <div className="mt-0.5 text-[9px] leading-tight">
+                            {absentCount > 0 && (
+                              <span className="text-red-600">(Vắng: {data.absentStudents.join(", ")})</span>
+                            )}
+                            {data.lateStudents.length > 0 && (
+                              <span className="text-orange-600 ml-1">(Muộn: {data.lateStudents.join(", ")})</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-1.5 text-xs pb-1.5 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-800 whitespace-nowrap text-[11px]">
+                 Kiểm tra & sửa
               </h3>
-            <div className="ml-auto bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
-             {parsedViolations.length} mục
+            <div className="ml-auto bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap">
+             {parsedViolations.length}
            </div>
 <Button
   onClick={handleAddViolation}
   className="bg-green-600 hover:bg-green-700 text-white 
-             px-2 py-1 rounded-lg text-xs font-medium 
-             flex items-center gap-1 transition-colors whitespace-nowrap"
+             px-1.5 py-0.5 rounded text-[10px] font-medium 
+             flex items-center gap-0.5 transition-colors whitespace-nowrap h-5"
   >
-  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
   </svg>
   Thêm
@@ -668,37 +761,64 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                   studentsByClass.get(normalizeClassName(v.violatingClass)) ||
                   studentOptions;
                 return (
-                  <div key={i} className="bg-white/40 backdrop-blur-sm border border-gray-200 rounded-lg p-2.5 space-y-2 shadow-sm">
+                  <div key={i} className="bg-white/40 backdrop-blur-sm border border-gray-200 rounded-lg p-2 space-y-1.5 shadow-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-sm text-gray-800 break-words">
+                        <h4 className="font-bold text-xs text-gray-800 break-words leading-tight">
                           {v.studentName
                             ? `${v.studentName} (${v.violatingClass})`
                             : v.violatingClass}
                         </h4>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate" title={v.originalText}>
+                        <p className="text-[10px] text-gray-500 mt-0.5 truncate" title={v.originalText}>
                           {v.originalText}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <div className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs font-medium">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <div className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
                           #{i + 1}
                         </div>
                         <button
                           onClick={() => handleDeleteViolation(i)}
-                          className="bg-red-500 hover:bg-red-600 text-white p-1 rounded transition-colors"
+                          className="bg-red-500 hover:bg-red-600 text-white p-0.5 rounded transition-colors"
                           title="Xóa"
                         >
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-gray-700">Học sinh</label>
+                    {/* Warning if student name not found in class (only if not a full match) */}
+                    {v.studentName && (() => {
+                      const studentsInClass = allStudents?.filter(s => 
+                        normalizeClassName(s.className) === normalizeClassName(v.violatingClass)
+                      ) || [];
+                      
+                      // Check if it's an exact full name match
+                      const isExactMatch = studentsInClass.some(s => 
+                        s.fullName.toLowerCase() === v.studentName?.toLowerCase()
+                      );
+                      
+                      // Only show warning if not an exact match and class has students
+                      if (!isExactMatch && studentsInClass.length > 0) {
+                        return (
+                          <div className="bg-yellow-50 border border-yellow-300 rounded px-2 py-1 flex items-start gap-1">
+                            <svg className="w-3 h-3 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span className="text-[10px] text-yellow-800 leading-tight">
+                              Vui lòng chọn họ tên đầy đủ từ danh sách
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="space-y-0.5">
+                        <label className="text-[10px] font-medium text-gray-700">Học sinh</label>
                         <input
                           list={`students-list-${i}`}
                           type="text"
@@ -706,8 +826,8 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                           onChange={(e) =>
                             handleFieldChange(i, "studentName", e.target.value)
                           }
-                          className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
-                          placeholder="Tên học sinh"
+                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
+                          placeholder="Tên"
                         />
                         <datalist id={`students-list-${i}`}>
                           {studentOptionsForClass.map((opt: { id: Key | null | undefined; value: string | number | readonly string[] | undefined; label: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
@@ -718,8 +838,8 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                         </datalist>
                       </div>
                       
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-gray-700">Lớp</label>
+                      <div className="space-y-0.5">
+                        <label className="text-[10px] font-medium text-gray-700">Lớp</label>
                         <input
                           type="text"
                           value={v.violatingClass}
@@ -730,12 +850,12 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                               e.target.value
                             )
                           }
-                          className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         />
                       </div>
                       
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-xs font-medium text-gray-700">Loại vi phạm</label>
+                      <div className="col-span-2 space-y-0.5">
+                        <label className="text-[10px] font-medium text-gray-700">Loại vi phạm</label>
                         <select
                           value={v.violationType}
                           onChange={(e) =>
@@ -745,7 +865,7 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                               e.target.value
                             )
                           }
-                          className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         >
                           {ALL_VIOLATIONS.map((type) => (
                             <option key={type} value={type}>
@@ -755,42 +875,42 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                         </select>
                       </div>
                       
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-xs font-medium text-gray-700">Chi tiết</label>
+                      <div className="col-span-2 space-y-0.5">
+                        <label className="text-[10px] font-medium text-gray-700">Chi tiết</label>
                         <input
                           type="text"
                           value={v.details || ""}
                           onChange={(e) =>
                             handleFieldChange(i, "details", e.target.value)
                           }
-                          className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
-                          placeholder="Mô tả chi tiết"
+                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
+                          placeholder="Mô tả"
                         />
                       </div>
                       
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-xs font-medium text-gray-700">Bằng chứng</label>
+                      <div className="col-span-2 space-y-0.5">
+                        <label className="text-[10px] font-medium text-gray-700">Bằng chứng</label>
                         <input
                           type="file"
                           multiple
                           accept="image/*"
                           onChange={(e) => handleFileChange(i, e.target.files)}
-                          className="w-full p-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                          className="w-full p-1 text-[10px] border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         />
                         {v.evidenceFiles && v.evidenceFiles.length > 0 && (
-                          <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+                          <div className="grid grid-cols-4 gap-1 mt-1">
                             {v.evidenceFiles.map((file, fileIndex) => (
                               <div key={fileIndex} className="relative group">
                                 <img
                                   src={URL.createObjectURL(file)}
                                   alt={`${fileIndex}`}
-                                  className="h-16 w-full object-cover rounded shadow-sm"
+                                  className="h-12 w-full object-cover rounded shadow-sm"
                                 />
                                 <button
                                   onClick={() => handleRemoveFile(i, fileIndex)}
-                                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                  className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                                 >
-                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                   </svg>
                                 </button>
@@ -804,72 +924,70 @@ Ngô Xuân lộc 11a8 (sai dp, dép lê)
                 );
               })}
               {parsedViolations.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <svg className="h-10 w-10 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <svg className="h-8 w-8 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="text-gray-500 font-medium text-sm">Chưa có dữ liệu</p>
-                  <p className="text-gray-400 text-xs mt-1">Nhấn "Thêm" để bắt đầu</p>
+                  <p className="text-gray-500 font-medium text-xs">Chưa có dữ liệu</p>
+                  <p className="text-gray-400 text-[10px] mt-0.5">Nhấn "Thêm" để bắt đầu</p>
                 </div>
               )}
             </div>
-            <DialogFooter className="flex-col sm:flex-row gap-2 pt-2 border-t border-gray-200">
+            <DialogFooter className="flex flex-row gap-1.5 pt-2 border-t border-gray-200">
               <Button 
                 variant="outline" 
                 onClick={handleBackToInput} 
-                className="w-full sm:w-auto flex items-center gap-1.5 py-2 px-4 text-sm text-gray-600 hover:text-gray-800 border-gray-300"
+                className="flex-1 flex items-center justify-center gap-1 py-2 px-2 text-[10px] text-gray-600 hover:text-gray-800 border-gray-300 h-9"
               >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Quay lại
               </Button>
               
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={handleSubmitAndCopy}
-                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg text-sm"
-                  disabled={
-                    isSubmitting || isParsing || parsedViolations.length === 0
-                  }
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Gửi & Copy
-                    </>
-                  )}
-                </Button>
-                
-                <Button
-                  onClick={() => handleSubmit()}
-                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2 px-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg text-sm"
-                  disabled={
-                    isSubmitting || isParsing || parsedViolations.length === 0
-                  }
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Đang gửi...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                      Gửi ({parsedViolations.length})
-                    </>
-                  )}
-                </Button>
-              </div>
+              <Button
+                onClick={handleSubmitAndCopy}
+                className="flex-1 flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg text-[10px] h-9"
+                disabled={
+                  isSubmitting || isParsing || parsedViolations.length === 0
+                }
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Xử lý...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Gửi & Copy
+                  </>
+                )}
+              </Button>
+              
+              <Button
+                onClick={() => handleSubmit()}
+                className="flex-1 flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg text-[10px] h-9"
+                disabled={
+                  isSubmitting || isParsing || parsedViolations.length === 0
+                }
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Gửi...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    Gửi ({parsedViolations.length})
+                  </>
+                )}
+              </Button>
             </DialogFooter>
           </div>
         )}
