@@ -142,7 +142,7 @@ export default function ViolationReportForm() {
       <div className="relative">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-800">Báo cáo vi phạm</h2>
+              <h2 className="text-xl font-bold text-slate-800">Báo cáo vi phạm riêng lẻ</h2>
           </div>
     
           <div className="glass-card-subtle">

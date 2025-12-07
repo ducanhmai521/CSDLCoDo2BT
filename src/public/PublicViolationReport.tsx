@@ -30,8 +30,16 @@ const PublicViolationReport = () => {
   const [reporterPassword, setReporterPassword] = useState("");
   const [isReporterAuthenticated, setIsReporterAuthenticated] = useState(false);
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
+  const [loadedDays, setLoadedDays] = useState<{ [key: number]: boolean }>({});
   const [expandedDetails, setExpandedDetails] = useState<{ [key: string]: boolean }>({});
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
+  const [hideExcusedAbsence, setHideExcusedAbsence] = useState(true);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(true);
+  const [hasAcknowledged, setHasAcknowledged] = useState(() => {
+    return localStorage.getItem('violationReportUnderstood') === 'true';
+  });
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [modalState, setModalState] = useState<'welcome' | 'mustAgree'>('welcome');
   
   // Modal State
   const [modalMedia, setModalMedia] = useState<ModalMedia | null>(null);
@@ -50,7 +58,7 @@ const PublicViolationReport = () => {
   const checkPassword = useMutation(api.reporters.checkReporterPassword);
   const violations = useQuery(
     api.violations.getPublicViolations,
-    dateRange ? { start: dateRange.start, end: dateRange.end } : "skip"
+    (dateRange && hasAcknowledged) ? { start: dateRange.start, end: dateRange.end } : "skip"
   );
 
   // Memoized Calculations
@@ -159,7 +167,30 @@ const PublicViolationReport = () => {
     else { setWeekError(null); setWeekNumber(num); }
   };
 
-  const toggleDay = (day: number) => setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
+  const toggleDay = (day: number) => {
+    setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
+    if (!loadedDays[day]) {
+      setLoadedDays(prev => ({ ...prev, [day]: true }));
+    }
+  };
+  
+  const handleUnderstood = () => {
+    if (dontShowAgain) {
+      localStorage.setItem('violationReportUnderstood', 'true');
+    }
+    setHasAcknowledged(true);
+    setShowWelcomeModal(false);
+  };
+  
+  const handleClose = () => {
+    setModalState('mustAgree');
+  };
+  
+  useEffect(() => {
+    if (hasAcknowledged) {
+      setShowWelcomeModal(false);
+    }
+  }, [hasAcknowledged]);
   
   const toggleDetails = (violationId: string) => setExpandedDetails(prev => ({ ...prev, [violationId]: !prev[violationId] }));
 
@@ -211,6 +242,95 @@ const PublicViolationReport = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Welcome Modal */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in duration-300">
+            {modalState === 'welcome' ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-800">Bạn ơiiii!</h2>
+                </div>
+                <div className="space-y-3 text-sm text-slate-700">
+                  <p className="font-medium">Để tiết kiệm băng thông và tăng tốc độ tải, chúng mình đã thay đổi cách hiển thị:</p>
+                  <ul className="space-y-2 list-disc list-inside pl-2">
+                    <li><strong>Click vào ngày</strong> để xem vi phạm của ngày đó</li>
+                    <li>Web chỉ tải dữ liệu những ngày bạn bấm vào</li>
+                  </ul>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                    <p className="text-xs text-blue-800"><strong>Mẹo:</strong> Bạn có thể hiện/ẩn "Nghỉ học có phép" bằng nút toggle ở góc trên (mặc định đang ẩn)</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-3 pb-2 border-t border-slate-200">
+                  <input
+                    type="checkbox"
+                    id="dontShowAgain"
+                    checked={dontShowAgain}
+                    onChange={(e) => setDontShowAgain(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="dontShowAgain" className="text-sm text-slate-600 cursor-pointer select-none">
+                    Không hiện lại thông báo này
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleUnderstood}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
+                  >
+                    Toi dong tinh
+                  </button>
+                  <button
+                    onClick={handleClose}
+                    className="px-4 py-2.5 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+                  >
+                    Từ chối
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-800">Ê ủa?</h2>
+                </div>
+                <div className="space-y-3 text-sm text-slate-700">
+                  <p className="font-medium">Bạn phải dong tinh thì mới xem được nội dung web này.</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-xs text-amber-800">
+                      Các thay đổi này giúp trang tải nhanh hơn và tiết kiệm băng thông. Thay đổi nhỏ thôi nhưng giúp chúng mình tiết kiệm 1 ổ bánh mì mỗi tháng luôn á.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-3 pb-2 border-t border-slate-200">
+                  <input
+                    type="checkbox"
+                    id="dontShowAgain2"
+                    checked={dontShowAgain}
+                    onChange={(e) => setDontShowAgain(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="dontShowAgain2" className="text-sm text-slate-600 cursor-pointer select-none">
+                    Không hiện lại thông báo này
+                  </label>
+                </div>
+                <button
+                  onClick={handleUnderstood}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
+                >
+                  Toi that su dong tinh
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      
       {modalMedia && (
         <div 
           className={`fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-0 transition-opacity duration-300 ease-in-out ${isModalVisible ? 'opacity-100' : 'opacity-0'}`}
@@ -306,6 +426,19 @@ const PublicViolationReport = () => {
                 <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                 <span>Bảng điểm thô</span>
               </Link>
+              <button
+                onClick={() => setHideExcusedAbsence(!hideExcusedAbsence)}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded transition-colors text-[10px] sm:text-xs font-medium ${
+                  hideExcusedAbsence 
+                    ? 'bg-green-50 text-green-600 hover:bg-green-100' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+                title={hideExcusedAbsence ? 'Đang ẩn nghỉ có phép' : 'Đang hiện nghỉ có phép'}
+              >
+                <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span className="hidden sm:inline">{hideExcusedAbsence ? 'Ẩn nghỉ CP' : 'Hiện tất cả'}</span>
+                <span className="sm:hidden">{hideExcusedAbsence ? 'Ẩn' : 'Hiện'}</span>
+              </button>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-200 flex-shrink-0">
               <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 flex-shrink-0" />
@@ -355,8 +488,13 @@ const PublicViolationReport = () => {
           </div>
         )}
         {sortedDays.map(dayTimestamp => {
-          const dayViolations = violationsByDay.get(dayTimestamp)!;
+          const allDayViolations = violationsByDay.get(dayTimestamp)!;
+          const dayViolations = hideExcusedAbsence 
+            ? allDayViolations.filter((v: { violationType: string; }) => v.violationType !== "Nghỉ học có phép")
+            : allDayViolations;
           const isExpanded = expandedDays[dayTimestamp] !== false;
+          const isLoaded = loadedDays[dayTimestamp];
+          
           return (
             <div key={dayTimestamp} className="mb-3">
               <button onClick={() => toggleDay(dayTimestamp)} className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-3 py-2 rounded-t-lg flex items-center justify-between hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-sm">
@@ -366,7 +504,16 @@ const PublicViolationReport = () => {
                   {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </div>
               </button>
-              {isExpanded && (
+              {isExpanded && !isLoaded && (
+                <div className="bg-white rounded-b-lg shadow-sm border border-slate-200 border-t-0 p-8 text-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full mb-3">
+                    <Eye className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-700 mb-1">Click để tải vi phạm</p>
+                  <p className="text-xs text-slate-500">Dữ liệu sẽ được tải khi bạn click vào ngày</p>
+                </div>
+              )}
+              {isExpanded && isLoaded && (
                 <div className="bg-white rounded-b-lg shadow-sm overflow-hidden border border-slate-200 border-t-0">
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs sm:text-sm">

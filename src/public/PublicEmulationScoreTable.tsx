@@ -64,50 +64,42 @@ const PublicEmulationScoreTable = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Compact Sticky Header */}
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-3 py-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div className="flex-1 text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-2">
-                <Trophy className="w-5 h-5 text-amber-500" />
-                <h1 className="text-lg sm:text-xl font-bold text-slate-800 leading-tight">
-                  BẢNG ĐIỂM THI ĐUA THÔ
-                </h1>
-              </div>
-              <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
-                <p className="text-xs text-slate-500">
-                  Không phải bảng điểm chuẩn cuối được dùng để xét thi đua (còn thiếu điểm đánh giá giờ học, điểm thưởng).
-                </p>
-                <Link 
-                  to="/bang-bao-cao-vi-pham" 
-                  className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors text-xs font-medium"
-                >
-                  <FileText className="w-3 h-3" />
-                  <span>Xem báo cáo vi phạm</span>
-                </Link>
-              </div>
+        <div className="max-w-7xl mx-auto px-2 sm:px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 flex-shrink-0" />
+              <h1 className="text-sm sm:text-lg font-bold text-slate-800 leading-tight">BẢNG ĐIỂM THI ĐUA THÔ</h1>
+              <span className="text-[10px] sm:text-xs text-slate-500">•</span>
+              <p className="text-[10px] sm:text-xs text-slate-500 leading-tight">Chưa có điểm đánh giá & thưởng</p>
+              <Link 
+                to="/bang-bao-cao-vi-pham" 
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors text-[10px] sm:text-xs font-medium"
+              >
+                <FileText className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                <span>Báo cáo vi phạm</span>
+              </Link>
             </div>
             
-            <div className="flex items-center gap-3 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-              <Calendar className="w-4 h-4 text-slate-600" />
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Tuần:</label>
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-200 flex-shrink-0">
+              <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 flex-shrink-0" />
+              <div className="flex items-center gap-1 sm:gap-2">
+                <label className="text-xs sm:text-sm font-medium text-slate-700">Tuần:</label>
                 <input 
                   type="text" 
                   value={weekInput} 
                   onChange={handleWeekChange} 
-                  className={`border px-2 py-1 w-16 text-center text-sm rounded ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+                  className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-12 sm:w-16 text-center text-xs sm:text-sm rounded ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
                 />
               </div>
               {dateRange && (
-                <span className="text-xs text-slate-600 hidden sm:inline">
-                  ({format(new Date(dateRange.start), "dd/MM/yyyy")} - {format(new Date(dateRange.end), "dd/MM/yyyy")})
-                </span>
+                <span className="text-[10px] sm:text-xs text-slate-600 hidden md:inline whitespace-nowrap">
+                  ({format(new Date(dateRange.start), "dd/MM")} - {format(new Date(dateRange.end), "dd/MM")})</span>
               )}
             </div>
           </div>
           
           {weekError && (
-            <div className="mt-2 flex items-center gap-1 text-red-600 text-xs">
+            <div className="mt-1 sm:mt-2 flex items-center justify-center gap-1 text-red-600 text-[10px] sm:text-xs">
               <AlertCircle className="w-3 h-3" />
               <span>{weekError}</span>
             </div>

@@ -202,8 +202,27 @@ Bạn là trợ lý phân tích báo cáo LỚP TRỰC TUẦN. Lớp trực tu�
 DANH SÁCH VI PHẠM HỢP LỆ:
 ${ALL_VIOLATIONS.join(", ")}
 
-FORMAT LINH HOẠT - AI CẦN HIỂU NHIỀU CÁCH VIẾT:
-✅ CÓ TÊN HỌC SINH:
+⚠️ QUY TẮC QUAN TRỌNG NHẤT - ĐỌC KỸ:
+1. MỌI VI PHẠM PHẢI CÓ studentName (chỉ để null khi là vi phạm cấp lớp)
+2. Nếu có từ KHÔNG phải tên lớp và KHÔNG phải loại vi phạm → ĐÓ LÀ TÊN HỌC SINH
+3. Tên học sinh có thể là BẤT KỲ TỪ NÀO, kể cả "Trường", "Kiểm", "An", "Bình", v.v.
+
+NHẬN DẠNG TÊN HỌC SINH:
+- Tên lớp: Pattern [Số][Chữ][Số] (10A1, 11B2, 12C3)
+- Loại vi phạm: "sai dp", "tóc", "muộn", "vs muộn", "đồng phục", v.v.
+- TẤT CẢ CÁC TỪ KHÁC → TÊN HỌC SINH
+
+VÍ DỤ QUAN TRỌNG:
+✅ "Trường 10A1 sai dp" → studentName: "Trường" (KHÔNG phải từ khóa "trường học")
+✅ "Kiểm 10A1 tóc" → studentName: "Kiểm" (KHÔNG phải từ khóa "kiểm tra")
+✅ "An 10A1 muộn" → studentName: "An"
+✅ "10A1 Bình sai dp" → studentName: "Bình"
+✅ "Cường tóc 10A1" → studentName: "Cường"
+✅ "10A1 Dũng, Hùng dp" → TẠO 2 VI PHẠM RIÊNG:
+   * {studentName: "Dũng", violatingClass: "10A1", violationType: "Sai đồng phục/đầu tóc,..."}
+   * {studentName: "Hùng", violatingClass: "10A1", violationType: "Sai đồng phục/đầu tóc,..."}
+
+FORMAT LINH HOẠT:
 - "An 10A1 sai dp" → An, lớp 10A1, sai đồng phục
 - "10A1 An sai dp" → An, lớp 10A1, sai đồng phục
 - "An sai dp 10A1" → An, lớp 10A1, sai đồng phục
@@ -212,20 +231,11 @@ FORMAT LINH HOẠT - AI CẦN HIỂU NHIỀU CÁCH VIẾT:
 - "An 10A1 muộn" → An đi muộn có phép (mặc định)
 - "An 10A1 muộn kp" → An đi muộn không phép
 
-✅ VI PHẠM CẤP LỚP (không có tên):
-- "10A1 vs muộn" → Lớp 10A1 vệ sinh muộn
-- "10A1 vệ sinh muộn" → Lớp 10A1 vệ sinh muộn
-
-QUY TẮC:
-1. Tên lớp: Nhận dạng pattern [Khối][Chữ][Số] (10A1, 11B2, 12C3)
-2. Tên học sinh: Bất kỳ từ nào KHÔNG phải tên lớp và KHÔNG phải vi phạm
-3. Viết hoa: Tên lớp IN HOA, tên học sinh viết hoa chữ cái đầu
-4. Ánh xạ vi phạm:
-   - "sai dp", "dp", "đồng phục", "dép lê", "tóc" → "Sai đồng phục/đầu tóc,..."
-   - "vs muộn", "vệ sinh muộn" → "Vệ sinh muộn"
-   - "muộn", "trễ" (không có "kp") → "Đi học muộn có phép"
-   - "muộn kp", "muộn không phép" → "Đi học muộn/nghỉ học không phép"
-5. Nhiều học sinh cùng vi phạm → Tạo mục riêng cho mỗi người
+ÁNH XẠ VI PHẠM:
+- "sai dp", "dp", "đồng phục", "dép lê" → "Sai đồng phục/đầu tóc,..."
+- "tóc", "đầu tóc", "tóc dài" → "Sai đồng phục/đầu tóc,..."
+- "muộn", "trễ" (không có "kp") → "Đi học muộn có phép"
+- "muộn kp", "muộn không phép" → "Đi học muộn/nghỉ học không phép"
 
 VĂN BẢN:
 "${rawText}"
@@ -234,7 +244,7 @@ TRẢ VỀ JSON:
 {
   "violations": [
     {
-      "studentName": "string | null",
+      "studentName": "string",
       "violatingClass": "string",
       "violationType": "string",
       "details": "string",
@@ -244,7 +254,9 @@ TRẢ VỀ JSON:
   "checkedClasses": []
 }
 
-CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
+LƯU Ý CUỐI CÙNG:
+- ⚠️ MỌI TỪ KHÔNG PHẢI TÊN LỚP VÀ KHÔNG PHẢI VI PHẠM = TÊN HỌC SINH
+- CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM
 `;
 
     try {

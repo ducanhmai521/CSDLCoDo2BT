@@ -1,0 +1,27 @@
+{
+  "name": "CSDL Cờ đỏ THPT Số 2 Bảo Thắng",
+  "short_name": "Cờ đỏ 2BT",
+  "description": "Hệ thống quản lý vi phạm và nền nếp học sinh THPT Số 2 Bảo Thắng",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#06b6d4",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.ico",
+      "sizes": "48x48 32x32 16x16",
+      "type": "image/x-icon",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48 32x32 16x16",
+      "type": "image/x-icon",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "lang": "vi-VN",
+  "dir": "ltr"
+}
