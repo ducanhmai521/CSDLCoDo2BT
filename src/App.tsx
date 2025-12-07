@@ -42,7 +42,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-500/40 via-purple-400/30 to-blue-500/40 animated-gradient-bg bg-size-200 animate-gradient-slow">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-cyan-500/40 via-blue-400/30 to-teal-500/40 animated-gradient-bg bg-size-200 animate-gradient-slow">
       <header className="sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl bg-white/50 backdrop-blur-md shadow-lg">
         <div className="flex items-center gap-3">
           <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm">

@@ -249,103 +249,136 @@ export function AIViolationInputModal({
       return;
     }
 
-    const checkedClasses = Array.from(
-      new Set(parsedViolations.map((v) => v.violatingClass))
-    ).sort();
+    // Chế độ Cờ đỏ (attendance mode)
+    if (inputMode === "attendance") {
+      const sortedClasses = [...checkedClasses].sort();
+      
+      // Phân loại vi phạm khác (không phải vắng/muộn)
+      const otherStudentViolations: ParsedViolation[] = [];
+      const absenceKeywords = ["vắng", "nghỉ"];
+      const lateKeywords = ["muộn"];
 
-    const absenceKeywords = ["vắng", "nghỉ"];
-    const lateKeywords = ["muộn"];
-    const permittedKeywords = ["có phép", "cp"];
+      for (const v of parsedViolations) {
+        if (v.targetType === "student" && v.studentName) {
+          const violationText = (
+            v.violationType + (v.details || "")
+          ).toLowerCase();
+          const isLate = lateKeywords.some((k) => violationText.includes(k));
+          const isAbsence = absenceKeywords.some((k) =>
+            violationText.includes(k)
+          );
 
-    const lateWithPermission = new Map<string, string[]>();
-    const unexcusedAbsences = new Map<string, string[]>();
-    const otherStudentViolations: ParsedViolation[] = [];
-
-    for (const v of parsedViolations) {
-      if (v.targetType === "student" && v.studentName) {
-        const violationText = (
-          v.violationType + (v.details || "")
-        ).toLowerCase();
-        const isLate = lateKeywords.some((k) => violationText.includes(k));
-        const isAbsence = absenceKeywords.some((k) =>
-          violationText.includes(k)
-        );
-        const isPermitted = permittedKeywords.some((k) =>
-          violationText.includes(k)
-        );
-
-        if (isLate && isPermitted) {
-          if (!lateWithPermission.has(v.violatingClass)) {
-            lateWithPermission.set(v.violatingClass, []);
+          // Chỉ thêm vào otherStudentViolations nếu KHÔNG phải vắng/muộn
+          if (!isLate && !isAbsence) {
+            otherStudentViolations.push(v);
           }
-          lateWithPermission.get(v.violatingClass)!.push(v.studentName);
-        } else if (isAbsence && !isPermitted) {
-          if (!unexcusedAbsences.has(v.violatingClass)) {
-            unexcusedAbsences.set(v.violatingClass, []);
-          }
-          unexcusedAbsences.get(v.violatingClass)!.push(v.studentName);
-        } else {
-          otherStudentViolations.push(v);
         }
       }
-    }
 
-    const attendanceReportLines = checkedClasses.map((className) => {
-      const absentees = unexcusedAbsences.get(className) || [];
-      const latecomers = lateWithPermission.get(className) || [];
-
-      const attendanceStatus =
-        absentees.length > 0
-          ? `Vắng ${absentees.length} (${absentees.join(", ")})`
-          : "Đủ";
-
-      const lateNote =
-        latecomers.length > 0
-          ? ` (${latecomers.join(", ")} đi muộn có phép)`
-          : "";
-
-      return `${className}: ${attendanceStatus}${lateNote}`;
-    });
-
-    const attendanceReportString =
-      "\nSĩ số các lớp:\n" + attendanceReportLines.join("\n");
-
-    const studentViolations = otherStudentViolations
-      .map((v) => {
-        const violationText = (
-          v.violationType + (v.details || "")
-        ).toLowerCase();
-        const isLate = lateKeywords.some((k) => violationText.includes(k));
-        let detail = v.details || v.violationType;
-        if (isLate) {
-          detail = "Đi muộn không phép";
+      // Tạo báo cáo sĩ số từ attendanceByClass
+      const attendanceReportLines = sortedClasses.map((className) => {
+        const normalizedClass = normalizeClassName(className);
+        const attendanceData = attendanceByClass[normalizedClass];
+        const totalStudents = classRosterCounts[normalizedClass] || 0;
+        
+        const absentCount = attendanceData?.absentStudents.length || 0;
+        const lateCount = attendanceData?.lateStudents.length || 0;
+        const presentCount = totalStudents - absentCount;
+        
+        let line = `${className}: ${presentCount}/${totalStudents}`;
+        
+        if (absentCount > 0) {
+          line += ` (Vắng: ${attendanceData!.absentStudents.join(", ")})`;
         }
-        return `- ${v.studentName} (${v.violatingClass}): ${detail}`;
-      })
-      .join("\n");
+        
+        if (lateCount > 0) {
+          line += ` (Muộn có phép: ${attendanceData!.lateStudents.join(", ")})`;
+        }
+        
+        return line;
+      });
 
-    const classViolations = parsedViolations
-      .filter((v) => v.targetType === "class")
-      .map(
-        (v) => `- ${v.violatingClass}: ${v.details || v.violationType}`
-      )
-      .join("\n");
+      const attendanceReportString =
+        "\nSĩ số các lớp:\n" + attendanceReportLines.join("\n");
 
-    const reportString = `Ngày trực: ${formattedDate}\nNgười trực: ${myProfile.fullName} (${myProfile.className})\nCác lớp đã kiểm tra: ${checkedClasses.join(", ")}${attendanceReportString}\nNội dung vi phạm nền nếp:${
-      studentViolations ? "\n" + studentViolations : " Không có"
-    }\nNội dung tự quản:${
-      classViolations ? "\n" + classViolations : " Không có"
-    }`;
+      const studentViolations = otherStudentViolations
+        .map((v) => {
+          const violationText = (
+            v.violationType + (v.details || "")
+          ).toLowerCase();
+          const isLate = lateKeywords.some((k) => violationText.includes(k));
+          let detail = v.details || v.violationType;
+          if (isLate) {
+            detail = "Đi muộn không phép";
+          }
+          return `- ${v.studentName} (${v.violatingClass}): ${detail}`;
+        })
+        .join("\n");
 
-    try {
-      await navigator.clipboard.writeText(reportString);
-      toast.success("Đã sao chép mẫu báo cáo vào clipboard!");
-      if (andSubmit) {
-        await handleSubmit(true); // Pass a flag to avoid recursion
+      const classViolations = parsedViolations
+        .filter((v) => v.targetType === "class")
+        .map(
+          (v) => `- ${v.violatingClass}: ${v.details || v.violationType}`
+        )
+        .join("\n");
+
+      const reportString = `Ngày trực: ${formattedDate}\nNgười trực: ${myProfile.fullName} (${myProfile.className})\nCác lớp đã kiểm tra: ${sortedClasses.join(", ")}${attendanceReportString}\nNội dung vi phạm nền nếp:${
+        studentViolations ? "\n" + studentViolations : " Không có"
+      }\nNội dung tự quản:${
+        classViolations ? "\n" + classViolations : " Không có"
+      }`;
+
+      try {
+        await navigator.clipboard.writeText(reportString);
+        toast.success("Đã sao chép mẫu báo cáo vào clipboard!");
+        if (andSubmit) {
+          await handleSubmit(true);
+        }
+      } catch (err) {
+        toast.error("Không thể sao chép. Vui lòng thử lại.");
+        console.error("Failed to copy: ", err);
       }
-    } catch (err) {
-      toast.error("Không thể sao chép. Vui lòng thử lại.");
-      console.error("Failed to copy: ", err);
+    } 
+    // Chế độ Trực tuần (violations mode)
+    else {
+      const sortedViolations = [...parsedViolations].sort((a, b) => {
+        if (a.violatingClass !== b.violatingClass) {
+          return a.violatingClass.localeCompare(b.violatingClass);
+        }
+        return (a.studentName || "").localeCompare(b.studentName || "");
+      });
+
+      const studentViolations = sortedViolations
+        .filter((v) => v.targetType === "student" && v.studentName)
+        .map((v) => {
+          const detail = v.details || v.violationType;
+          return `- ${v.studentName} (${v.violatingClass}): ${detail}`;
+        })
+        .join("\n");
+
+      const classViolations = sortedViolations
+        .filter((v) => v.targetType === "class")
+        .map(
+          (v) => `- ${v.violatingClass}: ${v.details || v.violationType}`
+        )
+        .join("\n");
+
+      const reportString = `Ngày trực: ${formattedDate}\nNgười trực: ${myProfile.fullName} (${myProfile.className})\nNội dung vi phạm nền nếp:${
+        studentViolations ? "\n" + studentViolations : " Không có"
+      }\nNội dung tự quản:${
+        classViolations ? "\n" + classViolations : " Không có"
+      }`;
+
+      try {
+        await navigator.clipboard.writeText(reportString);
+        toast.success("Đã sao chép mẫu báo cáo vào clipboard!");
+        if (andSubmit) {
+          await handleSubmit(true);
+        }
+      } catch (err) {
+        toast.error("Không thể sao chép. Vui lòng thử lại.");
+        console.error("Failed to copy: ", err);
+      }
     }
   };
 
@@ -497,12 +530,12 @@ export function AIViolationInputModal({
   variant="default"
   className="w-full py-6 text-lg font-semibold 
              relative overflow-hidden rounded-2xl 
-             bg-gradient-to-r from-primary via-purple-500 to-primary/80 
-             text-white shadow-[0_0_20px_rgba(139,92,246,0.6)] 
-             hover:shadow-[0_0_35px_rgba(139,92,246,0.9)] 
+             bg-gradient-to-r from-primary via-cyan-500 to-primary/80 
+             text-white shadow-[0_0_20px_rgba(6,182,212,0.6)] 
+             hover:shadow-[0_0_35px_rgba(6,182,212,0.9)] 
              transition-all duration-500"
 >
-  <span className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 opacity-60 blur-xl animate-pulse" />
+  <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 opacity-60 blur-xl animate-pulse" />
   <span className="relative flex items-center justify-center">
     <svg
       className="h-5 w-5 mr-2 drop-shadow-md"
@@ -522,7 +555,7 @@ export function AIViolationInputModal({
 </Button>
       </DialogTrigger>
 <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] flex flex-col 
-  bg-gradient-to-br from-white/80 via-purple-100/70 to-blue-100/70
+  bg-gradient-to-br from-white/80 via-cyan-100/70 to-blue-100/70
   backdrop-blur-lg 
   border border-white/30 
   shadow-2xl rounded-2xl">
@@ -755,34 +788,34 @@ Bình 10A2 tóc
 </Button>
           </div>
             
-            <div className="flex-grow overflow-y-auto space-y-2 pr-1">
+            <div className="flex-grow overflow-y-auto space-y-2.5 pr-1">
               {parsedViolations.map((v, i) => {
                 const studentOptionsForClass =
                   studentsByClass.get(normalizeClassName(v.violatingClass)) ||
                   studentOptions;
                 return (
-                  <div key={i} className="bg-white/40 backdrop-blur-sm border border-gray-200 rounded-lg p-2 space-y-1.5 shadow-sm">
+                  <div key={i} className="bg-white/40 backdrop-blur-sm border border-gray-200 rounded-lg p-3 space-y-2 shadow-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-xs text-gray-800 break-words leading-tight">
+                        <h4 className="font-bold text-sm text-gray-800 break-words leading-tight">
                           {v.studentName
                             ? `${v.studentName} (${v.violatingClass})`
                             : v.violatingClass}
                         </h4>
-                        <p className="text-[10px] text-gray-500 mt-0.5 truncate" title={v.originalText}>
+                        <p className="text-xs text-gray-500 mt-1 truncate" title={v.originalText}>
                           {v.originalText}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <div className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-medium">
                           #{i + 1}
                         </div>
                         <button
                           onClick={() => handleDeleteViolation(i)}
-                          className="bg-red-500 hover:bg-red-600 text-white p-0.5 rounded transition-colors"
+                          className="bg-red-500 hover:bg-red-600 text-white p-1 rounded transition-colors"
                           title="Xóa"
                         >
-                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
@@ -803,11 +836,11 @@ Bình 10A2 tóc
                       // Only show warning if not an exact match and class has students
                       if (!isExactMatch && studentsInClass.length > 0) {
                         return (
-                          <div className="bg-yellow-50 border border-yellow-300 rounded px-2 py-1 flex items-start gap-1">
-                            <svg className="w-3 h-3 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <div className="bg-yellow-50 border border-yellow-300 rounded px-2.5 py-1.5 flex items-start gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
-                            <span className="text-[10px] text-yellow-800 leading-tight">
+                            <span className="text-xs text-yellow-800 leading-tight">
                               Vui lòng chọn họ tên đầy đủ từ danh sách
                             </span>
                           </div>
@@ -816,9 +849,9 @@ Bình 10A2 tóc
                       return null;
                     })()}
                     
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <div className="space-y-0.5">
-                        <label className="text-[10px] font-medium text-gray-700">Học sinh</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-700">Học sinh</label>
                         <input
                           list={`students-list-${i}`}
                           type="text"
@@ -826,7 +859,7 @@ Bình 10A2 tóc
                           onChange={(e) =>
                             handleFieldChange(i, "studentName", e.target.value)
                           }
-                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
+                          className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
                           placeholder="Tên"
                         />
                         <datalist id={`students-list-${i}`}>
@@ -838,8 +871,8 @@ Bình 10A2 tóc
                         </datalist>
                       </div>
                       
-                      <div className="space-y-0.5">
-                        <label className="text-[10px] font-medium text-gray-700">Lớp</label>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-700">Lớp</label>
                         <input
                           type="text"
                           value={v.violatingClass}
@@ -850,12 +883,12 @@ Bình 10A2 tóc
                               e.target.value
                             )
                           }
-                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                          className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         />
                       </div>
                       
-                      <div className="col-span-2 space-y-0.5">
-                        <label className="text-[10px] font-medium text-gray-700">Loại vi phạm</label>
+                      <div className="col-span-2 space-y-1">
+                        <label className="text-xs font-medium text-gray-700">Loại vi phạm</label>
                         <select
                           value={v.violationType}
                           onChange={(e) =>
@@ -865,7 +898,7 @@ Bình 10A2 tóc
                               e.target.value
                             )
                           }
-                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                          className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         >
                           {ALL_VIOLATIONS.map((type) => (
                             <option key={type} value={type}>
@@ -875,42 +908,42 @@ Bình 10A2 tóc
                         </select>
                       </div>
                       
-                      <div className="col-span-2 space-y-0.5">
-                        <label className="text-[10px] font-medium text-gray-700">Chi tiết</label>
+                      <div className="col-span-2 space-y-1">
+                        <label className="text-xs font-medium text-gray-700">Chi tiết</label>
                         <input
                           type="text"
                           value={v.details || ""}
                           onChange={(e) =>
                             handleFieldChange(i, "details", e.target.value)
                           }
-                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
+                          className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
                           placeholder="Mô tả"
                         />
                       </div>
                       
-                      <div className="col-span-2 space-y-0.5">
-                        <label className="text-[10px] font-medium text-gray-700">Bằng chứng</label>
+                      <div className="col-span-2 space-y-1">
+                        <label className="text-xs font-medium text-gray-700">Bằng chứng</label>
                         <input
                           type="file"
                           multiple
                           accept="image/*"
                           onChange={(e) => handleFileChange(i, e.target.files)}
-                          className="w-full p-1 text-[10px] border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                          className="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                         />
                         {v.evidenceFiles && v.evidenceFiles.length > 0 && (
-                          <div className="grid grid-cols-4 gap-1 mt-1">
+                          <div className="grid grid-cols-4 gap-1.5 mt-1.5">
                             {v.evidenceFiles.map((file, fileIndex) => (
                               <div key={fileIndex} className="relative group">
                                 <img
                                   src={URL.createObjectURL(file)}
                                   alt={`${fileIndex}`}
-                                  className="h-12 w-full object-cover rounded shadow-sm"
+                                  className="h-14 w-full object-cover rounded shadow-sm"
                                 />
                                 <button
                                   onClick={() => handleRemoveFile(i, fileIndex)}
-                                  className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                                 >
-                                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                   </svg>
                                 </button>
@@ -933,55 +966,57 @@ Bình 10A2 tóc
                 </div>
               )}
             </div>
-            <DialogFooter className="flex flex-row gap-1.5 pt-2 border-t border-gray-200">
+            <DialogFooter className="flex flex-row gap-1 pt-1.5 border-t border-gray-200">
               <Button 
                 variant="outline" 
                 onClick={handleBackToInput} 
-                className="flex-1 flex items-center justify-center gap-1 py-2 px-2 text-[10px] text-gray-600 hover:text-gray-800 border-gray-300 h-9"
+                className="flex items-center justify-center gap-0.5 py-1.5 px-2 text-[10px] text-gray-600 hover:text-gray-800 border-gray-300 h-7"
               >
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Quay lại
               </Button>
               
-              <Button
-                onClick={handleSubmitAndCopy}
-                className="flex-1 flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg text-[10px] h-9"
-                disabled={
-                  isSubmitting || isParsing || parsedViolations.length === 0
-                }
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Xử lý...
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Gửi & Copy
-                  </>
-                )}
-              </Button>
+              {inputMode === "attendance" && (
+                <Button
+                  onClick={handleSubmitAndCopy}
+                  className="flex-1 flex items-center justify-center gap-0.5 py-1.5 px-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg text-[10px] h-7"
+                  disabled={
+                    isSubmitting || isParsing || parsedViolations.length === 0
+                  }
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Gửi & Copy
+                    </>
+                  )}
+                </Button>
+              )}
               
               <Button
                 onClick={() => handleSubmit()}
-                className="flex-1 flex items-center justify-center gap-1 py-2 px-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg text-[10px] h-9"
+                className="flex-1 flex items-center justify-center gap-0.5 py-1.5 px-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg text-[10px] h-7"
                 disabled={
                   isSubmitting || isParsing || parsedViolations.length === 0
                 }
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     Gửi...
                   </>
                 ) : (
                   <>
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
                     Gửi ({parsedViolations.length})
