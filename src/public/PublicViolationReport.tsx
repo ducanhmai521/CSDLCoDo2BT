@@ -52,13 +52,6 @@ const PublicViolationReport = () => {
     api.violations.getPublicViolations,
     dateRange ? { start: dateRange.start, end: dateRange.end } : "skip"
   );
-  
-  // Lazy load evidence URLs only when needed
-  const [activeViolationId, setActiveViolationId] = useState<string | null>(null);
-  const evidenceUrls = useQuery(
-    api.violations.getViolationEvidence,
-    activeViolationId ? { violationId: activeViolationId as any } : "skip"
-  );
 
   // Memoized Calculations
   const violationsByDay = useMemo(() => {
@@ -72,7 +65,7 @@ const PublicViolationReport = () => {
     return grouped;
   }, [violations]);
 
-  const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => b - a); // Most recent first
+  const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
 
   // Side Effects
   useEffect(() => {
@@ -120,48 +113,31 @@ const PublicViolationReport = () => {
   };
 
   // Event Handlers
-  const handleOpenModal = (violation: any, evidenceIndex: number) => {
-    // Trigger lazy loading of evidence URLs
-    setActiveViolationId(violation._id);
-  };
-  
-  // Effect to open modal once evidence URLs are loaded
-  useEffect(() => {
-    if (evidenceUrls && evidenceUrls.length > 0 && activeViolationId) {
-      const violation = violations?.find(v => v._id === activeViolationId);
-      if (!violation) return;
-      
-      const url = evidenceUrls[0]; // Use first URL for now
-      if (!url) return;
-      
-      resetTransform();
-      setIsMediaLoading(true);
-      const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
-      const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-      const extension = url.split('.').pop()?.toLowerCase() || '';
-      
-      let type: 'image' | 'video' | null = null;
-      if (videoExtensions.includes(extension)) type = 'video';
-      else if (imageExtensions.includes(extension)) type = 'image';
-      else { window.open(url, '_blank'); return; }
+  const handleOpenModal = (violation: any, url: string) => {
+    resetTransform();
+    setIsMediaLoading(true);
+    const videoExtensions = ['mp4', 'webm', 'ogg', 'mov'];
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const extension = url.split('.').pop()?.toLowerCase() || '';
+    
+    let type: 'image' | 'video' | null = null;
+    if (videoExtensions.includes(extension)) type = 'video';
+    else if (imageExtensions.includes(extension)) type = 'image';
+    else { window.open(url, '_blank'); return; }
 
-      setModalMedia({
-        url, type,
-        violationInfo: {
-          student: violation.studentName || "Không có tên",
-          class: violation.violatingClass,
-          details: violation.details ? `${violation.violationType}: ${violation.details}` : violation.violationType
-        }
-      });
-    }
-  }, [evidenceUrls, activeViolationId, violations]);
+    setModalMedia({
+      url, type,
+      violationInfo: {
+        student: violation.studentName || "Không có tên",
+        class: violation.violatingClass,
+        details: violation.details ? `${violation.violationType}: ${violation.details}` : violation.violationType
+      }
+    });
+  };
 
   const handleCloseModal = () => {
     setIsModalVisible(false);
-    setTimeout(() => {
-      setModalMedia(null);
-      setActiveViolationId(null);
-    }, 300);
+    setTimeout(() => setModalMedia(null), 300);
   };
 
   const handlePasswordSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -438,25 +414,20 @@ const PublicViolationReport = () => {
                               </td>
                               {isReporterAuthenticated && (<td className="px-1.5 py-2 text-slate-700 text-xs sm:text-sm">{(v as any).requesterName || v.reporterName}</td>)}
                               <td className="px-1.5 py-2">
-                                {v.hasEvidence ? (
+                                {v.evidenceUrls && v.evidenceUrls.length > 0 ? (
                                   <div className="flex flex-col gap-1">
-                                    {Array.from({ length: v.evidenceCount }).map((_, i) => (
-                                      <div key={i}>
-                                        <button 
-                                          onClick={() => handleOpenModal(v, i)} 
-                                          className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-xs"
-                                          disabled={activeViolationId === v._id && !evidenceUrls}
-                                        >
-                                          {activeViolationId === v._id && !evidenceUrls ? (
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                          ) : (
+                                    {v.evidenceUrls.map((url: string | null, i: number) => {
+                                      if (!url) return null;
+                                      return (
+                                        <div key={i}>
+                                          <button onClick={() => handleOpenModal(v, url)} className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-xs">
                                             <Eye className="w-3 h-3" />
-                                          )}
-                                          <span className="hidden sm:inline">Xem {i + 1}</span>
-                                          <span className="sm:hidden">{i + 1}</span>
-                                        </button>
-                                      </div>
-                                    ))}
+                                            <span className="hidden sm:inline">Xem {i + 1}</span>
+                                            <span className="sm:hidden">{i + 1}</span>
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 text-xs">-</span>
