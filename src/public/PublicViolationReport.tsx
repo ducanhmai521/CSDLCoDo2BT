@@ -63,14 +63,6 @@ const PublicViolationReport = () => {
   // Memoized Calculations
   const violationsByDay = useMemo(() => {
     if (!violations) return new Map();
-    
-    // Debug: Check if any violations have evidence
-    const withEvidence = violations.filter(v => v.hasEvidence);
-    console.log(`Total violations: ${violations.length}, With evidence: ${withEvidence.length}`);
-    if (withEvidence.length > 0) {
-      console.log('Sample violation with evidence:', withEvidence[0]);
-    }
-    
     const grouped = new Map<number, typeof violations>();
     violations.forEach(v => {
       const dayStart = startOfDay(new Date(v.violationDate)).getTime();
@@ -128,12 +120,9 @@ const PublicViolationReport = () => {
   };
 
   // Event Handlers
-  const [selectedEvidenceIndex, setSelectedEvidenceIndex] = useState<number>(0);
-  
   const handleOpenModal = (violation: any, evidenceIndex: number) => {
     // Trigger lazy loading of evidence URLs
     setActiveViolationId(violation._id);
-    setSelectedEvidenceIndex(evidenceIndex);
   };
   
   // Effect to open modal once evidence URLs are loaded
@@ -142,7 +131,7 @@ const PublicViolationReport = () => {
       const violation = violations?.find(v => v._id === activeViolationId);
       if (!violation) return;
       
-      const url = evidenceUrls[selectedEvidenceIndex];
+      const url = evidenceUrls[0]; // Use first URL for now
       if (!url) return;
       
       resetTransform();
@@ -165,7 +154,7 @@ const PublicViolationReport = () => {
         }
       });
     }
-  }, [evidenceUrls, activeViolationId, violations, selectedEvidenceIndex]);
+  }, [evidenceUrls, activeViolationId, violations]);
 
   const handleCloseModal = () => {
     setIsModalVisible(false);
