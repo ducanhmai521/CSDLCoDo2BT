@@ -505,12 +505,15 @@ const PublicViolationReport = () => {
                 </div>
               </button>
               {isExpanded && !isLoaded && (
-                <div className="bg-white rounded-b-lg shadow-sm border border-slate-200 border-t-0 p-8 text-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full mb-3">
-                    <Eye className="w-6 h-6 text-indigo-600" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-700 mb-1">Click để tải vi phạm</p>
-                  <p className="text-xs text-slate-500">Dữ liệu sẽ được tải khi bạn click vào ngày</p>
+                <div className="bg-white rounded-b-lg shadow-sm border border-slate-200 border-t-0 p-4 text-center">
+                  <button
+                    onClick={() => setLoadedDays(prev => ({ ...prev, [dayTimestamp]: true }))}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium text-sm"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>Tải vi phạm ngày này</span>
+                  </button>
+                  <p className="text-xs text-slate-500 mt-2">Click để xem {dayViolations.length} vi phạm</p>
                 </div>
               )}
               {isExpanded && isLoaded && (
