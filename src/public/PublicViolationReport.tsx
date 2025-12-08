@@ -65,7 +65,7 @@ const PublicViolationReport = () => {
   const violationsByDay = useMemo(() => {
     if (!violations) return new Map();
     const grouped = new Map<number, typeof violations>();
-    violations.forEach(v => {
+    violations.forEach((v: any) => {
       const dayStart = startOfDay(new Date(v.violationDate)).getTime();
       if (!grouped.has(dayStart)) grouped.set(dayStart, []);
       grouped.get(dayStart)!.push(v);
