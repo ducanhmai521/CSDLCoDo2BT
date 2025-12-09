@@ -1,13 +1,101 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import Groq from "groq-sdk";
-import { api } from "./_generated/api";
 import { VIOLATION_CATEGORIES } from "./violationPoints";
 
 // Get the full list of violation names
 const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
   (category) => category.violations
 );
+
+// Validation action to double-check and correct AI output
+const validateAndCorrectAI = async (
+  groq: Groq,
+  model: string,
+  originalText: string,
+  firstPassJson: any,
+  mode: "attendance" | "violations"
+): Promise<any> => {
+  const validationPrompt = `
+Bạn là trợ lý kiểm tra và sửa lỗi kết quả phân tích báo cáo.
+
+DỮ LIỆU GỐC:
+"${originalText}"
+
+KẾT QUẢ PHÂN TÍCH LẦN 1 (JSON):
+${JSON.stringify(firstPassJson, null, 2)}
+
+DANH SÁCH VI PHẠM HỢP LỆ:
+${ALL_VIOLATIONS.join(", ")}
+
+NHIỆM VỤ:
+Kiểm tra kết quả phân tích lần 1 và sửa các lỗi sau (nếu có):
+
+1. ⚠️ LỖI NGHIÊM TRỌNG - PHẢI SỬA:
+   - Thiếu học sinh: Nếu dữ liệu gốc có tên học sinh nhưng JSON không có
+   - Sai tên lớp: Tên lớp không khớp với dữ liệu gốc
+   - Sai loại vi phạm: Loại vi phạm không có trong danh sách hợp lệ hoặc không khớp với dữ liệu gốc
+   - Thiếu vi phạm: Có vi phạm trong dữ liệu gốc nhưng không có trong JSON
+   - studentName = null khi có tên học sinh rõ ràng
+
+2. LỖI CẦN KIỂM TRA:
+   - Tên học sinh viết sai chính tả
+   - Chi tiết vi phạm không chính xác
+   - Thiếu thông tin quan trọng
+
+3. QUY TẮC:
+   - MỖI HỌC SINH = 1 VI PHẠM RIÊNG (không gộp chung)
+   - Tên lớp phải viết HOA (10a1 → 10A1)
+   - Tên học sinh viết hoa chữ cái đầu
+   - Loại vi phạm PHẢI có trong danh sách hợp lệ
+
+TRẢ VỀ JSON ĐÃ SỬA (hoặc giữ nguyên nếu không có lỗi):
+{
+  "violations": [...],
+  "checkedClasses": [...],
+  ${mode === "attendance" ? '"attendanceByClass": {...},' : ""}
+  "correctionsMade": ["Mô tả lỗi đã sửa 1", "Mô tả lỗi đã sửa 2"],
+  "isValid": true/false
+}
+
+CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
+`;
+
+  try {
+    const validationCompletion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: validationPrompt }],
+      model,
+      temperature: 0.05,
+      response_format: { type: "json_object" },
+    });
+
+    let validationText = validationCompletion.choices[0]?.message?.content || "";
+    
+    if (validationText.includes("```json")) {
+      validationText = validationText.substring(
+        validationText.indexOf("```json") + 7,
+        validationText.lastIndexOf("```")
+      );
+    } else if (validationText.includes("```")) {
+      validationText = validationText.substring(
+        validationText.indexOf("```") + 3,
+        validationText.lastIndexOf("```")
+      );
+    }
+
+    const validatedData = JSON.parse(validationText);
+    
+    // Log corrections if any were made
+    if (validatedData.correctionsMade && validatedData.correctionsMade.length > 0) {
+      console.log("AI Corrections made:", validatedData.correctionsMade);
+    }
+    
+    return validatedData;
+  } catch (error) {
+    console.error("Validation failed, using original result:", error);
+    return { ...firstPassJson, correctionsMade: [], isValid: true };
+  }
+};
 
 // Mode for "Cờ đỏ" - attendance checking with violations
 export const parseAttendanceWithAI = action({
@@ -177,10 +265,20 @@ LƯU Ý:
       }
 
       const parsedData = JSON.parse(text);
+      
+      // Double-check with validation pass
+      const validatedData = await validateAndCorrectAI(
+        groq,
+        model || "moonshotai/kimi-k2-instruct-0905",
+        rawText,
+        parsedData,
+        "attendance"
+      );
+      
       return {
-        violations: parsedData.violations || [],
-        checkedClasses: parsedData.checkedClasses || [],
-        attendanceByClass: parsedData.attendanceByClass || {},
+        violations: validatedData.violations || [],
+        checkedClasses: validatedData.checkedClasses || [],
+        attendanceByClass: validatedData.attendanceByClass || {},
       };
     } catch (error) {
       console.error("Error calling Groq API:", error);
@@ -299,13 +397,22 @@ LƯU Ý CUỐI CÙNG:
 
       const parsedData = JSON.parse(text);
 
-      if (Array.isArray(parsedData)) {
-        return { violations: parsedData, checkedClasses: [] };
-      }
+      const normalizedData = Array.isArray(parsedData) 
+        ? { violations: parsedData, checkedClasses: [] }
+        : { violations: parsedData.violations || [], checkedClasses: parsedData.checkedClasses || [] };
+
+      // Double-check with validation pass
+      const validatedData = await validateAndCorrectAI(
+        groq,
+        model || "moonshotai/kimi-k2-instruct-0905",
+        rawText,
+        normalizedData,
+        "violations"
+      );
 
       return {
-        violations: parsedData.violations || [],
-        checkedClasses: parsedData.checkedClasses || [],
+        violations: validatedData.violations || [],
+        checkedClasses: validatedData.checkedClasses || [],
       };
     } catch (error) {
       console.error("Error calling Groq API:", error);

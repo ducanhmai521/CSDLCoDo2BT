@@ -692,6 +692,13 @@ export function AIViolationInputModal({
                              {i + 1}
                            </div>
 
+                           {/* Original Text Display */}
+                           {v.originalText && (
+                             <div className="mb-3 px-2 py-1.5 bg-blue-50 text-blue-700 text-[10px] rounded border border-blue-200">
+                               <span className="font-semibold">Dữ liệu gốc:</span> {v.originalText}
+                             </div>
+                           )}
+
                            {/* Warning Alert */}
                            {v.studentName && v.targetType === 'student' && (() => {
                               const match = allStudents?.some(s => s.fullName.toLowerCase() === v.studentName?.toLowerCase() && normalizeClassName(s.className) === normalizeClassName(v.violatingClass));
