@@ -55,6 +55,7 @@ export function AIViolationInputModal({
   const [currentView, setCurrentView] = useState<"input" | "results">("input");
   const [inputMode, setInputMode] = useState<InputMode>("violations");
   const [showAdvanced, setShowAdvanced] = useState(false); // New state for collapsible options
+  const [selectedAIModel, setSelectedAIModel] = useState<string>("moonshotai/kimi-k2-instruct"); // AI model selection state
 
   // Lock zoom when modal opens
   React.useEffect(() => {
@@ -137,8 +138,8 @@ export function AIViolationInputModal({
     setIsParsing(true);
     try {
       const result = inputMode === "attendance" 
-        ? await parseAttendanceWithAI({ rawText })
-        : await parseViolationsWithAI({ rawText });
+        ? await parseAttendanceWithAI({ rawText, model: selectedAIModel })
+        : await parseViolationsWithAI({ rawText, model: selectedAIModel });
 
       const matchedResults = result.violations.map((v: any) => {
         let matchedViolation: ParsedViolation = {
@@ -598,6 +599,20 @@ export function AIViolationInputModal({
                         />
                       </div>
                       
+                      <div className="space-y-1">
+                        <label className="text-xs text-gray-500">AI Model</label>
+                        <select
+                          value={selectedAIModel}
+                          onChange={(e) => setSelectedAIModel(e.target.value)}
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                          <option value="moonshotai/kimi-k2-instruct">moonshotai/kimi-k2-instruct</option>
+                          <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+                          <option value="qwen/qwen3-32b">qwen/qwen3-32b</option>
+                          <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
+                        </select>
+                      </div>
+                      
                       {myProfile?.isSuperUser && (
                         <div className="space-y-1">
                           <label className="text-xs text-gray-500">Override người báo cáo</label>
@@ -712,24 +727,30 @@ export function AIViolationInputModal({
                                   className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent"
                                 />
                               </div>
-
-                              {/* SỬA ĐỔI 2: Tách dòng cho Lỗi Vi Phạm và Chi Tiết */}
                               
-                              {/* Violation Type - Full Width */}
+                              {/* Violation Type */}
                               <div className="col-span-1 sm:col-span-2 space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Lỗi vi phạm</label>
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Loại vi phạm</label>
                                 <select
-                                    value={v.violationType}
-                                    onChange={(e) => handleFieldChange(i, "violationType", e.target.value)}
-                                    className="w-full text-sm border border-gray-200 rounded px-3 py-2 bg-gray-50 focus:bg-white transition-colors focus:ring-1 focus:ring-blue-500 outline-none"
+                                  value={v.violationType}
+                                  onChange={(e) => handleFieldChange(i, "violationType", e.target.value)}
+                                  className="w-full text-sm border border-gray-200 rounded px-3 py-2 bg-gray-50 focus:bg-white transition-colors focus:ring-1 focus:ring-blue-500 outline-none"
                                 >
-                                    {ALL_VIOLATIONS.map((type) => <option key={type} value={type}>{type}</option>)}
+                                  {VIOLATION_CATEGORIES.map((category) => (
+                                    <optgroup key={category.name} label={`${category.name} (${category.points} điểm)`}>
+                                      {category.violations.map((violation) => (
+                                        <option key={violation} value={violation}>
+                                          {violation}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
                                 </select>
                               </div>
 
-                              {/* Details - Full Width */}
+                              {/* Violation Details */}
                               <div className="col-span-1 sm:col-span-2 space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Chi tiết lỗi</label>
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Chi tiết</label>
                                 <input
                                     value={v.details || ""}
                                     onChange={(e) => handleFieldChange(i, "details", e.target.value)}

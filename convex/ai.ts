@@ -13,6 +13,7 @@ const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
 export const parseAttendanceWithAI = action({
   args: {
     rawText: v.string(),
+    model: v.optional(v.string()),
   },
   returns: v.object({
     violations: v.array(v.object({
@@ -28,7 +29,7 @@ export const parseAttendanceWithAI = action({
       lateStudents: v.array(v.string()),
     })),
   }),
-  handler: async (ctx, { rawText }) => {
+  handler: async (ctx, { rawText, model }) => {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       throw new Error("Missing GROQ_API_KEY environment variable.");
@@ -92,7 +93,7 @@ QUY TẮC PHÂN TÍCH:
 VĂN BẢN:
 "${rawText}"
 
-TRẢ VỀ JSON:
+TRẢ VỀ JSON theo dạng:
 {
   "violations": [
     {
@@ -113,29 +114,36 @@ TRẢ VỀ JSON:
 }
 
 VÍ DỤ CỤ THỂ:
-Input: "10A7 nguyễn, đường nghỉ"
+Input: "12a1 trường, kiểm nghỉ, việt sai dp"
 Output:
 {
   "violations": [
     {
-      "studentName": "Nguyễn",
-      "violatingClass": "10A7",
+      "studentName": "Trường",
+      "violatingClass": "12A1",
       "violationType": "Nghỉ học có phép",
       "details": "",
-      "originalText": "10A7 nguyễn, đường nghỉ"
+      "originalText": "12a1 trường, kiểm nghỉ, việt sai dp"
     },
     {
-      "studentName": "Đường",
-      "violatingClass": "10A7",
+      "studentName": "Kiểm",
+      "violatingClass": "12A1",
       "violationType": "Nghỉ học có phép",
       "details": "",
-      "originalText": "10A7 nguyễn, đường nghỉ"
+      "originalText": "12a1 trường, kiểm nghỉ, việt sai dp"
+    },
+    {
+      "studentName": "Việt",
+      "violatingClass": "12A1",
+      "violationType": "Sai đồng phục/đầu tóc,...",
+      "details": "",
+      "originalText": "12a1 trường, kiểm nghỉ, việt sai dp"
     }
   ],
-  "checkedClasses": ["10A7"],
+  "checkedClasses": ["12A1"],
   "attendanceByClass": {
-    "10A7": {
-      "absentStudents": ["Nguyễn", "Đường"],
+    "12A1": {
+      "absentStudents": ["Trường", "Kiểm"],
       "lateStudents": []
     }
   }
@@ -155,7 +163,7 @@ LƯU Ý:
             content: prompt,
           },
         ],
-        model: "moonshotai/kimi-k2-instruct",
+        model: model || "moonshotai/kimi-k2-instruct",
         temperature: 0.1,
         response_format: { type: "json_object" },
       });
@@ -185,6 +193,7 @@ LƯU Ý:
 export const parseViolationsWithAI = action({
   args: {
     rawText: v.string(),
+    model: v.optional(v.string()),
   },
   returns: v.object({
     violations: v.array(v.object({
@@ -196,7 +205,7 @@ export const parseViolationsWithAI = action({
     })),
     checkedClasses: v.array(v.string()),
   }),
-  handler: async (ctx, { rawText }) => {
+  handler: async (ctx, { rawText, model }) => {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       throw new Error("Missing GROQ_API_KEY environment variable.");
@@ -275,7 +284,7 @@ LƯU Ý CUỐI CÙNG:
             content: prompt,
           },
         ],
-        model: "moonshotai/kimi-k2-instruct",
+        model: model || "moonshotai/kimi-k2-instruct",
         temperature: 0.1,
         response_format: { type: "json_object" },
       });
