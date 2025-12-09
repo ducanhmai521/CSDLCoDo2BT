@@ -37,16 +37,27 @@ Kiểm tra kết quả phân tích lần 1 và sửa các lỗi sau (nếu có):
    - Sai loại vi phạm: Loại vi phạm không có trong danh sách hợp lệ hoặc không khớp với dữ liệu gốc
    - Thiếu vi phạm: Có vi phạm trong dữ liệu gốc nhưng không có trong JSON
    - studentName = null khi có tên học sinh rõ ràng
+   - ⚠️ SAI ÁNH XẠ: Ví dụ details="mang đồ ăn" nhưng violationType="Nghỉ học có phép" → SỬA thành "Đồ ăn."
 
 2. LỖI CẦN KIỂM TRA:
    - Tên học sinh viết sai chính tả
+   - ⚠️ THIẾU CHI TIẾT: Nếu dữ liệu gốc có "quần bò", "tóc dài", "dép lê" nhưng details = "" → PHẢI ĐIỀN VÀO
    - Chi tiết vi phạm không chính xác
    - Thiếu thông tin quan trọng
 
-3. QUY TẮC:
-   - MỖI HỌC SINH = 1 VI PHẠM RIÊNG (không gộp chung)
-   - Tên lớp phải viết HOA (10a1 → 10A1)
-   - Tên học sinh viết hoa chữ cái đầu
+3. ÁNH XẠ VI PHẠM ĐÚNG (PHẢI DÙNG ĐÚNG TÊN):
+   - "đồ ăn", "mang đồ ăn" → violationType: "Đồ ăn.", details: "mang đồ ăn"
+   - "điện thoại", "dt" → violationType: "Sử dụng điện thoại sai mục đích", details: "điện thoại"
+   - "quần bò" → violationType: "Sai đồng phục/đầu tóc,...", details: "quần bò"
+   - "tóc dài" → violationType: "Sai đồng phục/đầu tóc,...", details: "tóc dài"
+   - "dép lê" → violationType: "Sai đồng phục/đầu tóc,...", details: "dép lê"
+   - "vs muộn", "trực nhật muộn" → violationType: "Trực nhật, vệ sinh tự quản muộn, bẩn.", details: ""
+   - "hút thuốc" → violationType: "Hút thuốc lá.", details: "hút thuốc"
+   - "đánh nhau" → violationType: "Có học sinh đánh nhau.", details: "đánh nhau"
+
+4. QUY TẮC KHÁC:
+   - MỖI HỌC SINH = 1 VI PHẠM RIÊNG
+   - Tên lớp viết HOA (10a1 → 10A1)
    - Loại vi phạm PHẢI có trong danh sách hợp lệ
 
 TRẢ VỀ JSON ĐÃ SỬA (hoặc giữ nguyên nếu không có lỗi):
@@ -172,11 +183,25 @@ QUY TẮC PHÂN TÍCH:
 2. Tên học sinh: Viết hoa chữ cái đầu mỗi từ
 3. Từ khóa vắng/nghỉ: "vắng", "nghỉ", "absent", "v"
 4. Từ khóa muộn: "muộn", "trễ", "late", "m"
-5. Vi phạm khác: Ánh xạ sang loại vi phạm chuẩn
-   - "sai dp", "dp", "đồng phục" → "Sai đồng phục/đầu tóc,..."
-   - "tóc", "đầu tóc" → "Sai đồng phục/đầu tóc,..."
-   - "vs muộn", "vệ sinh muộn" → "Vệ sinh muộn"
-6. ⚠️ NHIỀU HỌC SINH: Nếu có danh sách tên (An, Bình, Cường) → TẠO VI PHẠM RIÊNG CHO MỖI NGƯỜI
+5. ⚠️ ÁNH XẠ VI PHẠM - ĐỌC KỸ (PHẢI DÙNG ĐÚNG TÊN TRONG DANH SÁCH):
+   - "sai dp", "dp", "đồng phục", "dép lê", "tóc", "đầu tóc" → "Sai đồng phục/đầu tóc,..."
+   - "vs muộn", "vệ sinh muộn", "trực nhật muộn" → "Trực nhật, vệ sinh tự quản muộn, bẩn."
+   - "đồ ăn", "mang đồ ăn", "ăn uống" → "Đồ ăn."
+   - "điện thoại", "dt", "phone" → "Sử dụng điện thoại sai mục đích"
+   - "muộn" (không có "kp") → "Đi học muộn có phép"
+   - "muộn kp", "muộn không phép" → "Đi học muộn/nghỉ học không phép"
+   - "vắng", "nghỉ" → "Nghỉ học có phép"
+   - "không trực nhật", "không vs" → "Không trực nhật, vệ sinh khu vực tự quản."
+   - "hút thuốc" → "Hút thuốc lá."
+6. ⚠️ PHẦN DETAILS - CỰC KỲ QUAN TRỌNG:
+   - LUÔN LUÔN điền chi tiết cụ thể vào trường "details"
+   - Ví dụ: "Văn quần bò" → violationType: "Sai đồng phục/đầu tóc,...", details: "quần bò"
+   - Ví dụ: "An tóc dài" → violationType: "Sai đồng phục/đầu tóc,...", details: "tóc dài"
+   - Ví dụ: "Bình mang đồ ăn" → violationType: "Đồ ăn.", details: "mang đồ ăn"
+   - Ví dụ: "Cường dép lê" → violationType: "Sai đồng phục/đầu tóc,...", details: "dép lê"
+   - Ví dụ: "Dũng điện thoại" → violationType: "Sử dụng điện thoại sai mục đích", details: "điện thoại"
+   - CHỈ để details = "" khi KHÔNG có thông tin cụ thể (vắng, muộn có phép)
+7. ⚠️ NHIỀU HỌC SINH: Nếu có danh sách tên (An, Bình, Cường) → TẠO VI PHẠM RIÊNG CHO MỖI NGƯỜI
 
 VĂN BẢN:
 "${rawText}"
@@ -202,7 +227,7 @@ TRẢ VỀ JSON theo dạng:
 }
 
 VÍ DỤ CỤ THỂ:
-Input: "12a1 trường, kiểm nghỉ, việt sai dp"
+Input: "12a1 trường, kiểm nghỉ, văn quần bò, hùng mang đồ ăn"
 Output:
 {
   "violations": [
@@ -211,21 +236,28 @@ Output:
       "violatingClass": "12A1",
       "violationType": "Nghỉ học có phép",
       "details": "",
-      "originalText": "12a1 trường, kiểm nghỉ, việt sai dp"
+      "originalText": "12a1 trường, kiểm nghỉ, văn quần bò, hùng mang đồ ăn"
     },
     {
       "studentName": "Kiểm",
       "violatingClass": "12A1",
       "violationType": "Nghỉ học có phép",
       "details": "",
-      "originalText": "12a1 trường, kiểm nghỉ, việt sai dp"
+      "originalText": "12a1 trường, kiểm nghỉ, văn quần bò, hùng mang đồ ăn"
     },
     {
-      "studentName": "Việt",
+      "studentName": "Văn",
       "violatingClass": "12A1",
       "violationType": "Sai đồng phục/đầu tóc,...",
-      "details": "",
-      "originalText": "12a1 trường, kiểm nghỉ, việt sai dp"
+      "details": "quần bò",
+      "originalText": "12a1 trường, kiểm nghỉ, văn quần bò, hùng mang đồ ăn"
+    },
+    {
+      "studentName": "Hùng",
+      "violatingClass": "12A1",
+      "violationType": "Đồ ăn.",
+      "details": "mang đồ ăn",
+      "originalText": "12a1 trường, kiểm nghỉ, văn quần bò, hùng mang đồ ăn"
     }
   ],
   "checkedClasses": ["12A1"],
@@ -346,11 +378,23 @@ FORMAT LINH HOẠT:
 - "An 10A1 muộn" → An đi muộn có phép (mặc định)
 - "An 10A1 muộn kp" → An đi muộn không phép
 
-ÁNH XẠ VI PHẠM:
-- "sai dp", "dp", "đồng phục", "dép lê" → "Sai đồng phục/đầu tóc,..."
-- "tóc", "đầu tóc", "tóc dài" → "Sai đồng phục/đầu tóc,..."
+⚠️ ÁNH XẠ VI PHẠM - PHẢI DÙNG ĐÚNG TÊN TRONG DANH SÁCH:
+- "sai dp", "dp", "đồng phục", "dép lê", "tóc", "đầu tóc" → "Sai đồng phục/đầu tóc,..."
 - "muộn", "trễ" (không có "kp") → "Đi học muộn có phép"
 - "muộn kp", "muộn không phép" → "Đi học muộn/nghỉ học không phép"
+- "đồ ăn", "mang đồ ăn", "ăn uống" → "Đồ ăn."
+- "điện thoại", "dt", "phone" → "Sử dụng điện thoại sai mục đích"
+- "hút thuốc" → "Hút thuốc lá."
+- "đánh nhau" → "Có học sinh đánh nhau."
+
+⚠️ PHẦN DETAILS - CỰC KỲ QUAN TRỌNG:
+- LUÔN LUÔN điền chi tiết cụ thể vào trường "details"
+- Ví dụ: "Văn quần bò" → violationType: "Sai đồng phục/đầu tóc,...", details: "quần bò"
+- Ví dụ: "An tóc dài" → violationType: "Sai đồng phục/đầu tóc,...", details: "tóc dài"
+- Ví dụ: "Bình mang đồ ăn" → violationType: "Đồ ăn.", details: "mang đồ ăn"
+- Ví dụ: "Cường dép lê" → violationType: "Sai đồng phục/đầu tóc,...", details: "dép lê"
+- Ví dụ: "Dũng điện thoại" → violationType: "Sử dụng điện thoại sai mục đích", details: "điện thoại"
+- CHỈ để details = "" khi KHÔNG có thông tin cụ thể
 
 VĂN BẢN:
 "${rawText}"
