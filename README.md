@@ -15,7 +15,7 @@ Nhằm mục đích nâng cao hiệu quả quản lý nền nếp học sinh.
   - [5. GitHub Actions để deploy code lên Convex tự động khi commit](#5-github-actions-để-deploy-code-lên-convex-tự-động-khi-commit)
 - [Biến môi trường](#biến-môi-trường)
   - [JWT](#jwt)
-  - [Gemini API](#gemini-api)
+  - [Groq API](#groq-api)
   - [Cloudflare R2](#cloudflare-r2)
 - [Đổi tên, logo trường](#đổi-tên-logo-trường)
 
@@ -62,7 +62,7 @@ Các bước để chạy dự án trên máy tính của bạn cho mục đích
     *   Thêm các biến môi trường sau (tham khảo cách lấy các key ở dưới):
         *   `JWT_PRIVATE_KEY`
         *   `JWKS`
-        *   `GEMINI_API_KEY`
+        *   `GROQ_API_KEY`
         *   `R2_ACCOUNT_ID`
         *   `R2_ACCESS_KEY_ID`
         *   `R2_SECRET_ACCESS_KEY`
@@ -130,14 +130,14 @@ Nền tảng sử dụng Convex Auth.
 2.  **Cấu hình Backend Convex:**
     *   Lưu `JWT_PRIVATE_KEY` và `JWKS` vào Environment Variables trong cài đặt của project Convex (nhớ chú ý môi trường production hay development cloud).
 
-### Gemini API
+### Groq API
 
-Nền tảng sử dụng Gemini API (2.5-flash-lite) để hỗ trợ việc chuẩn hóa dữ liệu nhập vào.
+Nền tảng sử dụng Groq API (moonshotai/kimi-k2-instruct) để hỗ trợ việc chuẩn hóa dữ liệu nhập vào.
 
-1. **Lấy API key ở Google AI Studio:**
-    *   Truy cập [Google AI Studio](https://aistudio.google.com/).
+1. **Lấy API key ở Groq Console:**
+    *   Truy cập [Groq Console](https://console.groq.com/).
     *   Tạo một API key.
-    *   Lưu API key vào biến môi trường `GEMINI_API_KEY`.
+    *   Lưu API key vào biến môi trường `GROQ_API_KEY`.
 
 ### Cloudflare R2
 

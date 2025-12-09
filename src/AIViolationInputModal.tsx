@@ -19,6 +19,7 @@ import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
 import { normalizeClassName } from "./lib/utils";
 import { stringSimilarity } from "string-similarity-js";
 import imageCompression from 'browser-image-compression';
+import React from "react";
 
 const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
   (category) => category.violations
@@ -54,6 +55,21 @@ export function AIViolationInputModal({
   const [isOpen, setIsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<"input" | "results">("input");
   const [inputMode, setInputMode] = useState<InputMode>("violations");
+
+  // Lock zoom when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      const viewport = document.querySelector('meta[name="viewport"]');
+      const originalContent = viewport?.getAttribute('content');
+      viewport?.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      
+      return () => {
+        if (originalContent) {
+          viewport?.setAttribute('content', originalContent);
+        }
+      };
+    }
+  }, [isOpen]);
 
   const parseViolationsWithAI = useAction(api.ai.parseViolationsWithAI);
   const parseAttendanceWithAI = useAction(api.ai.parseAttendanceWithAI);
@@ -144,19 +160,39 @@ export function AIViolationInputModal({
           const targetStudents =
             studentsInClass.length > 0 ? studentsInClass : allStudents;
 
-          const studentNames = targetStudents.map((s) => s.fullName);
-
-          if (studentNames.length > 0) {
-            const ratings = studentNames.map((name) => ({
-              name,
-              score: stringSimilarity(parsedName, name.toLowerCase()),
-            }));
-            const bestMatch = ratings.reduce((prev, curr) =>
-              prev.score > curr.score ? prev : curr
+          // Strategy 1: Check for exact match first
+          const exactMatch = targetStudents.find(
+            (s) => s.fullName.toLowerCase() === parsedName
+          );
+          
+          if (exactMatch) {
+            matchedViolation.studentName = exactMatch.fullName;
+          } else {
+            // Strategy 2: Check if only ONE student's name contains the parsed name
+            const containsMatches = targetStudents.filter((s) =>
+              s.fullName.toLowerCase().includes(parsedName)
             );
+            
+            if (containsMatches.length === 1) {
+              // Single match found - auto-select this student
+              matchedViolation.studentName = containsMatches[0].fullName;
+            } else {
+              // Strategy 3: Use similarity matching as fallback
+              const studentNames = targetStudents.map((s) => s.fullName);
+              
+              if (studentNames.length > 0) {
+                const ratings = studentNames.map((name) => ({
+                  name,
+                  score: stringSimilarity(parsedName, name.toLowerCase()),
+                }));
+                const bestMatch = ratings.reduce((prev, curr) =>
+                  prev.score > curr.score ? prev : curr
+                );
 
-            if (bestMatch.score > 0.5) {
-              matchedViolation.studentName = bestMatch.name;
+                if (bestMatch.score > 0.5) {
+                  matchedViolation.studentName = bestMatch.name;
+                }
+              }
             }
           }
         }

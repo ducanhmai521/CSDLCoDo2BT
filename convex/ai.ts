@@ -1,6 +1,6 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { api } from "./_generated/api";
 import { VIOLATION_CATEGORIES } from "./violationPoints";
 
@@ -29,13 +29,12 @@ export const parseAttendanceWithAI = action({
     })),
   }),
   handler: async (ctx, { rawText }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing GEMINI_API_KEY environment variable.");
+      throw new Error("Missing GROQ_API_KEY environment variable.");
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemma-3-27b" });
+    const groq = new Groq({ apiKey });
 
     const prompt = `
 Bạn là trợ lý phân tích báo cáo CỜ ĐỎ của trường học. Cờ đỏ đi từng lớp để kiểm tra sĩ số và vi phạm.
@@ -149,9 +148,19 @@ LƯU Ý:
 `;
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      let text = response.text();
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        model: "moonshotai/kimi-k2-instruct",
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+      });
+
+      let text = chatCompletion.choices[0]?.message?.content || "";
 
       if (text.includes("```json")) {
         text = text.substring(text.indexOf("```json") + 7, text.lastIndexOf("```"));
@@ -166,7 +175,7 @@ LƯU Ý:
         attendanceByClass: parsedData.attendanceByClass || {},
       };
     } catch (error) {
-      console.error("Error calling Gemini API:", error);
+      console.error("Error calling Groq API:", error);
       throw new Error("Failed to parse attendance using AI.");
     }
   },
@@ -188,13 +197,12 @@ export const parseViolationsWithAI = action({
     checkedClasses: v.array(v.string()),
   }),
   handler: async (ctx, { rawText }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing GEMINI_API_KEY environment variable.");
+      throw new Error("Missing GROQ_API_KEY environment variable.");
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemma-3-27b" });
+    const groq = new Groq({ apiKey });
 
     const prompt = `
 Bạn là trợ lý phân tích báo cáo LỚP TRỰC TUẦN. Lớp trực tuần đứng cổng trường kiểm tra vi phạm của học sinh vào trường.
@@ -260,9 +268,19 @@ LƯU Ý CUỐI CÙNG:
 `;
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      let text = response.text();
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        model: "moonshotai/kimi-k2-instruct",
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+      });
+
+      let text = chatCompletion.choices[0]?.message?.content || "";
 
       if (text.includes("```json")) {
         text = text.substring(text.indexOf("```json") + 7, text.lastIndexOf("```"));
@@ -281,7 +299,7 @@ LƯU Ý CUỐI CÙNG:
         checkedClasses: parsedData.checkedClasses || [],
       };
     } catch (error) {
-      console.error("Error calling Gemini API:", error);
+      console.error("Error calling Groq API:", error);
       throw new Error("Failed to parse violations using AI.");
     }
   },
