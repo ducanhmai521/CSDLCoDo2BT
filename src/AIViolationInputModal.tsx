@@ -55,7 +55,7 @@ export function AIViolationInputModal({
   const [currentView, setCurrentView] = useState<"input" | "results">("input");
   const [inputMode, setInputMode] = useState<InputMode>("violations");
   const [showAdvanced, setShowAdvanced] = useState(false); // New state for collapsible options
-  const [selectedAIModel, setSelectedAIModel] = useState<string>("moonshotai/kimi-k2-instruct"); // AI model selection state
+  const [selectedAIModel, setSelectedAIModel] = useState<string>("moonshotai/kimi-k2-instruct-0905"); // AI model selection state
 
   // Lock zoom when modal opens
   React.useEffect(() => {
@@ -606,9 +606,10 @@ export function AIViolationInputModal({
                           onChange={(e) => setSelectedAIModel(e.target.value)}
                           className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
-                          <option value="moonshotai/kimi-k2-instruct">moonshotai/kimi-k2-instruct</option>
-                          <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-                          <option value="qwen/qwen3-32b">qwen/qwen3-32b</option>
+                          <option value="moonshotai/kimi-k2-instruct-0905">moonshotai/kimi-k2-instruct-0905</option>
+                          <option value="groq/compound-mini">groq/compound-mini</option>
+                          <option value="groq/compound">groq/compound</option>
+                          <option value="meta-llama/llama-4-maverick-17b-128e-instruct">meta-llama/llama-4-maverick-17b-128e-instruct</option>
                           <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
                         </select>
                       </div>

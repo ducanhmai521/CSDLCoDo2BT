@@ -163,7 +163,7 @@ LƯU Ý:
             content: prompt,
           },
         ],
-        model: model || "moonshotai/kimi-k2-instruct",
+        model: model || "moonshotai/kimi-k2-instruct-0905",
         temperature: 0.1,
         response_format: { type: "json_object" },
       });
@@ -284,7 +284,7 @@ LƯU Ý CUỐI CÙNG:
             content: prompt,
           },
         ],
-        model: model || "moonshotai/kimi-k2-instruct",
+        model: model || "moonshotai/kimi-k2-instruct-0905",
         temperature: 0.1,
         response_format: { type: "json_object" },
       });
