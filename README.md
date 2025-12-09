@@ -1,215 +1,265 @@
-# CSDL Cờ Đỏ THPTS2BT
+# CSDL Cờ Đỏ THPTS2BT - Hệ Thống Quản Lý Nền Nếp Học Sinh
 
-Đây là một nền tảng quản lý nền nếp sử dụng [Convex](https://convex.dev) làm backend, [Vite](https://vitejs.dev/) làm frontend và Cloudflare R2 để lưu trữ các file bằng chứng.
-Nhằm mục đích nâng cao hiệu quả quản lý nền nếp học sinh.
+## 📋 Tổng Quan
 
-## Mục lục
-- [Lưu ý](#lưu-ý)
-- [Hướng dẫn deploy local (dev)](#hướng-dẫn-deploy-local-dev)
-  - [Điều kiện](#điều-kiện)
-  - [Chạy dự án local](#chạy-dự-án-local)
-- [Hướng dẫn triển khai Production](#hướng-dẫn-triển-khai-production)
-  - [Điều kiện](#điều-kiện-1)
-  - [1. Cài đặt Convex](#1-cài-đặt-convex)
-  - [2. Cài đặt Vercel](#2-cài-đặt-vercel)
-  - [5. GitHub Actions để deploy code lên Convex tự động khi commit](#5-github-actions-để-deploy-code-lên-convex-tự-động-khi-commit)
-- [Biến môi trường](#biến-môi-trường)
-  - [JWT](#jwt)
-  - [Groq API](#groq-api)
-  - [Cloudflare R2](#cloudflare-r2)
-- [Đổi tên, logo trường](#đổi-tên-logo-trường)
+**CSDL Cờ Đỏ THPTS2BT** là một nền tảng quản lý nền nếp học sinh hiện đại, được thiết kế đặc biệt cho trường THPT Số 2 Bảo Thắng. Hệ thống sử dụng công nghệ tiên tiến với:
 
+- **Backend**: Convex - nền tảng database thời gian thực
+- **Frontend**: Vite + React với giao diện hiện đại, responsive
+- **Lưu trữ file**: Cloudflare R2 cho ảnh bằng chứng vi phạm
+- **AI Integration**: Groq API để hỗ trợ xử lý dữ liệu thô
 
-## Lưu ý 
+## ✨ Tính Năng Nổi Bật
 
-*   Dự án này là dự án vibecode, có thể có lỗi và các sự tối ưu kém.
-*   Dự án này được thiết kế để hoạt động với các 24 lớp với tên là 10A1 -> 12A8, nếu cần sửa đổi (ví dụ 11A, B, C...) sẽ cần phải sửa lại kha khá file, các bạn sẽ phải tự sửa đổi nếu muốn adapt 😔. Bạn vẫn có thể sử dụng code của mình nếu trường của bạn không có đủ 24 lớp như mẫu nhưng tên lớp vẫn fit trong khoảng đó (ví dụ 10A1 -> 12A7 vẫn ok)
-*   Bạn có thể thoải mái fork repo của mình và sửa đổi code để sử dụng cho trường của bạn. Nếu bạn phát triển được tính năng nào hay ho thì báo mình để cập nhật vào repo gốc nhé hẹ hẹ (hứa sẽ credit đầy đủ) 😊
+### 🔐 1. Hệ Thống Xác Thực Đa Cấp
+- **Đăng nhập an toàn** với Convex Auth
+- **Phân quyền chi tiết**: Admin, Quản lý khối, Người dùng chờ duyệt
+- **Chuyển đổi vai trò linh hoạt** cho Admin
 
-## Hướng dẫn deploy local (dev)
+### 📊 2. Quản Lý Vi Phạm Thông Minh
+- **Ghi nhận vi phạm** theo danh mục chuẩn hóa
+- **Hỗ trợ AI nhập liệu**: Tự động chuẩn hóa dữ liệu thô từ văn bản
+- **Upload bằng chứng**: Hỗ trợ ảnh và video, tự động nén ảnh
+- **Phân loại vi phạm**: Theo học sinh hoặc theo lớp
+- **Tính điểm trừ tự động** theo quy định
 
-Các bước để chạy dự án trên máy tính của bạn cho mục đích phát triển.
+### 📈 3. Báo Cáo Và Thống Kê
+- **Bảng điểm thi đua**: Theo dõi điểm các lớp theo tuần/tháng
+- **Báo cáo vi phạm**: Chi tiết theo thời gian, lớp, cá nhân
+- **Xuất Excel**: Báo cáo có định dạng đẹp, sẵn sàng in
+- **Trang công khai**: Cho phép xem điểm và vi phạm không cần đăng nhập
 
-### Điều kiện
+### 👥 4. Quản Lý Học Sinh
+- **Danh sách lớp**: Quản lý 24 lớp (10A1 → 12A8)
+- **Tìm kiếm thông minh**: Tìm học sinh theo tên, lớp
+- **Import danh sách**: Từ file Excel với template có sẵn
+- **Theo dõi nền nếp**: Lịch sử vi phạm của từng học sinh
 
-*   Đã cài đặt [Node.js](https://nodejs.org/) (phiên bản 18+).
-*   Đã cài đặt [Git](https://git-scm.com/).
-*   Tài khoản [Convex](https://convex.dev/).
+### 📅 5. Quản Lý Thời Gian
+- **Lọc theo tuần**: Tự động xác định tuần hiện tại
+- **Lọc theo tháng**: Xem báo cáo tháng cụ thể
+- **Khoảng thời gian tùy chỉnh**: Linh hoạt chọn ngày bắt đầu - kết thúc
+- **Múi giờ Việt Nam**: Tự động điều chỉnh theo giờ địa phương
 
-### Chạy dự án local   
+### 🔄 6. Cập Nhật Tự Động
+- **Real-time sync**: Dữ liệu cập nhật ngay lập tức
+- **Auto-refresh**: Không cần F5 để xem dữ liệu mới
+- **Caching thông minh**: Tối ưu hiệu suất
 
-1.  **Clone repository về máy:**
-    ```bash
-    git clone https://github.com/ducanhmai521/CSDLCoDo2BT
-    cd CSDLCoDo2BT
-    ```
+### 🌐 7. Trang Công Khai
+- **Bảng điểm thi đua**: Xem điểm các lớp theo tuần
+- **Báo cáo vi phạm**: Công khai danh sách vi phạm
+- **Xin phép**: Form xin phép nghỉ học online
+- **Xem bằng chứng**: Truy cập ảnh/video vi phạm
 
-2.  **Cài đặt các dependencies:**
-    ```bash
-    npm install
-    ```
+## 🎯 Hướng Dẫn Sử Dụng Chi Tiết
 
-3.  **Khởi tạo Convex và chạy backend local:**
-    Chạy lệnh sau và làm theo các hướng dẫn trên màn hình để đăng nhập và khởi tạo dự án Convex của bạn.
-    ```bash
-    npx convex dev
-    ```
-    Sau khi chạy thành công, lệnh này sẽ khởi động một backend server local.
+### I. CHO ADMIN (Quản Trị Viên)
 
-4.  **Cấu hình biến môi trường cho Backend:**
-    *   Trong khi `npx convex dev` đang chạy, mở trình duyệt và truy cập vào Convex dashboard của project.
-    *   Vào tab "Settings" -> "Environment Variables".
-    *   Thêm các biến môi trường sau (tham khảo cách lấy các key ở dưới):
-        *   `JWT_PRIVATE_KEY`
-        *   `JWKS`
-        *   `GROQ_API_KEY`
-        *   `R2_ACCOUNT_ID`
-        *   `R2_ACCESS_KEY_ID`
-        *   `R2_SECRET_ACCESS_KEY`
-        *   `R2_BUCKET_NAME`
-        *   `R2_PUBLIC_URL`
+#### 1. Dashboard Tổng Quan
+- **Xem thống kê nhanh**: Tổng số vi phạm, học sinh, lớp
+- **Theo dõi tình hình**: Biểu đồ vi phạm theo thời gian
+- **Quản lý người dùng**: Duyệt tài khoản mới, phân quyền
 
-6.  **Chạy dự án:**
-    *   Mở một cửa sổ terminal.
-    *   Chạy lệnh sau để khởi động server:
-    ```bash
-    npm run dev
-    ```
-    Trang web của bạn bây giờ sẽ có thể truy cập được tại `http://localhost:5173` (hoặc một cổng khác nếu 5173 đã được sử dụng).
+#### 2. Quản Lý Vi Phạm
+**Bước 1**: Chọn loại đối tượng
+- **Vi phạm cá nhân**: Chọn học sinh cụ thể
+- **Vi phạm tập thể**: Chọn cả lớp
 
-## Hướng dẫn triển khai Production
+**Bước 2**: Nhập thông tin
+- **Nhập thủ công**: Điền form chi tiết
+- **Dùng AI hỗ trợ**: Paste danh sách thô, AI sẽ parse tự động
 
-Các bước để triển khai production web.
+**Bước 3**: Upload bằng chứng
+- **Kéo thả file**: Hỗ trợ nhiều ảnh/video
+- **Tự động nén**: Ảnh >1MB sẽ được nén
+- **Xem trước**: Kiểm tra trước khi gửi
 
-### Điều kiện
+**Bước 4**: Xác nhận và lưu
+- **Kiểm tra lại**: Xem tổng quan trước khi lưu
+- **Lưu vi phạm**: Hệ thống tự tính điểm trừ
 
-*   Tài khoản [Vercel](https://vercel.com/).
-*   Tài khoản [GitHub](https://github.com/).
-*   Tài khoản [Convex](https://convex.dev/).
+#### 3. Xuất Báo Cáo
+**Tuần**:
+1. Chọn tuần cần xuất
+2. Click "Xuất Excel"
+3. File sẽ tải về với tên: `vi-pham-tuan-X-ngay-thang-nam.xlsx`
 
-### 1. Cài đặt Convex
+**Tháng**:
+1. Chọn tháng cần xuất
+2. Click "Xuất Excel"
+3. File sẽ tải về với tên: `vi-pham-thang-MM-yyyy.xlsx`
 
-1.  **Tạo một dự án Convex mới (bỏ qua nếu đã tạo ở phần deploy local):**
-    *   Truy cập [Convex Dashboard](https://dashboard.convex.dev/).
-    *   Tạo một dự án mới.
+**Tùy chỉnh**:
+1. Chọn khoảng ngày bắt đầu - kết thúc
+2. Có thể lọc thêm theo khối, lớp
+3. Click "Xuất Excel"
 
-2.  **Lấy Deploy Key:**
-    *   Trong Convex Dashboard của dự án vừa tạo, đi tới "Settings" -> "Deploy Keys" (nhớ là chọn production thay vì development cloud).
-    *   Tạo một key mới và sao chép.
+#### 4. Quản Lý Danh Sách
+**Import học sinh**:
+1. Click "Tải template Excel"
+2. Điền danh sách theo mẫu
+3. Upload file Excel
+4. Hệ thống tự động import
 
-### 2. Cài đặt Vercel
+**Xem danh sách lớp**:
+- Click vào từng lớp để xem chi tiết
+- Tìm kiếm học sinh theo tên
+- Export danh sách nếu cần
 
-1.  **Tạo một dự án Vercel mới:**
-    *   Truy cập vào Vercel và tạo một dự án mới.
-    *   Nhập dự án từ GitHub Repository của bạn.
+### II. CHO QUẢN LÝ KHỐI
 
-2.  **Cấu hình Biến môi trường (Environment Variables):**
-    *   Trong cài đặt dự án Vercel của bạn, điều hướng đến phần "Environment Variables".
-    *   Thêm biến môi trường sau:
-        *   `VITE_CONVEX_URL`: URL của deployment Convex production của bạn.
-        *   `CONVEX_DEPLOYMENT_KEY`: Key deploy Convex bạn đã sao chép ở bước trước.
+#### 1. Theo Dõi Khối
+- **Xem vi phạm khối mình quản lý**
+- **Thống kê theo lớp**: Biết lớp nào vi phạm nhiều
+- **Theo dõi xu hướng**: Vi phạm tăng hay giảm
 
-### 5. GitHub Actions để deploy code lên Convex tự động khi commit
+#### 2. Ghi Nhận Vi Phạm
+- **Quyền ghi nhận**: Chỉ cho khối mình quản lý
+- **Cùng quy trình**: Giống Admin nhưng giới hạn phạm vi
+- **Không thể xóa**: Chỉ Admin mới có quyền xóa
 
-Để tự động deploy code lên Convex khi commit bạn có thể dùng GitHub Actions. Repo đã có sẵn file yml workflows, bạn chỉ cần thêm deploy key của dự án Convex vào Github Repo.
+### III. TRANG CÔNG KHAI (Không Cần Đăng Nhập)
 
-1.  **Tạo Workflow GitHub Actions:**
-    *   Ở repo của bạn, vào tab "Settings" -> "Secrets and variables" -> "Actions".
-    *   Thêm biến `CONVEX_DEPLOY_KEY` vào "Repository secrets".
+#### 1. Bảng Điểm Thi Đua
+**URL**: `/bang-diem-thi-dua-tho`
+- **Xem theo tuần**: Mặc định tuần hiện tại
+- **Chọn tuần khác**: Từ dropdown hoặc date picker
+- **Xếp hạng**: Tự động sắp xếp từ cao xuống thấp
 
-## Biến môi trường
+#### 2. Báo Cáo Vi Phạm
+**URL**: `/bang-bao-cao-vi-pham`
+- **Xem theo tuần**: Mặc định theo tuần hiện tại
+- **Click xem chi tiết**: Xem nội dung vi phạm
+- **Xem bằng chứng**: Click vào icon để xem ảnh
 
-### JWT
+#### 3. Xin Phép Nghỉ Học
+**URL**: `/xin-phep`
+- **Form đơn giản**: Họ tên, lớp, lý do, ngày nghỉ
+- **Upload file đính kèm**: Giấy khám bệnh, etc.
+- **Gửi yêu cầu**
 
-Nền tảng sử dụng Convex Auth.
+## 🛠️ Cài Đặt Và Triển Khai
 
-1.  **Tạo JWT Private Key:**
-    *   Bạn cần tự tạo một cặp khóa RSA. 
-    *   **Quan trọng:** JWS (JSON Web Signature) algorithm phải được đặt là `RS256`.
+### Yêu Cầu Hệ Thống
+- **Node.js**: Phiên bản 19 trở lên
+- **Git**: Để clone repository
+- **Tài khoản**: Convex, Vercel, Cloudflare R2
 
-2.  **Cấu hình Backend Convex:**
-    *   Lưu `JWT_PRIVATE_KEY` và `JWKS` vào Environment Variables trong cài đặt của project Convex (nhớ chú ý môi trường production hay development cloud).
+### Cài Đặt Local (Development)
 
-### Groq API
+```bash
+# 1. Clone repository
+git clone https://github.com/ducanhmai521/CSDLCoDo2BT
+cd CSDLCoDo2BT
 
-Nền tảng sử dụng Groq API (moonshotai/kimi-k2-instruct) để hỗ trợ việc chuẩn hóa dữ liệu nhập vào.
+# 2. Cài dependencies
+npm install
 
-1. **Lấy API key ở Groq Console:**
-    *   Truy cập [Groq Console](https://console.groq.com/).
-    *   Tạo một API key.
-    *   Lưu API key vào biến môi trường `GROQ_API_KEY`.
+# 3. Khởi tạo Convex
+npx convex dev
 
-### Cloudflare R2
-
-### Bước 1: Tạo R2 Bucket
-1. Đăng nhập vào Cloudflare Dashboard
-2. Vào R2 Object Storage
-3. Tạo bucket mới cho việc lưu trữ ảnh bằng chứng
-
-### Bước 2: Tạo R2 API Token
-1. Vào R2 Object Storage > Manage R2 API tokens
-2. Tạo token mới với quyền:
-   - Object:Read, Object:Write
-   - Bucket:Read (cho bucket bạn đã tạo)
-
-### Bước 3: Cấu hình Environment Variables
-Thêm các biến môi trường sau vào biến môi trường của dự án Convex của bạn:
-
+# 4. Chạy project (mở 2 terminal)
+npm run dev:frontend  # Terminal 1 - Frontend
+npm run dev:backend # Terminal 2 - Backend
 ```
+
+### Triển Khai Production
+
+#### 1. Chuẩn Bị
+- **Convex**: Tạo project production, lấy deployment key
+- **Vercel**: Import từ GitHub, cấu hình environment variables
+- **Cloudflare R2**: Tạo bucket, API token
+
+#### 2. Environment Variables
+Cần cấu hình đầy đủ các biến:
+```
+# JWT & Auth
+JWT_PRIVATE_KEY=your_jwt_private_key
+JWKS=your_jwks_json
+
+# Groq AI
+GROQ_API_KEY=your_groq_api_key
+
+# Cloudflare R2
 R2_ACCOUNT_ID=your_r2_account_id
-R2_ACCESS_KEY_ID=your_r2_access_key_id
-R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
-R2_BUCKET_NAME=your_r2_bucket_name
-R2_PUBLIC_URL=https://your_r2_public_domain.com
+R2_ACCESS_KEY_ID=your_r2_access_key
+R2_SECRET_ACCESS_KEY=your_r2_secret_key
+R2_BUCKET_NAME=your_bucket_name
+R2_PUBLIC_URL=your_r2_public_url
+
+# Deployment
+VITE_CONVEX_URL=your_convex_deployment_url
+CONVEX_DEPLOYMENT_KEY=your_convex_deploy_key
 ```
 
-### Bước 4: Cấu hình Public Access
-Nếu bạn muốn ảnh có thể truy cập công khai:
-1. Vào R2 Object Storage > Settings
-2. Bật "Public access"
-3. Cấu hình custom domain nếu cần
+#### 3. GitHub Actions (Tùy Chọn)
+- **Tự động deploy**: Khi push code lên GitHub
+- **Cấu hình**: Thêm `CONVEX_DEPLOY_KEY` vào GitHub Secrets
 
-### Lưu ý
-- `R2_ACCOUNT_ID`: Tìm trong Cloudflare Dashboard > R2 > Overview
-- `R2_PUBLIC_URL`: URL công khai để truy cập ảnh (nên dùng custom domain nếu triển khai production)
-- Đảm bảo bucket có quyền public read nếu bạn muốn ảnh hiển thị trực tiếp
+## 📁 Cấu Trúc Dự Án
 
-## Đổi tên, logo trường
+```
+CSDLCoDo2BT/
+├── convex/                 # Backend logic
+│   ├── violations.ts       # Logic vi phạm
+│   ├── users.ts           # Quản lý người dùng
+│   ├── ai.ts              # AI integration
+│   ├── r2.ts              # Cloudflare R2
+│   └── excelExport.ts     # Xuất Excel
+├── src/
+│   ├── components/        # UI components
+│   ├── public/            # Trang công khai
+│   ├── AdminDashboard.tsx # Dashboard Admin
+│   ├── ViolationReportForm.tsx # Form báo cáo
+│   └── AIViolationInputModal.tsx # AI helper
+└── README.md
+```
 
-Để thay đổi tên của web theo tên trường:
+## 🔧 Tùy Chỉnh Cho Trường Của Bạn
 
-1.  **Cập nhật `index.html` (tên xuất hiện ở title bar):**
-    *   Mở tệp `index.html`.
-    *   Thay đổi thẻ `<title>` thành tên trường của bạn.
+### 1. Đổi Tên Trường
+- **File**: `index.html` - thay đổi `<title>`
+- **File**: `src/App.tsx` - thay đổi tên trong header và footer
+- **File**: `src/public/*.tsx` - thay đổi tiêu đề các bảng công khai
 
-2.  **Cập nhật `App.tsx` (tên,logo xuất hiện ở Header):**
-    *   Mở tệp `App.tsx`.
-    *   Thay đổi các dòng sau theo ý của bạn:
-    ```
-    <h2 className="text-lg font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPTS2BT</h2>
-    <p className="hidden md:block text-xs text-slate-600">Nền tảng quản lý vi phạm và nền nếp của trường THPT Số 2 Bảo Thắng</p>
-    ```
-    và
-    ```
-    <p className="font-medium">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
-    <p className="text-xs text-slate-600">Phát triển bởi Mai Đức Anh</p>
-    ```
-    *   Sửa dòng sau thành link file (raw) của logo trường, nên sử dụng png trong suốt:
-    ```
-    <img src="https://www.dropbox.com/scl/fi/23fj64gvknqcw0fu6ibzw/icon.ico?rlkey=t0qmc0ffbkoh5z16g5xts105w&st=for1a0hd&raw=1" alt="favicon" className="w-8 h-8 rounded-lg" />
-    ```
+### 2. Đổi Logo
+- **Icon**: Thay thế `icon.ico` và `favicon.ico`
+- **Logo header**: Đổi URL trong `src/App.tsx`
+- **Logo public**: Đổi trong các file `src/public/*.tsx`
 
-3.  **Cập nhật `icon.ico` (icon của web):**
-    *   Đổi file này thành logo trường của bạn (để nguyên tên là `icon.ico`, nên sử dụng ico trong suốt).
+### 3. Điều Chỉnh Danh Mục Vi Phạm
+- **File**: `convex/violationPoints.ts`
+- **Cấu trúc**: Categories → Violations → Điểm trừ
+- **Tùy chỉnh**: Thêm, sửa, xóa theo quy định trường bạn
 
-4. **Cập nhật các tiêu đề ở các bảng public:**
-    *   Mở tệp `PublicEmulationScoreTable.tsx`.
-    *   Thay đổi tiêu đề của bảng theo ý của bạn:
-    ```
-    <h1 className="text-2xl font-bold text-center mb-2">CSDL CỜ ĐỎ THPTS2BT | BẢNG ĐIỂM THI ĐUA THÔ</h1>
-    ```
-    *   Mở tệp `PublicViolationReport.tsx`.
-    *   Thay đổi tiêu đề của bảng theo ý của bạn:
-    ```
-    <h1 className="text-2xl font-bold text-center mb-2">CSDL CỜ ĐỎ THPTS2BT | BÁO CÁO VI PHẠM</h1>
-    ```
+### 4. Số Lượng Lớp
+- **Mặc định**: 24 lớp (10A1 → 12A8)
+- **Thay đổi**: Cần sửa nhiều file, xem lưu ý bên dưới
+
+## ⚠️ Lưu Ý Quan Trọng
+
+### 1. Giới Hạn Thiết Kế
+- **Số lớp**: Code được thiết kế cho 24 lớp cố định
+- **Tên lớp**: Theo format 10A1, 11A2, 12A8...
+- **Nếu khác**: Cần chỉnh sửa nhiều file, không khuyến khích cho người không chuyên
+
+### 2. Bảo Mật
+- **JWT Keys**: Tự tạo cặp khóa RSA, đảm bảo an toàn
+- **API Keys**: Không commit lên GitHub
+- **File upload**: Có giới hạn kích thước, tự động nén
+
+### 3. Performance
+- **Real-time**: Dữ liệu cập nhật ngay lập tức
+- **Caching**: Tự động cache để tối ưu
+- **Lazy loading**: Chỉ load data khi cần
+
+## 🤝 Đóng Góp
+
+Chúng tôi welcome mọi đóng góp! Nếu bạn:
+- **Phát hiện lỗi**: Tạo issue trên GitHub
+- **Muốn thêm tính năng**: Fork và tạo pull request
+
+## 📄 License
+
+Project này được license theo GPL-3.0.
