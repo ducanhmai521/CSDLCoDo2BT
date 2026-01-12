@@ -6,11 +6,11 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay } from "date-fns";
 import { 
   ChevronDown, ChevronUp, Eye, Calendar, AlertCircle, 
-  FileText, Loader2, Trophy, X, User, Users, FileWarning, Download
+  FileText, Loader2, Trophy, X, User, Users, FileWarning, Download, ShieldCheck, Sparkles
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-// Define a richer type for our modal state
+// --- TYPES ---
 type ModalMedia = {
   url: string;
   type: 'image' | 'video';
@@ -21,6 +21,224 @@ type ModalMedia = {
   }
 }
 
+// --- SUB-COMPONENT: VIOLATION ROW (Clean & Intuitive) ---
+const ViolationRow = ({ 
+  violation, 
+  isReporterAuthenticated, 
+  onOpenEvidence 
+}: { 
+  violation: any, 
+  isReporterAuthenticated: boolean,
+  onOpenEvidence: (v: any, url: string) => void 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Kiểm tra dữ liệu
+  const hasDetails = violation.details && violation.details.trim() !== '';
+  const hasEvidence = violation.evidenceUrls && violation.evidenceUrls.length > 0;
+  
+  // Lấy thông tin người báo cáo (nếu có quyền xem hoặc data có trả về)
+  const reporterName = (violation as any).requesterName || violation.reporterName;
+  const reporterIsSuperUser = (violation as any).reporterIsSuperUser || false;
+  const reporterCustomization = (violation as any).reporterCustomization || null;
+
+  return (
+    <div className="border-b border-slate-100 last:border-0 bg-white hover:bg-slate-50 transition-colors">
+      {/* TẦNG 1: OVERVIEW - Click để mở/đóng */}
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer select-none group"
+      >
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 overflow-hidden">
+          {/* Badge Lớp & Điểm */}
+          <div className="flex flex-col items-center justify-center gap-1 min-w-[2.5rem]">
+            <span className="font-bold text-slate-700 text-xs sm:text-sm">{violation.violatingClass}</span>
+            <span className="inline-flex items-center justify-center min-w-[1.5rem] h-4 sm:h-5 bg-red-50 text-red-600 border border-red-100 font-bold rounded-md text-[10px] px-1">
+              -{violation.points}
+            </span>
+          </div>
+          
+          {/* Thông tin chính */}
+          <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+            <span className="text-xs sm:text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+              {violation.studentName || "Không có tên"}
+            </span>
+            <span className="text-xs text-slate-500 truncate pr-2">
+              {violation.violationType}
+            </span>
+          </div>
+          
+{/* Hiện người báo cáo */}
+{reporterName && (
+  // Dùng flex-shrink-0 để badge không bị bóp méo, nhưng ml-auto để đẩy nó sang phải
+  <div className="flex items-center ml-auto pl-2"> 
+    {reporterIsSuperUser ? (
+      // --- ADMIN BADGE (RESPONSIVE) ---
+      <div className="group relative flex items-center">
+        {/* Glow Background */}
+        <div className="absolute -inset-1 bg-indigo-500/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition duration-500"></div>
+        
+        {/* Container chính: Mobile padding nhỏ hơn chút */}
+        <div className="relative flex items-center bg-white border border-indigo-200 shadow-[0_2px_8px_-3px_rgba(79,70,229,0.3)] rounded-lg sm:rounded-full py-1 px-2 sm:py-0.5 sm:px-1.5 sm:pl-2 gap-1.5 sm:gap-1.5">
+          
+          {/* Icon Shield: Mobile ẩn đi hoặc nhỏ lại nếu cần tiết kiệm nữa (ở đây mình giữ nhưng cho nhỏ xíu) */}
+          <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" strokeWidth={2.5} />
+          
+          {/* Text Container: Flex Col trên Mobile (dọc), Flex Row trên Desktop (ngang) */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
+              
+              {/* Label ADMIN */}
+              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-indigo-600 uppercase leading-none 
+                             sm:border-r sm:border-indigo-200 sm:pr-1.5 sm:py-0.5
+                             border-b border-indigo-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+                  Nhập bởi Admin
+              </span>
+              
+              {/* Tên Admin */}
+              <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                  {reporterName}
+              </span>
+          </div>
+        </div>
+      </div>
+    ) : reporterCustomization ? (
+      // --- CUSTOM BADGE ---
+      <div className="group relative flex items-center">
+        {/* Glow Background */}
+        <div className={`absolute -inset-1 bg-${reporterCustomization.colorFrom}/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition duration-500`}></div>
+        
+        {/* Container chính */}
+        <div className={`relative flex items-center bg-white border border-${reporterCustomization.colorFrom} shadow-[0_2px_8px_-3px_rgba(100,116,139,0.3)] rounded-lg sm:rounded-full py-1 px-2 sm:py-0.5 sm:px-1.5 sm:pl-2 gap-1.5 sm:gap-1.5`}>
+          
+          {/* Custom Icon */}
+          {reporterCustomization.icon && (
+            <span className={`text-${reporterCustomization.colorFrom} text-sm`}>
+              {reporterCustomization.icon}
+            </span>
+          )}
+          
+          {/* Text Container */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
+              
+              {/* Label */}
+              <span className={`text-[8px] sm:text-[9px] font-extrabold tracking-wider text-${reporterCustomization.colorFrom} uppercase leading-none 
+                             sm:border-r sm:border-${reporterCustomization.colorFrom} sm:pr-1.5 sm:py-0.5
+                             border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit`}>
+                  {reporterCustomization.label || 'Nhập bởi'}
+              </span>
+              
+              {/* Tên User */}
+              <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                  {reporterName}
+              </span>
+          </div>
+        </div>
+      </div>
+    ) : (
+      // --- USER BADGE (Giống admin nhưng màu xám) ---
+      <div className="group relative flex items-center">
+        {/* Glow Background */}
+        <div className="absolute -inset-1 bg-slate-400/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition duration-500"></div>
+        
+        {/* Container chính: Mobile padding nhỏ hơn chút */}
+        <div className="relative flex items-center bg-white border border-slate-200 shadow-[0_2px_8px_-3px_rgba(100,116,139,0.3)] rounded-lg sm:rounded-full py-1 px-2 sm:py-0.5 sm:px-1.5 sm:pl-2 gap-1.5 sm:gap-1.5">
+          
+          {/* Text Container: Flex Col trên Mobile (dọc), Flex Row trên Desktop (ngang) */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
+              
+              {/* Label USER */}
+              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-none 
+                             sm:border-r sm:border-slate-200 sm:pr-1.5 sm:py-0.5
+                             border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+                  Nhập bởi
+              </span>
+              
+              {/* Tên User */}
+              <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                  {reporterName}
+              </span>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+)}
+        </div>
+
+        {/* Nút Toggle Icon */}
+        <div className={`text-slate-400 pl-2 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+           <ChevronDown className="w-5 h-5" />
+        </div>
+      </div>
+
+      {/* TẦNG 2: DETAILS - Expandable Area */}
+      <div 
+        className={`overflow-hidden transition-all duration-300 ease-in-out bg-slate-50/80 ${
+          isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="p-3 sm:p-4 text-sm space-y-3 border-t border-slate-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
+          
+          {/* Chi tiết lỗi */}
+          <div className="flex gap-3">
+            <div className="mt-0.5 min-w-[20px]"><FileWarning className="w-4 h-4 text-slate-400" /></div>
+            <div>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Chi tiết vi phạm</span>
+              <p className="text-slate-700 mt-0.5 leading-relaxed">
+                {hasDetails ? violation.details : "Không có mô tả chi tiết."}
+              </p>
+            </div>
+          </div>
+
+          {/* Người báo cáo (Chỉ hiện ở details nếu chưa hiện ở overview) */}
+          {reporterName && (
+            <div className="flex gap-3">
+              <div className="mt-0.5 min-w-[20px]"><User className="w-4 h-4 text-slate-400" /></div>
+              <div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Người báo cáo</span>
+                <p className="text-slate-700 mt-0.5 font-medium">
+                  {reporterName}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Khu vực Bằng chứng */}
+          <div className="flex gap-3 pt-1">
+            <div className="mt-1.5 min-w-[20px]"><Eye className="w-4 h-4 text-slate-400" /></div>
+            <div className="flex-1">
+               <span className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Bằng chứng</span>
+               {hasEvidence ? (
+                 <div className="flex flex-wrap gap-2">
+                    {violation.evidenceUrls.map((url: string, i: number) => {
+                      if (!url) return null;
+                      return (
+                        <button 
+                          key={i}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Ngăn click lan ra ngoài làm đóng accordion
+                            onOpenEvidence(violation, url);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:shadow-sm transition-all text-xs font-medium"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Xem bằng chứng {i + 1}</span>
+                        </button>
+                      )
+                    })}
+                 </div>
+               ) : (
+                 <span className="text-xs text-slate-400 italic">Không có bằng chứng đính kèm</span>
+               )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN COMPONENT ---
 const PublicViolationReport = () => {
   // Component State
   const [weekNumber, setWeekNumber] = useState(1);
@@ -31,7 +249,7 @@ const PublicViolationReport = () => {
   const [isReporterAuthenticated, setIsReporterAuthenticated] = useState(false);
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
   const [loadedDays, setLoadedDays] = useState<{ [key: number]: boolean }>({});
-  const [expandedDetails, setExpandedDetails] = useState<{ [key: string]: boolean }>({});
+  // Đã xóa state expandedDetails vì ViolationRow tự xử lý
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
   const [hideExcusedAbsence, setHideExcusedAbsence] = useState(true);
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
@@ -71,7 +289,7 @@ const PublicViolationReport = () => {
       grouped.get(dayStart)!.push(v);
     });
     return grouped;
-  }, [violations]);
+  }, [violations, hideExcusedAbsence]);
 
   const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
 
@@ -192,8 +410,6 @@ const PublicViolationReport = () => {
     }
   }, [hasAcknowledged]);
   
-  const toggleDetails = (violationId: string) => setExpandedDetails(prev => ({ ...prev, [violationId]: !prev[violationId] }));
-
   // --- Zoom & Pan Handlers ---
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -241,7 +457,7 @@ const PublicViolationReport = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-10">
       {/* Welcome Modal */}
       {showWelcomeModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -255,13 +471,13 @@ const PublicViolationReport = () => {
                   <h2 className="text-xl font-bold text-slate-800">Bạn ơiiii!</h2>
                 </div>
                 <div className="space-y-3 text-sm text-slate-700">
-                  <p className="font-medium">Để tiết kiệm băng thông và tăng tốc độ tải, chúng mình đã thay đổi cách hiển thị:</p>
+                  <p className="font-medium">Web đã cập nhật giao diện mới gọn gàng hơn:</p>
                   <ul className="space-y-2 list-disc list-inside pl-2">
-                    <li><strong>Click vào ngày</strong> để xem vi phạm của ngày đó</li>
-                    <li>Web chỉ tải dữ liệu những ngày bạn bấm vào</li>
+                    <li><strong>Bấm vào ngày</strong> để xem danh sách vi phạm.</li>
+                    <li><strong>Bấm vào từng dòng</strong> vi phạm để xem chi tiết & bằng chứng.</li>
                   </ul>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
-                    <p className="text-xs text-blue-800"><strong>Mẹo:</strong> Bạn có thể hiện/ẩn "Nghỉ học có phép" bằng nút toggle ở góc trên (mặc định đang ẩn)</p>
+                    <p className="text-xs text-blue-800"><strong>Mẹo:</strong> Bạn có thể hiện/ẩn "Nghỉ học có phép" bằng nút toggle ở góc trên.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pt-3 pb-2 border-t border-slate-200">
@@ -301,11 +517,6 @@ const PublicViolationReport = () => {
                 </div>
                 <div className="space-y-3 text-sm text-slate-700">
                   <p className="font-medium">Bạn phải dong tinh thì mới xem được nội dung web này.</p>
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="text-xs text-amber-800">
-                      Các thay đổi này giúp trang tải nhanh hơn và tiết kiệm băng thông. Thay đổi nhỏ thôi nhưng giúp chúng mình tiết kiệm 1 ổ bánh mì mỗi tháng luôn á.
-                    </p>
-                  </div>
                 </div>
                 <div className="flex items-center gap-2 pt-3 pb-2 border-t border-slate-200">
                   <input
@@ -415,16 +626,16 @@ const PublicViolationReport = () => {
 
       {/* Compact Sticky Header */}
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-2 sm:px-3 py-2">
+        <div className="max-w-5xl mx-auto px-2 sm:px-3 py-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 flex-shrink-0" />
-              <h1 className="text-sm sm:text-lg font-bold text-slate-800 leading-tight">BÁO CÁO VI PHẠM THPTS2BT</h1>
-              <span className="text-[10px] sm:text-xs text-slate-500">•</span>
-              <p className="text-[10px] sm:text-xs text-slate-500 leading-tight">Có thể có sai sót</p>
+              <h1 className="text-sm sm:text-lg font-bold text-slate-800 leading-tight">VI PHẠM THPTS2BT</h1>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">•</span>
+              <p className="text-[10px] sm:text-xs text-slate-500 leading-tight hidden sm:block">Dữ liệu công khai</p>
               <Link to="/bang-diem-thi-dua-tho" className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 bg-amber-50 text-amber-600 rounded hover:bg-amber-100 transition-colors text-[10px] sm:text-xs font-medium">
                 <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                <span>Bảng điểm thô</span>
+                <span>Bảng điểm</span>
               </Link>
               <button
                 onClick={() => setHideExcusedAbsence(!hideExcusedAbsence)}
@@ -444,9 +655,8 @@ const PublicViolationReport = () => {
               <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 flex-shrink-0" />
               <div className="flex items-center gap-1 sm:gap-2">
                 <label className="text-xs sm:text-sm font-medium text-slate-700">Tuần:</label>
-                <input type="text" value={weekInput} onChange={handleWeekChange} className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-12 sm:w-16 text-center text-xs sm:text-sm rounded ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} />
+                <input type="text" value={weekInput} onChange={handleWeekChange} className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-8 sm:w-16 text-center text-xs sm:text-sm rounded ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} />
               </div>
-              {dateRange && (<span className="text-[10px] sm:text-xs text-slate-600 hidden md:inline whitespace-nowrap">({format(new Date(dateRange.start), "dd/MM")} - {format(new Date(dateRange.end), "dd/MM")})</span>)}
             </div>
           </div>
           {weekError && (
@@ -465,7 +675,7 @@ const PublicViolationReport = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-3 py-3">
+      <div className="max-w-5xl mx-auto px-3 py-3">
         {violations === undefined && (
           <div className="flex flex-col items-center justify-center py-16 space-y-4">
             <div className="relative">
@@ -479,7 +689,7 @@ const PublicViolationReport = () => {
           </div>
         )}
         {violations && violations.length === 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center mt-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
               <FileText className="w-8 h-8 text-slate-400" />
             </div>
@@ -487,131 +697,92 @@ const PublicViolationReport = () => {
             <p className="text-sm text-slate-500">Không có vi phạm nào trong tuần này</p>
           </div>
         )}
-        {sortedDays.map(dayTimestamp => {
-          const allDayViolations = violationsByDay.get(dayTimestamp)!;
-          const dayViolations = hideExcusedAbsence 
-            ? allDayViolations.filter((v: { violationType: string; }) => v.violationType !== "Nghỉ học có phép")
-            : allDayViolations;
-          const isExpanded = expandedDays[dayTimestamp] !== false;
-          const isLoaded = loadedDays[dayTimestamp];
-          
-          // Nếu ẩn nghỉ có phép và ngày này chỉ có nghỉ có phép thì hiển thị compact
-          if (hideExcusedAbsence && dayViolations.length === 0) {
-            const excusedAbsenceCount = allDayViolations.filter((v: { violationType: string; }) => v.violationType === "Nghỉ học có phép").length;
-            return (
-              <div key={dayTimestamp} className="mb-3">
-                <div className="w-full bg-gradient-to-r from-slate-400 to-slate-500 text-white px-3 py-2 rounded-lg flex items-center justify-between shadow-sm opacity-75">
-                  <span className="font-semibold text-sm">{format(new Date(dayTimestamp), "iiii, 'ngày' dd/MM/yyyy", { locale: vi })}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-white/20 px-2 py-0.5 rounded text-xs">
-                      {excusedAbsenceCount > 0 ? `Chỉ có ${excusedAbsenceCount} nghỉ CP` : 'Không có vi phạm'}
-                    </span>
-                    <Eye className="w-4 h-4 opacity-50" />
-                  </div>
+        
+        {/* Daily Lists */}
+        <div className="space-y-4 mt-2">
+          {sortedDays.map(dayTimestamp => {
+            const allDayViolations = violationsByDay.get(dayTimestamp)!;
+            const dayViolations = hideExcusedAbsence 
+              ? allDayViolations.filter((v: { violationType: string; }) => v.violationType !== "Nghỉ học có phép")
+              : allDayViolations;
+            const isExpanded = expandedDays[dayTimestamp] !== false;
+            const isLoaded = loadedDays[dayTimestamp];
+            
+            // Case: Ẩn nghỉ có phép và chỉ còn nghỉ có phép
+            if (hideExcusedAbsence && dayViolations.length === 0) {
+              const excusedAbsenceCount = allDayViolations.filter((v: { violationType: string; }) => v.violationType === "Nghỉ học có phép").length;
+              if (excusedAbsenceCount === 0) return null;
+              
+              return (
+                <div key={dayTimestamp} className="w-full bg-slate-100 text-slate-500 px-4 py-3 rounded-xl flex items-center justify-between border border-slate-200">
+                  <span className="font-semibold text-sm">{format(new Date(dayTimestamp), "iiii, dd/MM", { locale: vi })}</span>
+                  <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200">Chỉ có {excusedAbsenceCount} nghỉ CP</span>
                 </div>
+              );
+            }
+            
+            // Nếu không có vi phạm nào sau khi filter thì skip
+            if (dayViolations.length === 0) return null;
+            
+            return (
+              <div key={dayTimestamp} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Header Ngày */}
+                <button 
+                  onClick={() => toggleDay(dayTimestamp)} 
+                  className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${
+                    isExpanded 
+                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white' 
+                      : 'bg-white hover:bg-slate-50 text-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-sm sm:text-base capitalize">
+                      {format(new Date(dayTimestamp), "iiii", { locale: vi })}
+                    </span>
+                    <span className={`text-xs sm:text-sm font-medium px-2 py-0.5 rounded-full ${isExpanded ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                      {format(new Date(dayTimestamp), "dd/MM")}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-medium px-2 py-1 rounded ${isExpanded ? 'bg-white/20' : 'bg-indigo-50 text-indigo-600'}`}>
+                      {dayViolations.length} vi phạm
+                    </span>
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </div>
+                </button>
+
+                {/* Body Ngày */}
+                {isExpanded && (
+                  <div className="border-t border-slate-200">
+                    {!isLoaded ? (
+                      <div className="p-8 text-center bg-slate-50/50">
+                        <button
+                          onClick={() => setLoadedDays(prev => ({ ...prev, [dayTimestamp]: true }))}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-all shadow-sm font-medium text-sm"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>Tải {dayViolations.length} vi phạm</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {dayViolations.map((v: any) => (
+                          <ViolationRow 
+                            key={v._id} 
+                            violation={v}
+                            isReporterAuthenticated={isReporterAuthenticated}
+                            onOpenEvidence={handleOpenModal}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
-          }
-          
-          return (
-            <div key={dayTimestamp} className="mb-3">
-              <button onClick={() => toggleDay(dayTimestamp)} className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-3 py-2 rounded-t-lg flex items-center justify-between hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-sm">
-                <span className="font-semibold text-sm">{format(new Date(dayTimestamp), "iiii, 'ngày' dd/MM/yyyy", { locale: vi })}</span>
-                <div className="flex items-center gap-2">
-                  <span className="bg-white/20 px-2 py-0.5 rounded text-xs">{dayViolations.length} vi phạm</span>
-                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </div>
-              </button>
-              {isExpanded && !isLoaded && (
-                <div className="bg-white rounded-b-lg shadow-sm border border-slate-200 border-t-0 p-4 text-center">
-                  <button
-                    onClick={() => setLoadedDays(prev => ({ ...prev, [dayTimestamp]: true }))}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium text-sm"
-                  >
-                    <Eye className="w-4 h-4" />
-                    <span>Tải vi phạm ngày này</span>
-                  </button>
-                  <p className="text-xs text-slate-500 mt-2">Click để xem {dayViolations.length} vi phạm</p>
-                </div>
-              )}
-              {isExpanded && isLoaded && (
-                <div className="bg-white rounded-b-lg shadow-sm overflow-hidden border border-slate-200 border-t-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="px-1.5 py-2 text-left font-semibold text-slate-700 w-12 sm:w-14">Lớp</th>
-                          <th className="px-1.5 py-2 text-left font-semibold text-slate-700">Học sinh</th>
-                          <th className="px-1.5 py-2 text-left font-semibold text-slate-700">Chi tiết vi phạm</th>
-                          <th className="px-1.5 py-2 text-center font-semibold text-slate-700 w-14 sm:w-16">Điểm trừ</th>
-                          {isReporterAuthenticated && (<th className="px-1.5 py-2 text-left font-semibold text-slate-700">Báo cáo</th>)}
-                          <th className="px-1.5 py-2 text-center font-semibold text-slate-700 w-16 sm:w-20">BC</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {dayViolations.map((v: any) => {
-                          const isDetailExpanded = expandedDetails[v._id];
-                          const hasDetails = v.details && v.details.trim() !== '';
-                          
-                          return (
-                            <tr key={v._id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-1.5 py-2 text-center font-medium text-slate-900 text-xs sm:text-sm">{v.violatingClass}</td>
-                              <td className="px-1.5 py-2 text-slate-800 text-xs sm:text-sm">{v.studentName || "-"}</td>
-                              <td className="px-1.5 py-2 text-slate-700">
-                                <div className="font-medium text-slate-900 text-xs sm:text-sm">
-                                  {v.violationType}
-                                  {hasDetails && (
-                                    <>
-                                      <button 
-                                        onClick={() => toggleDetails(v._id)}
-                                        className="ml-1 text-blue-600 hover:text-blue-700 inline-flex items-center"
-                                      >
-                                        {isDetailExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                      </button>
-                                      {isDetailExpanded && (
-                                        <div className="mt-1 text-xs text-slate-600 border-l-2 border-slate-300 pl-2">
-                                          {v.details}
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-1.5 py-2 text-center">
-                                <span className="inline-flex items-center justify-center min-w-[2rem] sm:min-w-[2.5rem] h-5 sm:h-6 bg-red-100 text-red-700 font-bold rounded text-xs sm:text-sm px-1.5 sm:px-2">{v.points}</span>
-                              </td>
-                              {isReporterAuthenticated && (<td className="px-1.5 py-2 text-slate-700 text-xs sm:text-sm">{(v as any).requesterName || v.reporterName}</td>)}
-                              <td className="px-1.5 py-2">
-                                {v.evidenceUrls && v.evidenceUrls.length > 0 ? (
-                                  <div className="flex flex-col gap-1">
-                                    {v.evidenceUrls.map((url: string | null, i: number) => {
-                                      if (!url) return null;
-                                      return (
-                                        <div key={i}>
-                                          <button onClick={() => handleOpenModal(v, url)} className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-xs">
-                                            <Eye className="w-3 h-3" />
-                                            <span className="hidden sm:inline">Xem {i + 1}</span>
-                                            <span className="sm:hidden">{i + 1}</span>
-                                          </button>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400 text-xs">-</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+          })}
+        </div>
       </div>
     </div>
   );

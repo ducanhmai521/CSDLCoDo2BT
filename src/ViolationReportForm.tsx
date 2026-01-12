@@ -26,6 +26,7 @@ export default function ViolationReportForm() {
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const generateR2UploadUrl = useMutation(api.r2.generateR2UploadUrl);
   const reportViolation = useMutation(api.violations.reportViolation);
+  const addReportingPoints = useMutation(api.reportingPoints.addReportingPoints);
 
   const resetForm = () => {
     setTargetType("class");
@@ -127,7 +128,13 @@ export default function ViolationReportForm() {
         details: details || "",
         evidenceR2Keys,
       });
-      toast.success("Báo cáo vi phạm thành công!");
+      
+      // Add reporting points (10 points per successful report)
+      await addReportingPoints({
+        points: 10,
+      });
+      
+      toast.success("Báo cáo vi phạm thành công! (+10 điểm báo cáo)");
       resetForm();
     } catch (error) {
       toast.error((error as Error).message);

@@ -14,6 +14,7 @@ import PublicEmulationScoreTable from "./public/PublicEmulationScoreTable";
 import PublicViolationReport from "./public/PublicViolationReport";
 import EviView from "./public/EviView";
 import PublicAbsenceRequest from "./public/PublicAbsenceRequest";
+import ReportingLeaderboard from "./ReportingLeaderboard";
 
 export default function AppWrapper() {
   return (
@@ -23,6 +24,7 @@ export default function AppWrapper() {
         <Route path="/bang-diem-thi-dua-tho" element={<PublicEmulationScoreTable />} />
         <Route path="/bang-bao-cao-vi-pham" element={<PublicViolationReport />} />
         <Route path="/xin-phep" element={<PublicAbsenceRequest />} />
+        <Route path="/bang-xep-hang" element={<ReportingLeaderboard />} />
         <Route path="/eviview/*" element={<EviView />} />
       </Routes>
     </BrowserRouter>
@@ -77,18 +79,15 @@ function App() {
       
       <footer className="py-6 text-center text-sm text-slate-700 border-t border-white/40 mt-8 nav-glass">
         <div className="max-w-7xl mx-auto px-4">
-            <div>
-              <p className="font-medium text-slate-800">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
-              <p className="text-slate-700"></p>
-              <p className="text-slate-700 mt-2">
-                <a href="https://github.com/ducanhmai521/CSDLCoDo2BT" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
-                  GitHub Repository
-                </a>
-                <a href="https://17022008.xyz" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
-                  Liên hệ Dev
-                </a>
-              </p>
-            </div>
+          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-2">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
+          <div className="flex justify-center gap-4 text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
+            <a href="https://github.com/ducanhmai521/CSDLCoDo2BT" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
+              GitHub Repository
+            </a>
+            <a href="https://17022008.xyz" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
+              Liên hệ Dev
+            </a>
+          </div>
         </div>
       </footer>
       <ForceRefresh />
@@ -132,8 +131,7 @@ function Content() {
                 Nâng cao hiệu quả <span className="text-primary">quản lý nền nếp học sinh</span>
               </h1>
               <p className="mt-4 text-slate-700 text-lg">
-                Hệ thống tập trung quản lý vi phạm, tổng hợp báo cáo, và hỗ trợ ra quyết
-                định nhanh chóng cho Ban quản trị nhà trường.
+                Hệ thống tập trung tổng hợp báo cáo, và cải thiện hiệu quả quản lý nền nếp học sinh.
               </p>
             </div>
             
@@ -180,8 +178,8 @@ function Content() {
                     <FiDatabase />
                   </span>
                   <div>
-                    <h3 className="font-bold text-slate-800">Giao diện thân thiện</h3>
-                    <p className="text-sm text-slate-600">Dễ sử dụng, thân thiện với người dùng</p>
+                    <h3 className="font-bold text-slate-800">Thân thiện</h3>
+                    <p className="text-sm text-slate-600">Giao diện trực quan, dễ sử dụng</p>
                   </div>
                 </div>
               </div>

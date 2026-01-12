@@ -38,6 +38,7 @@ export default function AdminDashboard() {
   const exportRosterTemplate = useAction(api.adminTools.exportRosterTemplate);
   const importRoster = useAction(api.adminTools.importRoster);
   const setupPublicAbsenceSystemUser = useAction(api.adminTools.setupPublicAbsenceSystemUser);
+  const migrateExistingViolations = useMutation(api.reportingPoints.migrateExistingViolations);
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const roster = useQuery(api.users.listRoster);
@@ -384,6 +385,26 @@ export default function AdminDashboard() {
               <span className="font-semibold text-slate-800">{weekNumber}</span>
             </div>
           </div>
+        </div>
+
+        <div className="glass-card-subtle p-4">
+          <h3 className="text-lg font-semibold mb-3 text-slate-800">Điểm báo cáo</h3>
+          <p className="text-sm text-slate-600 mb-3">
+            Chạy migration để cộng điểm cho các vi phạm hiện có trong database (10 điểm/vi phạm).
+          </p>
+          <button
+            onClick={async () => {
+              try {
+                const result = await migrateExistingViolations();
+                toast.success(result.message);
+              } catch (err) {
+                toast.error((err as Error).message);
+              }
+            }}
+            className="btn-glass-primary"
+          >
+            <Settings className="w-5 h-5 inline-block mr-1" /> Migrate điểm báo cáo
+          </button>
         </div>
 
         <div className="glass-card-subtle p-4">

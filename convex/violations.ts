@@ -312,9 +312,15 @@ export const deleteViolation = action({
             throw new Error("Không tìm thấy vi phạm.");
         }
         
+        // Remove reporting points (10 points per violation)
+        await ctx.runMutation(internal.reportingPoints.removeReportingPointsInternal, {
+            userId: violation.reporterId,
+            points: 10,
+        });
+        
         // Delete R2 evidence files
         if (violation.evidenceR2Keys && violation.evidenceR2Keys.length > 0) {
-            await Promise.all(violation.evidenceR2Keys.map(key => 
+            await Promise.all(violation.evidenceR2Keys.map((key: string) => 
                 ctx.runAction(internal.r2Actions.deleteR2Object, { key })
             ));
         }
@@ -485,8 +491,36 @@ export const getPublicViolations = query({
         );
 
         const reporterProfileMap = new Map();
+        const reporterSuperUserMap = new Map();
         reporterProfiles.forEach(profile => {
-            if (profile) { reporterProfileMap.set(profile.userId, profile.fullName); }
+            if (profile) { 
+                reporterProfileMap.set(profile.userId, profile.fullName);
+                reporterSuperUserMap.set(profile.userId, profile.isSuperUser || false);
+            }
+        });
+
+        // Get reporter customizations
+        const reporterCustomizations = await Promise.all(
+            reporterUserIds.map(async userId => {
+                const purchase = await ctx.db
+                    .query('userPurchases')
+                    .withIndex('by_userId', q => q.eq('userId', userId))
+                    .filter(q => q.eq(q.field('isActive'), true))
+                    .first();
+                
+                if (purchase && purchase.customization) {
+                    const item = await ctx.db.get(purchase.itemId);
+                    if (item && item.category === 'customization') {
+                        return { userId, customization: purchase.customization };
+                    }
+                }
+                return { userId, customization: null };
+            })
+        );
+
+        const reporterCustomizationMap = new Map();
+        reporterCustomizations.forEach(({ userId, customization }) => {
+            reporterCustomizationMap.set(userId, customization);
         });
 
         const violationPointsMap = new Map<string, number>();
@@ -522,6 +556,8 @@ export const getPublicViolations = query({
             return {
                 ...v,
                 reporterName: reporterProfileMap.get(v.reporterId) ?? 'Không rõ',
+                reporterIsSuperUser: reporterSuperUserMap.get(v.reporterId) ?? false,
+                reporterCustomization: reporterCustomizationMap.get(v.reporterId) ?? null,
                 evidenceUrls,
                 points: violationPointsMap.get(v.violationType) ?? 0,
             };

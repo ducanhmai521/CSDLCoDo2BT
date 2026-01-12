@@ -76,6 +76,7 @@ export function AIViolationInputModal({
   const parseAttendanceWithAI = useAction(api.ai.parseAttendanceWithAI);
   const bulkReportViolations = useMutation(api.violations.bulkReportViolations);
   const generateR2UploadUrl = useMutation(api.r2.generateR2UploadUrl);
+  const addReportingPoints = useMutation(api.reportingPoints.addReportingPoints);
   const allStudents = useQuery(api.users.getAllStudents);
   const allUserProfiles = useQuery(api.users.getAllUserProfiles);
   const myProfile = useQuery(api.users.getMyProfile);
@@ -449,7 +450,14 @@ export function AIViolationInputModal({
         customReporterId: customReporterId ?? undefined,
       });
 
-      if (result.successCount > 0) toast.success(`Gửi thành công ${result.successCount} báo cáo.`);
+      if (result.successCount > 0) {
+        // Add reporting points for successful reports (10 points each)
+        await addReportingPoints({
+          points: result.successCount * 10,
+        });
+        
+        toast.success(`Gửi thành công ${result.successCount} báo cáo. (+${result.successCount * 10} điểm báo cáo)`);
+      }
       if (result.duplicateCount > 0) toast.warning(`${result.duplicateCount} báo cáo trùng lặp đã bỏ qua.`);
 
       setRawText("");

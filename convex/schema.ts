@@ -73,6 +73,31 @@ const applicationTables = {
     name: v.string(),
   }).index("by_name", ["name"]),
 
+  reportingPoints: defineTable({
+    userId: v.id("users"),
+    points: v.number(),
+    totalReports: v.number(),
+  }).index("by_userId", ["userId"])
+    .index("by_points", ["points"]),
+
+  shopItems: defineTable({
+    name: v.string(),
+    description: v.string(),
+    price: v.number(),
+    category: v.string(),
+    isActive: v.boolean(),
+    metadata: v.optional(v.any()), // For storing item-specific data
+  }),
+
+  userPurchases: defineTable({
+    userId: v.id("users"),
+    itemId: v.id("shopItems"),
+    purchaseDate: v.number(),
+    isActive: v.boolean(),
+    customization: v.optional(v.any()), // For storing user customizations
+  }).index("by_userId", ["userId"])
+    .index("by_itemId", ["itemId"]),
+
 };
 
 export default defineSchema({
