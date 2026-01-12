@@ -248,7 +248,6 @@ const PublicViolationReport = () => {
   const [reporterPassword, setReporterPassword] = useState("");
   const [isReporterAuthenticated, setIsReporterAuthenticated] = useState(false);
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
-  const [loadedDays, setLoadedDays] = useState<{ [key: number]: boolean }>({});
   // Đã xóa state expandedDetails vì ViolationRow tự xử lý
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
   const [hideExcusedAbsence, setHideExcusedAbsence] = useState(true);
@@ -387,9 +386,6 @@ const PublicViolationReport = () => {
 
   const toggleDay = (day: number) => {
     setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
-    if (!loadedDays[day]) {
-      setLoadedDays(prev => ({ ...prev, [day]: true }));
-    }
   };
   
   const handleUnderstood = () => {
@@ -473,7 +469,6 @@ const PublicViolationReport = () => {
                 <div className="space-y-3 text-sm text-slate-700">
                   <p className="font-medium">Web đã cập nhật giao diện mới gọn gàng hơn:</p>
                   <ul className="space-y-2 list-disc list-inside pl-2">
-                    <li><strong>Bấm vào ngày</strong> để xem danh sách vi phạm.</li>
                     <li><strong>Bấm vào từng dòng</strong> vi phạm để xem chi tiết & bằng chứng.</li>
                   </ul>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
@@ -706,7 +701,6 @@ const PublicViolationReport = () => {
               ? allDayViolations.filter((v: { violationType: string; }) => v.violationType !== "Nghỉ học có phép")
               : allDayViolations;
             const isExpanded = expandedDays[dayTimestamp] !== false;
-            const isLoaded = loadedDays[dayTimestamp];
             
             // Case: Ẩn nghỉ có phép và chỉ còn nghỉ có phép
             if (hideExcusedAbsence && dayViolations.length === 0) {
@@ -755,28 +749,16 @@ const PublicViolationReport = () => {
                 {/* Body Ngày */}
                 {isExpanded && (
                   <div className="border-t border-slate-200">
-                    {!isLoaded ? (
-                      <div className="p-8 text-center bg-slate-50/50">
-                        <button
-                          onClick={() => setLoadedDays(prev => ({ ...prev, [dayTimestamp]: true }))}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-all shadow-sm font-medium text-sm"
-                        >
-                          <Eye className="w-4 h-4" />
-                          <span>Tải {dayViolations.length} vi phạm</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-slate-100">
-                        {dayViolations.map((v: any) => (
-                          <ViolationRow 
-                            key={v._id} 
-                            violation={v}
-                            isReporterAuthenticated={isReporterAuthenticated}
-                            onOpenEvidence={handleOpenModal}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    <div className="divide-y divide-slate-100">
+                      {dayViolations.map((v: any) => (
+                        <ViolationRow 
+                          key={v._id} 
+                          violation={v}
+                          isReporterAuthenticated={isReporterAuthenticated}
+                          onOpenEvidence={handleOpenModal}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
