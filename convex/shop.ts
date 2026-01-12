@@ -151,8 +151,14 @@ export const updateCustomization = mutation({
       return { success: false, message: "Không tìm thấy giao dịch mua hàng" };
     }
 
+    // Ensure showPublic is always true for new customizations
+    const cleanedCustomization = {
+      ...args.customization,
+      showPublic: true, // Force to always be public
+    };
+
     await ctx.db.patch(args.purchaseId, {
-      customization: args.customization,
+      customization: cleanedCustomization,
     });
 
     return { success: true, message: "Đã cập nhật tùy chỉnh thành công!" };

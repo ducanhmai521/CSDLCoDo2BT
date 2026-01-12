@@ -66,9 +66,6 @@ export default function ItemCustomizationModal({ isOpen, onClose, purchase, item
     const existing = purchase?.customization?.colorFrom;
     return AVAILABLE_COLORS.find(c => c.from === existing) || AVAILABLE_COLORS[0];
   });
-  const [showPublic, setShowPublic] = useState(
-    purchase?.customization?.showPublic ?? true
-  );
   const [customLabel, setCustomLabel] = useState(
     purchase?.customization?.label || "Nhập bởi"
   );
@@ -109,7 +106,7 @@ export default function ItemCustomizationModal({ isOpen, onClose, purchase, item
         icon: selectedIcon,
         colorFrom: selectedColor.from,
         colorTo: selectedColor.to,
-        showPublic,
+        showPublic: true, // Always public
         label: customLabel,
         type: "reporter_badge"
       };
@@ -136,7 +133,6 @@ export default function ItemCustomizationModal({ isOpen, onClose, purchase, item
   const handleReset = () => {
     setSelectedIcon(AVAILABLE_ICONS[0].emoji);
     setSelectedColor(AVAILABLE_COLORS[0]);
-    setShowPublic(true);
     setCustomLabel("Nhập bởi");
     setLabelError(null);
   };
@@ -222,19 +218,17 @@ export default function ItemCustomizationModal({ isOpen, onClose, purchase, item
               </div>
             </div>
 
-            {/* Public Display Note */}
-            {showPublic && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-2 text-blue-700">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-xs font-medium">
-                    Thẻ tên sẽ hiển thị công khai, nếu muốn ẩn hãy chỉnh ở dưới.
-                  </span>
-                </div>
+            {/* Public Display Note - Always shown since it's always public */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-blue-700">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-xs font-medium">
+                  Thẻ tên sẽ hiển thị công khai cho tất cả mọi người.
+                </span>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Icon Selection */}
@@ -304,24 +298,6 @@ export default function ItemCustomizationModal({ isOpen, onClose, purchase, item
                 {customLabel.length}/15
               </span>
             </div>
-          </div>
-
-          {/* Public Display Toggle */}
-          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <div>
-              <h3 className="text-sm font-bold text-slate-700">Hiển thị công khai</h3>
-              <p className="text-xs text-slate-600">Thẻ sẽ hiện với tất cả mọi người (mặc định sẽ ẩn)</p>
-            </div>
-            <button
-              onClick={() => setShowPublic(!showPublic)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                showPublic ? 'bg-blue-500' : 'bg-slate-300'
-              }`}
-            >
-              <div className={`absolute w-5 h-5 bg-white rounded-full top-0.5 transition-transform ${
-                showPublic ? 'translate-x-6' : 'translate-x-0.5'
-              }`} />
-            </button>
           </div>
         </div>
 

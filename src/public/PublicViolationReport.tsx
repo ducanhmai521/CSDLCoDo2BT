@@ -24,11 +24,9 @@ type ModalMedia = {
 // --- SUB-COMPONENT: VIOLATION ROW (Clean & Intuitive) ---
 const ViolationRow = ({ 
   violation, 
-  isReporterAuthenticated, 
   onOpenEvidence 
 }: { 
   violation: any, 
-  isReporterAuthenticated: boolean,
   onOpenEvidence: (v: any, url: string) => void 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -244,9 +242,7 @@ const PublicViolationReport = () => {
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekInput, setWeekInput] = useState('1');
   const [weekError, setWeekError] = useState<string | null>(null);
-  const [showReporterInput, setShowReporterInput] = useState(false);
-  const [reporterPassword, setReporterPassword] = useState("");
-  const [isReporterAuthenticated, setIsReporterAuthenticated] = useState(false);
+
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
   // Đã xóa state expandedDetails vì ViolationRow tự xử lý
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
@@ -272,7 +268,6 @@ const PublicViolationReport = () => {
 
   // Convex Hooks
   const baseDateStr = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
-  const checkPassword = useMutation(api.reporters.checkReporterPassword);
   const violations = useQuery(
     api.violations.getPublicViolations,
     (dateRange && hasAcknowledged) ? { start: dateRange.start, end: dateRange.end } : "skip"
@@ -310,10 +305,7 @@ const PublicViolationReport = () => {
     }
   }, [modalMedia]);
   
-  useEffect(() => {
-    if (weekNumber === 172) setShowReporterInput(true);
-    else setShowReporterInput(false);
-  }, [weekNumber]);
+
 
   useEffect(() => {
     if (baseDateStr && !weekError) {
@@ -365,15 +357,7 @@ const PublicViolationReport = () => {
     setTimeout(() => setModalMedia(null), 300);
   };
 
-  const handlePasswordSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const isValid = await checkPassword({ password: reporterPassword });
-      if (isValid) {
-        setIsReporterAuthenticated(true);
-        setShowReporterInput(false);
-      } else alert("Sai mật khẩu!");
-    }
-  };
+
 
   const handleWeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -660,12 +644,6 @@ const PublicViolationReport = () => {
               <span>{weekError}</span>
             </div>
           )}
-          {showReporterInput && (
-            <div className="mt-1 sm:mt-2 flex justify-center items-center gap-2">
-              <label className="text-xs sm:text-sm font-medium text-slate-700">Mật khẩu:</label>
-              <input type="password" value={reporterPassword} onChange={(e) => setReporterPassword(e.target.value)} onKeyDown={handlePasswordSubmit} className="border border-slate-300 px-2 py-1 w-32 sm:w-40 text-center text-xs sm:text-sm rounded" />
-            </div>
-          )}
         </div>
       </div>
 
@@ -754,7 +732,6 @@ const PublicViolationReport = () => {
                         <ViolationRow 
                           key={v._id} 
                           violation={v}
-                          isReporterAuthenticated={isReporterAuthenticated}
                           onOpenEvidence={handleOpenModal}
                         />
                       ))}
