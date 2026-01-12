@@ -172,7 +172,7 @@ export const initializeShopItems = mutation({
     await ctx.db.insert("shopItems", {
       name: "Tùy chỉnh thẻ tên người báo cáo",
       description: "Tự chọn màu sắc và icon cho thẻ tên của bạn khi báo cáo vi phạm.",
-      price: 200,
+      price: 400,
       category: "customization",
       isActive: true,
       metadata: {
