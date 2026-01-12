@@ -495,6 +495,24 @@ const PublicViolationReport = () => {
           const isExpanded = expandedDays[dayTimestamp] !== false;
           const isLoaded = loadedDays[dayTimestamp];
           
+          // Nếu ẩn nghỉ có phép và ngày này chỉ có nghỉ có phép thì hiển thị compact
+          if (hideExcusedAbsence && dayViolations.length === 0) {
+            const excusedAbsenceCount = allDayViolations.filter((v: { violationType: string; }) => v.violationType === "Nghỉ học có phép").length;
+            return (
+              <div key={dayTimestamp} className="mb-3">
+                <div className="w-full bg-gradient-to-r from-slate-400 to-slate-500 text-white px-3 py-2 rounded-lg flex items-center justify-between shadow-sm opacity-75">
+                  <span className="font-semibold text-sm">{format(new Date(dayTimestamp), "iiii, 'ngày' dd/MM/yyyy", { locale: vi })}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-white/20 px-2 py-0.5 rounded text-xs">
+                      {excusedAbsenceCount > 0 ? `Chỉ có ${excusedAbsenceCount} nghỉ CP` : 'Không có vi phạm'}
+                    </span>
+                    <Eye className="w-4 h-4 opacity-50" />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          
           return (
             <div key={dayTimestamp} className="mb-3">
               <button onClick={() => toggleDay(dayTimestamp)} className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-3 py-2 rounded-t-lg flex items-center justify-between hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-sm">
