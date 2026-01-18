@@ -20,7 +20,23 @@ type ModalMedia = {
     details: string;
   }
 }
-
+const premiumStyles = `
+  @keyframes shimmer {
+    0% { transform: translateX(-150%); }
+    100% { transform: translateX(150%); }
+  }
+  @keyframes gradient-xy {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+  .animate-gradient-text {
+    background-size: 200% auto;
+    animation: gradient-xy 3s linear infinite;
+  }
+`;
 // --- SUB-COMPONENT: VIOLATION ROW (Clean & Intuitive) ---
 const ViolationRow = ({ 
   violation, 
@@ -71,28 +87,25 @@ const ViolationRow = ({
   // Dùng flex-shrink-0 để badge không bị bóp méo, nhưng ml-auto để đẩy nó sang phải
   <div className="flex items-center ml-auto pl-2"> 
     {reporterIsSuperUser ? (
-      // --- ADMIN BADGE (RESPONSIVE) ---
-      <div className="group relative flex items-center">
-        {/* Glow Background */}
-        <div className="absolute -inset-1 bg-indigo-500/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition duration-500"></div>
+      <div className="relative inline-flex overflow-hidden rounded-lg sm:rounded-full p-[1.5px] group shadow-sm flex-shrink-0 cursor-default">
         
-        {/* Container chính: Mobile padding nhỏ hơn chút */}
-        <div className="relative flex items-center bg-white border border-indigo-200 shadow-[0_2px_8px_-3px_rgba(79,70,229,0.3)] rounded-lg sm:rounded-full py-1 px-2 sm:py-0.5 sm:px-1.5 sm:pl-2 gap-1.5 sm:gap-1.5">
+        {/* Lớp 1: Cầu vồng xoay */}
+        <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#ef4444_0%,#eab308_25%,#22c55e_50%,#3b82f6_75%,#a855f7_100%,#ef4444_100%)]" />
+        
+        {/* Lớp 2: Nội dung nền trắng */}
+        <div className="relative flex items-center bg-white rounded-lg sm:rounded-full py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5 h-full w-full backface-hidden">
           
-          {/* Icon Shield: Mobile ẩn đi hoặc nhỏ lại nếu cần tiết kiệm nữa (ở đây mình giữ nhưng cho nhỏ xíu) */}
-          <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" strokeWidth={2.5} />
+          <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-blue-700 shrink-0" strokeWidth={2.5} />
           
-          {/* Text Container: Flex Col trên Mobile (dọc), Flex Row trên Desktop (ngang) */}
+          {/* Text Container */}
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
               
-              {/* Label ADMIN */}
-              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-indigo-600 uppercase leading-none 
-                             sm:border-r sm:border-indigo-200 sm:pr-1.5 sm:py-0.5
-                             border-b border-indigo-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-800 to-blue-600 uppercase leading-none 
+                             sm:border-r sm:border-blue-100 sm:pr-1.5 sm:py-0.5
+                             border-b border-blue-50 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
                   Nhập bởi Admin
               </span>
               
-              {/* Tên Admin */}
               <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
                   {reporterName}
               </span>
