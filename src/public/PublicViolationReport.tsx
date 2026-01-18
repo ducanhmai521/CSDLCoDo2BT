@@ -88,19 +88,14 @@ const ViolationRow = ({
   <div className="flex items-center ml-auto pl-2"> 
     {reporterIsSuperUser ? (
       <div className="relative inline-flex overflow-hidden rounded-lg sm:rounded-full p-[1.5px] group shadow-sm flex-shrink-0 cursor-default">
-        
-        {/* Lớp 1: Cầu vồng xoay */}
         <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#ef4444_0%,#eab308_25%,#22c55e_50%,#3b82f6_75%,#a855f7_100%,#ef4444_100%)]" />
-        
-        {/* Lớp 2: Nội dung nền trắng */}
-        <div className="relative flex items-center bg-white rounded-lg sm:rounded-full py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5 h-full w-full backface-hidden">
-          
+        <div className="relative flex items-center bg-white rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5 h-full w-full backface-hidden">
+          {/* Icon Shield */}
           <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-blue-700 shrink-0" strokeWidth={2.5} />
-          
           {/* Text Container */}
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
               
-              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-800 to-blue-600 uppercase leading-none 
+              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-800 to-blue-600 uppercase leading-tight sm:leading-none 
                              sm:border-r sm:border-blue-100 sm:pr-1.5 sm:py-0.5
                              border-b border-blue-50 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
                   Nhập bởi Admin
