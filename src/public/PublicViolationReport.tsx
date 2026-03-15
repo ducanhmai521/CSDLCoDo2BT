@@ -87,15 +87,15 @@ const ViolationRow = ({
   // Dùng flex-shrink-0 để badge không bị bóp méo, nhưng ml-auto để đẩy nó sang phải
   <div className="flex items-center ml-auto pl-2"> 
     {reporterIsSuperUser ? (
-      <div className="relative inline-flex overflow-hidden rounded-lg sm:rounded-full p-[1.5px] group shadow-sm flex-shrink-0 cursor-default">
-        <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#ef4444_0%,#eab308_25%,#22c55e_50%,#3b82f6_75%,#a855f7_100%,#ef4444_100%)]" />
+      <div className="relative inline-flex overflow-hidden rounded-lg sm:rounded-full p-[0.5px] group shadow-sm flex-shrink-0 cursor-default border border-blue-200">
+        <span className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-purple-500/20 opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
         <div className="relative flex items-center bg-white rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5 h-full w-full backface-hidden">
           {/* Icon Shield */}
           <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-blue-700 shrink-0" strokeWidth={2.5} />
           {/* Text Container */}
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
               
-              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-800 to-blue-600 uppercase leading-tight sm:leading-none 
+              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-blue-700 uppercase leading-tight sm:leading-none 
                              sm:border-r sm:border-blue-100 sm:pr-1.5 sm:py-0.5
                              border-b border-blue-50 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
                   Nhập bởi Admin
@@ -250,7 +250,7 @@ const PublicViolationReport = () => {
   const navigate = useNavigate();
   
   // Tab state - check URL for initial tab
-  const [activeTab, setActiveTab] = useState<'violations' | 'scores'>(() => {
+  const [activeTab, setActiveTab] = useState<'violations' | 'scores' | 'classSummary'>(() => {
     if (location.pathname === '/bang-diem-thi-dua-tho') {
       return 'scores';
     }
@@ -260,6 +260,13 @@ const PublicViolationReport = () => {
   // Component State
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekInput, setWeekInput] = useState('1');
+  
+  // Class Selection State (from localStorage)
+  const [selectedClass, setSelectedClass] = useState<string | null>(() => {
+    return localStorage.getItem('selectedClassSummary') || null;
+  });
+  const [isClassSelectorOpen, setIsClassSelectorOpen] = useState(false);
+  
   const [weekError, setWeekError] = useState<string | null>(null);
 
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
@@ -268,7 +275,7 @@ const PublicViolationReport = () => {
   const [hideExcusedAbsence, setHideExcusedAbsence] = useState(true);
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
   const [hasAcknowledged, setHasAcknowledged] = useState(() => {
-    return localStorage.getItem('violationReportUnderstood') === 'true';
+    return localStorage.getItem('violationReportUnderstood_v2') === 'true';
   });
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [modalState, setModalState] = useState<'welcome' | 'mustAgree'>('welcome');
@@ -295,6 +302,11 @@ const PublicViolationReport = () => {
     api.violations.getPublicEmulationScores,
     dateRange ? { start: dateRange.start, end: dateRange.end } : "skip"
   );
+  
+  const classViolations = useQuery(
+    api.violations.getViolationsByClass,
+    (activeTab === 'classSummary' && selectedClass) ? { className: selectedClass } : "skip"
+  );
 
   // Memoized Calculations
   const violationsByDay = useMemo(() => {
@@ -309,6 +321,42 @@ const PublicViolationReport = () => {
   }, [violations, hideExcusedAbsence]);
 
   const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
+  
+  // Group Class Violations by Week
+  const classViolationsByWeek = useMemo(() => {
+      if (!classViolations || !baseDateStr) return [];
+      
+      const base = new Date(baseDateStr);
+      const grouped = new Map<number, any[]>();
+      
+      classViolations.forEach((v: any) => {
+          // Filter excused absence if enabled
+          if (hideExcusedAbsence && v.violationType === "Nghỉ học có phép") return;
+
+          const vDate = new Date(v.violationDate);
+          // Calculate week number relative to base date
+          // Week 1 starts at base date
+          const diffTime = vDate.getTime() - base.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          // Assuming base date is Monday of Week 1
+          // If vDate is before base, it's week 0 or negative?
+          // Let's assume valid weeks are >= 1
+          const w = Math.floor(diffDays / 7) + 1;
+          
+          if (!grouped.has(w)) grouped.set(w, []);
+          grouped.get(w)!.push(v);
+      });
+      
+      // We want to show all weeks from Current Week down to 1
+      const weeks: { week: number, violations: any[] }[] = [];
+      for (let i = weekNumber; i >= 1; i--) {
+          weeks.push({
+              week: i,
+              violations: grouped.get(i) || []
+          });
+      }
+      return weeks;
+  }, [classViolations, baseDateStr, weekNumber]);
 
   // Side Effects
   useEffect(() => {
@@ -390,17 +438,23 @@ const PublicViolationReport = () => {
     if (isNaN(num) || num <= 0) { setWeekError('Tuần phải là một số dương hợp lệ'); } 
     else { setWeekError(null); setWeekNumber(num); }
   };
+  
+  const handleClassSelect = (cls: string) => {
+    setSelectedClass(cls);
+    localStorage.setItem('selectedClassSummary', cls);
+    setIsClassSelectorOpen(false);
+  };
 
   const toggleDay = (day: number) => {
     setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
   };
 
   // Handle tab changes and URL updates
-  const handleTabChange = (tab: 'violations' | 'scores') => {
+  const handleTabChange = (tab: 'violations' | 'scores' | 'classSummary') => {
     setActiveTab(tab);
     if (tab === 'scores') {
       navigate('/bang-diem-thi-dua-tho', { replace: true });
-    } else {
+    } else if (tab === 'violations') {
       navigate('/bang-bao-cao-vi-pham', { replace: true });
     }
   };
@@ -409,14 +463,14 @@ const PublicViolationReport = () => {
   useEffect(() => {
     if (location.pathname === '/bang-diem-thi-dua-tho') {
       setActiveTab('scores');
-    } else {
+    } else if (location.pathname === '/bang-bao-cao-vi-pham' && activeTab === 'scores') {
       setActiveTab('violations');
     }
   }, [location.pathname]);
   
   const handleUnderstood = () => {
     if (dontShowAgain) {
-      localStorage.setItem('violationReportUnderstood', 'true');
+      localStorage.setItem('violationReportUnderstood_v2', 'true');
     }
     setHasAcknowledged(true);
     setShowWelcomeModal(false);
@@ -493,12 +547,54 @@ const PublicViolationReport = () => {
                   <h2 className="text-xl font-bold text-slate-800">Bạn ơiiii!</h2>
                 </div>
                 <div className="space-y-3 text-sm text-slate-700">
-                  <p className="font-medium">Web đã cập nhật giao diện mới gọn gàng hơn:</p>
-                  <ul className="space-y-2 list-disc list-inside pl-2">
-                    <li><strong>Bấm vào từng dòng</strong> vi phạm để xem chi tiết & bằng chứng.</li>
-                  </ul>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
-                    <p className="text-xs text-blue-800"><strong>Mẹo:</strong> Bạn có thể hiện/ẩn "Nghỉ học có phép" bằng nút toggle ở góc trên.</p>
+                  <p className="font-medium text-blue-800">Web đã cập nhật thêm nhiều tính năng mới:</p>
+                  
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">Tab Vi phạm (Mặc định)</p>
+                        <p className="text-xs text-slate-500">Xem vi phạm theo từng ngày trong tuần. Bấm vào mỗi dòng để xem chi tiết & bằng chứng.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center shrink-0">
+                        <Users className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">Tab Tổng hợp theo lớp</p>
+                        <p className="text-xs text-slate-500">Chọn lớp của bạn để xem tất cả vi phạm từ đầu năm đến nay, được gom nhóm theo từng tuần.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center shrink-0">
+                        <Trophy className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">Tab Bảng điểm</p>
+                        <p className="text-xs text-slate-500">Theo dõi điểm thi đua thô của tất cả các lớp trong tuần hiện tại.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center shrink-0">
+                        <Eye className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">Ẩn/Hiện nghỉ có phép</p>
+                        <p className="text-xs text-slate-500">Sử dụng nút ở góc dưới bên phải để lọc nhanh các vi phạm không cần thiết.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                    <p className="text-[11px] text-blue-800 leading-relaxed">
+                      <strong>Lưu ý:</strong> Hệ thống sẽ tự động ghi nhớ lớp bạn đã chọn ở tab "Tổng hợp theo lớp" cho lần truy cập sau!
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pt-3 pb-2 border-t border-slate-200">
@@ -645,33 +741,94 @@ const PublicViolationReport = () => {
         </div>
       )}
 
+      {isClassSelectorOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setIsClassSelectorOpen(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" />
+                Chọn lớp của bạn
+              </h3>
+              <button onClick={() => setIsClassSelectorOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {[10, 11, 12].map(grade => (
+                <div key={grade} className="space-y-2">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-full h-px bg-slate-200"></span>
+                    <span className="whitespace-nowrap">Khối {grade}</span>
+                    <span className="w-full h-px bg-slate-200"></span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                    {Array.from({ length: 8 }, (_, i) => `${grade}A${i + 1}`).map(cls => (
+                      <button
+                        key={cls}
+                        onClick={() => handleClassSelect(cls)}
+                        className={`px-2 py-2 text-sm font-medium rounded-lg transition-all ${
+                          selectedClass === cls
+                            ? 'bg-emerald-600 text-white shadow-md scale-105'
+                            : 'bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-sm border border-slate-200'
+                        }`}
+                      >
+                        {cls.substring(2)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sticky Header */}
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto">
-          {/* Header Row: Title + Week Selector */}
+          {/* Header Row: Title + Week/Class Selector */}
           <div className="px-3 sm:px-4 py-2 border-b border-slate-100">
             <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
               <h1 className="text-sm sm:text-base font-bold text-slate-800">
                 CSDL Cờ đỏ THPTS2BT
               </h1>
               
-              <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-50 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 flex-shrink-0">
-                <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 flex-shrink-0" />
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs sm:text-sm font-medium text-slate-700">Tuần:</label>
-                  <input 
-                    type="text" 
-                    value={weekInput} 
-                    onChange={handleWeekChange} 
-                    className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-10 sm:w-16 text-center text-xs sm:text-sm rounded font-medium ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} 
-                  />
+              {activeTab === 'classSummary' ? (
+                <button 
+                  onClick={() => setIsClassSelectorOpen(true)}
+                  className="flex items-center gap-1.5 sm:gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm hover:border-emerald-300 hover:shadow-md hover:text-emerald-700 transition-all group"
+                >
+                  <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <Users className="w-3 h-3 text-emerald-600" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-none mb-0.5">Lớp</span>
+                    <span className="text-sm font-bold text-slate-800 leading-none group-hover:text-emerald-700">
+                      {selectedClass || "Chọn lớp"}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-50 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 flex-shrink-0">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 flex-shrink-0" />
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs sm:text-sm font-medium text-slate-700">Tuần:</label>
+                    <input 
+                        type="text" 
+                        value={weekInput} 
+                        onChange={handleWeekChange} 
+                        className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-10 sm:w-16 text-center text-xs sm:text-sm rounded font-medium ${weekError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} 
+                    />
+                  </div>
+                  {dateRange && (
+                    <span className="text-[10px] sm:text-xs text-slate-600 whitespace-nowrap">
+                        ({format(new Date(dateRange.start), "dd/MM")} - {format(new Date(dateRange.end), "dd/MM")})
+                    </span>
+                  )}
                 </div>
-                {dateRange && (
-                  <span className="text-[10px] sm:text-xs text-slate-600 whitespace-nowrap">
-                    ({format(new Date(dateRange.start), "dd/MM")} - {format(new Date(dateRange.end), "dd/MM")})
-                  </span>
-                )}
-              </div>
+              )}
             </div>
             
             {weekError && (
@@ -685,10 +842,10 @@ const PublicViolationReport = () => {
           {/* Tab Selector Row */}
           <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 sm:gap-3">
             {/* Tab Selector */}
-            <div className="flex items-center gap-0.5 border-b-2 border-slate-200 flex-1">
+            <div className="flex items-center gap-0.5 border-b-2 border-slate-200 flex-1 overflow-x-auto no-scrollbar scroll-smooth">
               <button
                 onClick={() => handleTabChange('violations')}
-                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors ${
+                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeTab === 'violations'
                     ? 'text-indigo-600'
                     : 'text-slate-500 hover:text-slate-700'
@@ -704,7 +861,7 @@ const PublicViolationReport = () => {
               </button>
               <button
                 onClick={() => handleTabChange('scores')}
-                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors ${
+                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeTab === 'scores'
                     ? 'text-amber-600'
                     : 'text-slate-500 hover:text-slate-700'
@@ -718,38 +875,58 @@ const PublicViolationReport = () => {
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600 -mb-[2px]"></div>
                 )}
               </button>
+              <button
+                onClick={() => handleTabChange('classSummary')}
+                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'classSummary'
+                    ? 'text-emerald-600'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>Tổng hợp theo lớp</span>
+                </span>
+                {activeTab === 'classSummary' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600 -mb-[2px]"></div>
+                )}
+              </button>
             </div>
+          </div>
+
+          {/* Disclaimer & Actions */}
+          <div className="px-3 sm:px-4 py-1.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] sm:text-xs text-slate-500 leading-relaxed flex-1 min-w-[200px]">
+              {activeTab === 'violations' ? (
+                <>
+                  Dữ liệu vi phạm được cập nhật bởi các thành viên đội cờ đỏ. Nếu phát hiện sai sót, hãy báo lại thành viên đội hoặc Admin nhé!
+                </>
+              ) : activeTab === 'scores' ? (
+                <>
+                  Bảng điểm thi đua thô được tính toán dựa trên dữ liệu vi phạm, chưa bao gồm điểm giờ học, điểm thưởng.
+                </>
+              ) : (
+                <>
+                    Tổng hợp tất cả vi phạm của lớp {selectedClass} từ đầu năm học đến nay, sắp xếp theo tuần mới nhất.
+                </>
+              )}
+            </p>
             
-            {/* Show/Hide toggle only for violations tab */}
-            {activeTab === 'violations' && (
+            {/* Show/Hide toggle for violation-related tabs */}
+            {(activeTab === 'violations' || activeTab === 'classSummary') && (
               <button
                 onClick={() => setHideExcusedAbsence(!hideExcusedAbsence)}
-                className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-colors text-xs sm:text-sm font-medium whitespace-nowrap ${
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[10px] sm:text-xs font-medium whitespace-nowrap flex-shrink-0 ${
                   hideExcusedAbsence 
                     ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200' 
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
                 }`}
                 title={hideExcusedAbsence ? 'Đang ẩn nghỉ có phép' : 'Đang hiện nghỉ có phép'}
               >
-                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 <span>{hideExcusedAbsence ? 'Ẩn nghỉ CP' : 'Hiện tất cả'}</span>
               </button>
             )}
-          </div>
-
-          {/* Disclaimer */}
-          <div className="px-3 sm:px-4 py-1.5 border-t border-slate-100">
-            <p className="text-[10px] sm:text-xs text-slate-500 leading-relaxed">
-              {activeTab === 'violations' ? (
-                <>
-                  Dữ liệu vi phạm được cập nhật bởi các thành viên đội cờ đỏ. Nếu phát hiện sai sót, hãy báo lại thành viên đội hoặc Admin nhé!
-                </>
-              ) : (
-                <>
-                  Bảng điểm thi đua thô được tính toán dựa trên dữ liệu vi phạm, chưa bao gồm điểm giờ học, điểm thưởng.
-                </>
-              )}
-            </p>
           </div>
         </div>
       </div>
@@ -853,7 +1030,7 @@ const PublicViolationReport = () => {
               })}
             </div>
           </>
-        ) : (
+        ) : activeTab === 'scores' ? (
           // Emulation Scores Content
           <>
             {emulationScores === undefined && (
@@ -943,6 +1120,79 @@ const PublicViolationReport = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+          </>
+        ) : (
+          // Class Summary Content
+          <>
+            {!selectedClass ? (
+              <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center animate-bounce">
+                  <Users className="w-8 h-8 text-emerald-600" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-bold text-slate-800">Chưa chọn lớp</h3>
+                  <p className="text-sm text-slate-500 max-w-xs mx-auto">
+                    Vui lòng chọn một lớp để xem tổng hợp vi phạm.
+                  </p>
+                  <button 
+                    onClick={() => setIsClassSelectorOpen(true)}
+                    className="mt-4 px-6 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors"
+                  >
+                    Chọn lớp ngay
+                  </button>
+                </div>
+              </div>
+            ) : classViolations === undefined ? (
+              <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                <div className="relative">
+                  <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
+                  <div className="absolute inset-0 w-12 h-12 border-4 border-emerald-200 rounded-full animate-pulse"></div>
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-lg font-medium text-slate-700">Đang tải dữ liệu lớp {selectedClass}...</p>
+                  <p className="text-sm text-slate-500">Vui lòng chờ trong giây lát</p>
+                </div>
+              </div>
+            ) : classViolations && classViolationsByWeek.length === 0 ? (
+               <div className="bg-white rounded-lg shadow-sm p-8 text-center mt-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
+                  <FileText className="w-8 h-8 text-slate-400" />
+                </div>
+                <p className="text-lg font-medium text-slate-700 mb-1">Chưa có dữ liệu</p>
+                <p className="text-sm text-slate-500">Không tìm thấy dữ liệu vi phạm cho lớp này</p>
+              </div>
+            ) : (
+              <div className="space-y-4 mt-2">
+                {classViolationsByWeek.map(({ week, violations }) => (
+                  <div key={week} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="w-full px-4 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-200">
+                      <div className="flex items-center gap-3">
+                         <span className="font-bold text-sm sm:text-base text-slate-800">Tuần {week}</span>
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-1 rounded ${violations.length > 0 ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+                        {violations.length > 0 ? `${violations.length} vi phạm` : 'Không có vi phạm'}
+                      </span>
+                    </div>
+
+                    {violations.length > 0 ? (
+                        <div className="divide-y divide-slate-100">
+                          {violations.map((v: any) => (
+                            <ViolationRow 
+                              key={v._id} 
+                              violation={v}
+                              onOpenEvidence={handleOpenModal}
+                            />
+                          ))}
+                        </div>
+                    ) : (
+                        <div className="p-4 text-center text-sm text-slate-500 italic bg-slate-50/50">
+                            Tuần này lớp ngoan, không có vi phạm nào! 🎉
+                        </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </>

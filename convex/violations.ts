@@ -453,6 +453,102 @@ export const getPublicEmulationScores = query({
     }
 });
 
+export const getViolationsByClass = query({
+    args: {
+        className: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const violations = await ctx.db
+            .query("violations")
+            .withIndex("by_violatingClass", q => q.eq("violatingClass", args.className))
+            .order("desc")
+            .collect();
+
+        const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
+        const reporterProfiles = await Promise.all(
+            reporterUserIds.map(userId => 
+                ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', userId)).unique()
+            )
+        );
+        
+        const reporterProfileMap = new Map();
+        const reporterSuperUserMap = new Map();
+
+        reporterProfiles.forEach(profile => {
+            if (profile) {
+                reporterProfileMap.set(profile.userId, profile.fullName);
+                reporterSuperUserMap.set(profile.userId, profile.isSuperUser || false);
+            }
+        });
+
+        // Get reporter customizations
+        const reporterCustomizations = await Promise.all(
+            reporterUserIds.map(async userId => {
+                const purchase = await ctx.db
+                    .query('userPurchases')
+                    .withIndex('by_userId', q => q.eq('userId', userId))
+                    .filter(q => q.eq(q.field('isActive'), true))
+                    .first();
+                
+                if (purchase && purchase.customization) {
+                    const item = await ctx.db.get(purchase.itemId);
+                    if (item && item.category === 'customization') {
+                        return { userId, customization: purchase.customization };
+                    }
+                }
+                return { userId, customization: null };
+            })
+        );
+
+        const reporterCustomizationMap = new Map();
+        reporterCustomizations.forEach(({ userId, customization }) => {
+            reporterCustomizationMap.set(userId, customization);
+        });
+
+        const violationPointsMap = new Map<string, number>();
+        VIOLATION_CATEGORIES.forEach(category => {
+            category.violations.forEach(violationName => {
+                violationPointsMap.set(violationName, category.points);
+            });
+        });
+
+        const detailedViolations = await Promise.all(violations.map(async v => {
+            // Get evidence URLs from both Convex storage (legacy) and R2
+            const evidenceUrls: (string | null)[] = [];
+            
+            // Legacy Convex storage URLs
+            if (v.evidenceFileIds && v.evidenceFileIds.length > 0) {
+                const convexUrls = await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId)));
+                evidenceUrls.push(...convexUrls);
+            }
+            
+            // R2 URLs
+            if (v.evidenceR2Keys && v.evidenceR2Keys.length > 0) {
+                const r2Urls = await Promise.all(v.evidenceR2Keys.map(async (key) => {
+                    try {
+                        return await ctx.runQuery(api.r2.getR2PublicUrl, { key });
+                    } catch (error) {
+                        console.error("Error getting R2 URL for key:", key, error);
+                        return null;
+                    }
+                }));
+                evidenceUrls.push(...r2Urls);
+            }
+            
+            return {
+                ...v,
+                reporterName: reporterProfileMap.get(v.reporterId) ?? 'Không rõ',
+                reporterIsSuperUser: reporterSuperUserMap.get(v.reporterId) ?? false,
+                reporterCustomization: reporterCustomizationMap.get(v.reporterId) ?? null,
+                evidenceUrls,
+                points: violationPointsMap.get(v.violationType) ?? 0,
+            };
+        }));
+
+        return detailedViolations;
+    }
+});
+
 export const getPublicViolations = query({
     args: {
         start: v.optional(v.number()),
