@@ -46,6 +46,11 @@ const ViolationRow = ({
   onOpenEvidence: (v: any, url: string) => void 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const violationTimestamp = (() => {
+    const t = violation?.violationDate ? new Date(violation.violationDate).getTime() : NaN;
+    if (!Number.isFinite(t)) return typeof violation?._creationTime === "number" ? violation._creationTime : null;
+    return t;
+  })();
   
   // Kiểm tra dữ liệu
   const hasDetails = violation.details && violation.details.trim() !== '';
@@ -53,6 +58,7 @@ const ViolationRow = ({
   
   // Lấy thông tin người báo cáo (nếu có quyền xem hoặc data có trả về)
   const reporterName = (violation as any).requesterName || violation.reporterName;
+  const isImportedFromAbsenceRequest = Boolean((violation as any).requesterName);
   const reporterIsSuperUser = (violation as any).reporterIsSuperUser || false;
   const reporterCustomization = (violation as any).reporterCustomization || null;
 
@@ -86,24 +92,44 @@ const ViolationRow = ({
 {reporterName && (
   // Dùng flex-shrink-0 để badge không bị bóp méo, nhưng ml-auto để đẩy nó sang phải
   <div className="flex items-center ml-auto pl-2"> 
-    {reporterIsSuperUser ? (
-      <div className="relative inline-flex overflow-hidden rounded-lg sm:rounded-full p-[0.5px] group shadow-sm flex-shrink-0 cursor-default border border-blue-200">
-        <span className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-purple-500/20 opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
+    {isImportedFromAbsenceRequest ? (
+      <div className="relative inline-flex overflow-hidden rounded-lg sm:rounded-full p-[0.5px] group shadow-sm flex-shrink-0 cursor-default border border-emerald-200">
+        <span className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
         <div className="relative flex items-center bg-white rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5 h-full w-full backface-hidden">
-          {/* Icon Shield */}
-          <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-blue-700 shrink-0" strokeWidth={2.5} />
-          {/* Text Container */}
+          <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-emerald-700 shrink-0" strokeWidth={2.5} />
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-              
-              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-blue-700 uppercase leading-tight sm:leading-none 
-                             sm:border-r sm:border-blue-100 sm:pr-1.5 sm:py-0.5
-                             border-b border-blue-50 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
-                  Nhập bởi Admin
-              </span>
-              
-              <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
-                  {reporterName}
-              </span>
+            <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-emerald-700 uppercase leading-tight sm:leading-none 
+                           sm:border-r sm:border-emerald-100 sm:pr-1.5 sm:py-0.5
+                           border-b border-emerald-50 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+              Nhập từ trang xin nghỉ
+            </span>
+            <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+              {reporterName}
+            </span>
+          </div>
+        </div>
+      </div>
+    ) : reporterIsSuperUser ? (
+      <div className="relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-slate-50/80 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05),0_0_0_1px_rgba(226,232,240,0.9)]">
+        {/* Subtle animated rainbow glow (low opacity, no heavy blur) */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 opacity-[0.09] saturate-150 animate-[gradient-xy_8s_linear_infinite] bg-[linear-gradient(90deg,rgba(99,102,241,0.90),rgba(236,72,153,0.80),rgba(245,158,11,0.75),rgba(34,197,94,0.72),rgba(14,165,233,0.80),rgba(99,102,241,0.90))] [background-size:320%_320%]"
+        />
+        <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
+          <ShieldCheck
+            className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-indigo-700 shrink-0 [filter:drop-shadow(0_0_0.5px_rgba(236,72,153,0.35))_drop-shadow(0_0_0.5px_rgba(14,165,233,0.30))]"
+            strokeWidth={2.5}
+          />
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
+            <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-slate-700 uppercase leading-tight sm:leading-none 
+                           sm:border-r sm:border-slate-200 sm:pr-1.5 sm:py-0.5
+                           border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+              Admin nhập
+            </span>
+            <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+              {reporterName}
+            </span>
           </div>
         </div>
       </div>
@@ -184,6 +210,18 @@ const ViolationRow = ({
         }`}
       >
         <div className="p-3 sm:p-4 text-sm space-y-3 border-t border-slate-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
+          {/* Ngày vi phạm */}
+          {violationTimestamp && (
+            <div className="flex gap-3">
+              <div className="mt-0.5 min-w-[20px]"><Calendar className="w-4 h-4 text-slate-400" /></div>
+              <div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Ngày vi phạm</span>
+                <p className="text-slate-700 mt-0.5 font-medium">
+                  {format(new Date(violationTimestamp), "iiii, dd/MM", { locale: vi })}
+                </p>
+              </div>
+            </div>
+          )}
           
           {/* Chi tiết lỗi */}
           <div className="flex gap-3">
@@ -318,10 +356,18 @@ const PublicViolationReport = () => {
       grouped.get(dayStart)!.push(v);
     });
     return grouped;
-  }, [violations, hideExcusedAbsence]);
+  }, [violations]);
 
   const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
   
+  // Tuần hiện tại (độc lập với tuần đang chọn ở tab chính)
+  const currentWeekNumber = useMemo(() => {
+    if (!baseDateStr) return 1;
+    const base = new Date(baseDateStr);
+    const now = new Date();
+    return differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
+  }, [baseDateStr]);
+
   // Group Class Violations by Week
   const classViolationsByWeek = useMemo(() => {
       if (!classViolations || !baseDateStr) return [];
@@ -346,17 +392,25 @@ const PublicViolationReport = () => {
           if (!grouped.has(w)) grouped.set(w, []);
           grouped.get(w)!.push(v);
       });
+      // Sort theo ngày vi phạm trong từng tuần (tránh lệch do nhập bù)
+      for (const [, rows] of grouped) {
+        rows.sort((a: any, b: any) => {
+          const at = a?.violationDate ? new Date(a.violationDate).getTime() : (typeof a?._creationTime === "number" ? a._creationTime : 0);
+          const bt = b?.violationDate ? new Date(b.violationDate).getTime() : (typeof b?._creationTime === "number" ? b._creationTime : 0);
+          return at - bt;
+        });
+      }
       
       // We want to show all weeks from Current Week down to 1
       const weeks: { week: number, violations: any[] }[] = [];
-      for (let i = weekNumber; i >= 1; i--) {
+      for (let i = currentWeekNumber; i >= 1; i--) {
           weeks.push({
               week: i,
               violations: grouped.get(i) || []
           });
       }
       return weeks;
-  }, [classViolations, baseDateStr, weekNumber]);
+  }, [classViolations, baseDateStr, currentWeekNumber, hideExcusedAbsence]);
 
   // Side Effects
   useEffect(() => {

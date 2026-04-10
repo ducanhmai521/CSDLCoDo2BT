@@ -464,6 +464,14 @@ export const getViolationsByClass = query({
             .order("desc")
             .collect();
 
+        // Sort theo ngày vi phạm (không theo ngày nhập DB) để tránh lệch khi nhập bù
+        violations.sort((a, b) => {
+            const at = typeof (a as any).violationDate === "number" ? (a as any).violationDate : new Date((a as any).violationDate).getTime();
+            const bt = typeof (b as any).violationDate === "number" ? (b as any).violationDate : new Date((b as any).violationDate).getTime();
+            if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
+            return (a as any)._creationTime - (b as any)._creationTime;
+        });
+
         const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
         const reporterProfiles = await Promise.all(
             reporterUserIds.map(userId => 
