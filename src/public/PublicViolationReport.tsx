@@ -37,6 +37,14 @@ const premiumStyles = `
     animation: gradient-xy 3s linear infinite;
   }
 `;
+
+function displayStudentHeading(violation: any): string {
+  const name = typeof violation?.studentName === "string" ? violation.studentName.trim() : "";
+  if (name) return name;
+  if (violation?.targetType === "class") return "Vi phạm cấp lớp";
+  return "Không có tên";
+}
+
 // --- SUB-COMPONENT: VIOLATION ROW (Clean & Intuitive) ---
 const ViolationRow = ({ 
   violation, 
@@ -81,7 +89,7 @@ const ViolationRow = ({
           {/* Thông tin chính */}
           <div className="flex flex-col min-w-0 flex-1 gap-0.5">
             <span className="text-xs sm:text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-              {violation.studentName || "Không có tên"}
+              {displayStudentHeading(violation)}
             </span>
             <span className="text-xs text-slate-500 truncate pr-2">
               {violation.violationType}
@@ -114,7 +122,7 @@ const ViolationRow = ({
         {/* Subtle animated rainbow glow (low opacity, no heavy blur) */}
         <span
           aria-hidden="true"
-          className="absolute inset-0 opacity-[0.09] saturate-150 animate-[gradient-xy_8s_linear_infinite] bg-[linear-gradient(90deg,rgba(99,102,241,0.90),rgba(236,72,153,0.80),rgba(245,158,11,0.75),rgba(34,197,94,0.72),rgba(14,165,233,0.80),rgba(99,102,241,0.90))] [background-size:320%_320%]"
+          className="absolute inset-0 opacity-[0.07] saturate-150 animate-[gradient-xy_1s_linear_infinite] bg-[linear-gradient(90deg,rgba(99,102,241,0.90),rgba(236,72,153,0.80),rgba(245,158,11,0.75),rgba(34,197,94,0.72),rgba(14,165,233,0.80),rgba(99,102,241,0.90))] [background-size:320%_320%]"
         />
         <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
           <ShieldCheck
@@ -470,7 +478,7 @@ const PublicViolationReport = () => {
     setModalMedia({
       url, type,
       violationInfo: {
-        student: violation.studentName || "Không có tên",
+        student: displayStudentHeading(violation),
         class: violation.violatingClass,
         details: violation.details ? `${violation.violationType}: ${violation.details}` : violation.violationType
       }
