@@ -55,7 +55,9 @@ export function AIViolationInputModal({
   const [currentView, setCurrentView] = useState<"input" | "results">("input");
   const [inputMode, setInputMode] = useState<InputMode>("violations");
   const [showAdvanced, setShowAdvanced] = useState(false); // New state for collapsible options
-  const [selectedAIModel, setSelectedAIModel] = useState<string>("moonshotai/kimi-k2-instruct-0905"); // AI model selection state
+  // Model selection is now controlled server-side (Admin setting)
+  const [usedModel, setUsedModel] = useState<string | null>(null);
+  const [correctionsMade, setCorrectionsMade] = useState<string[]>([]);
 
   // Lock zoom when modal opens
   React.useEffect(() => {
@@ -80,6 +82,8 @@ export function AIViolationInputModal({
   const allStudents = useQuery(api.users.getAllStudents);
   const allUserProfiles = useQuery(api.users.getAllUserProfiles);
   const myProfile = useQuery(api.users.getMyProfile);
+  const savedAiModels = useQuery(api.users.getSetting, { key: "aiModels" });
+  const savedAiModel = useQuery(api.users.getSetting, { key: "aiModel" });
 
   const { classRosterCounts } = useMemo(() => {
     if (!allStudents)
@@ -137,11 +141,30 @@ export function AIViolationInputModal({
     }
 
     setIsParsing(true);
+    const startedAt = performance.now();
+    const configuredModelList =
+      (typeof savedAiModels === "string" && savedAiModels.trim()
+        ? savedAiModels.trim().split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean)
+        : typeof savedAiModel === "string" && savedAiModel.trim()
+          ? [savedAiModel.trim()]
+          : []) as string[];
+    const primaryModel = configuredModelList[0] || "fallback";
+    const toastId = toast.loading("Đang chuẩn bị yêu cầu AI...");
     try {
+      toast.message(
+        `Đang gửi yêu cầu đến model ưu tiên: ${primaryModel}${configuredModelList.length > 1 ? " (có fallback)" : ""}`,
+        { id: toastId }
+      );
       const result = inputMode === "attendance" 
-        ? await parseAttendanceWithAI({ rawText, model: selectedAIModel })
-        : await parseViolationsWithAI({ rawText, model: selectedAIModel });
+        ? await parseAttendanceWithAI({ rawText })
+        : await parseViolationsWithAI({ rawText });
 
+      const serverUsedModel = (result as any).usedModel as string | undefined;
+      const serverCorrections = Array.isArray((result as any).correctionsMade) ? ((result as any).correctionsMade as string[]) : [];
+      toast.message(
+        `Model phản hồi: ${serverUsedModel || primaryModel}. Đang ghép tên học sinh...`,
+        { id: toastId }
+      );
       const matchedResults = result.violations.map((v: any) => {
         let matchedViolation: ParsedViolation = {
           ...v,
@@ -196,20 +219,34 @@ export function AIViolationInputModal({
 
       setParsedViolations(matchedResults);
       setCheckedClasses(result.checkedClasses);
+      setUsedModel("usedModel" in result ? (result as any).usedModel : null);
+      setCorrectionsMade(serverCorrections);
       
       if (inputMode === "attendance" && 'attendanceByClass' in result) {
         setAttendanceByClass(result.attendanceByClass as Record<string, { absentStudents: string[]; lateStudents: string[] }>);
       }
       
       setCurrentView("results");
-      toast.success(`Đã phân tích xong ${matchedResults.length} mục.`);
+      const elapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
+      const modelLabel =
+        ("usedModel" in result ? (result as any).usedModel : null) ||
+        configuredModelText ||
+        "fallback";
+      const correctionLabel = serverCorrections.length > 0 ? ` • AI sửa: ${serverCorrections.length} mục` : "";
+      toast.success(`Xong: ${matchedResults.length} mục • model: ${modelLabel}${correctionLabel} • ${elapsedMs}ms`, { id: toastId });
     } catch (error) {
-      toast.error("Lỗi khi phân tích bằng AI: " + (error as Error).message);
+      toast.error("Lỗi khi phân tích bằng AI: " + (error as Error).message, { id: toastId });
       console.error(error);
     } finally {
       setIsParsing(false);
     }
   };
+
+  const configuredModelText =
+    (typeof savedAiModels === "string" && savedAiModels.trim()
+      ? savedAiModels.trim().split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0]
+      : null) ||
+    (typeof savedAiModel === "string" && savedAiModel.trim() ? savedAiModel.trim() : null);
 
   const handleFieldChange = (
     index: number,
@@ -259,11 +296,24 @@ export function AIViolationInputModal({
 
   const handleAddViolation = () => {
     const newViolation: ParsedViolation = {
-      studentName: null,
+      studentName: "",
       violatingClass: "",
       violationType: ALL_VIOLATIONS[0] || "",
       details: null,
-      targetType: "class",
+      targetType: "student",
+      originalText: "Thêm mới",
+      evidenceFiles: [],
+    };
+    setParsedViolations([...parsedViolations, newViolation]);
+  };
+
+  const handleAddViolationWithType = (t: "student" | "class") => {
+    const newViolation: ParsedViolation = {
+      studentName: t === "student" ? "" : null,
+      violatingClass: "",
+      violationType: ALL_VIOLATIONS[0] || "",
+      details: null,
+      targetType: t,
       originalText: "Thêm mới",
       evidenceFiles: [],
     };
@@ -608,25 +658,16 @@ export function AIViolationInputModal({
                       </div>
                       
                       <div className="space-y-1">
-                        <label className="text-xs text-gray-500">AI Model</label>
-                        <select
-                          value={selectedAIModel}
-                          onChange={(e) => setSelectedAIModel(e.target.value)}
-                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
-                          <option value="moonshotai/kimi-k2-instruct-0905">moonshotai/kimi-k2-instruct-0905 (default)</option>
-                          <option value="moonshotai/kimi-k2-instruct">moonshotai/kimi-k2-instruct</option>
-                          <option value="allam-2-7b">allam-2-7b</option>
-                          <option value="groq/compound">groq/compound</option>
-                          <option value="groq/compound-mini">groq/compound-mini</option>
-                          <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
-                          <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-                          <option value="meta-llama/llama-4-maverick-17b-128e-instruct">meta-llama/llama-4-maverick-17b-128e-instruct</option>
-                          <option value="meta-llama/llama-4-scout-17b-16e-instruct">meta-llama/llama-4-scout-17b-16e-instruct</option>
-                          <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
-                          <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
-                          <option value="qwen/qwen3-32b">qwen/qwen3-32b</option>
-                        </select>
+                        <label className="text-xs text-gray-500">AI model</label>
+                        <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md px-3 py-2">
+                          Đang cấu hình:{" "}
+                          <span className="font-mono text-gray-800">
+                            {configuredModelText || "Chưa đặt (sẽ dùng fallback)"}
+                          </span>
+                          <div className="mt-1 text-[11px] text-gray-500">
+                            (Cấu hình ở Admin Dashboard → Cài đặt → AI)
+                          </div>
+                        </div>
                       </div>
                       
                       {myProfile?.isSuperUser && (
@@ -656,6 +697,23 @@ export function AIViolationInputModal({
           ) : (
             // RESULTS VIEW
             <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-right-4 duration-300">
+              {(usedModel || configuredModelText) && (
+                <div className="bg-white/70 border border-gray-200 rounded-xl p-3 shadow-sm text-xs text-gray-600">
+                  AI model đang dùng:{" "}
+                  <span className="font-mono text-gray-800">{usedModel || configuredModelText}</span>
+                </div>
+              )}
+              {correctionsMade.length > 0 && (
+                <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3 shadow-sm text-xs text-amber-900">
+                  <div className="font-semibold mb-1">AI đã tự sửa:</div>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {correctionsMade.slice(0, 6).map((c, idx) => (
+                      <li key={idx}>{c}</li>
+                    ))}
+                    {correctionsMade.length > 6 && <li>... (+{correctionsMade.length - 6} mục)</li>}
+                  </ul>
+                </div>
+              )}
                {/* Attendance Summary */}
                {inputMode === "attendance" && Object.keys(attendanceByClass).length > 0 && (
                 <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 shadow-sm">
@@ -724,32 +782,64 @@ export function AIViolationInputModal({
                               ) : null;
                            })()}
 
-                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {/* Student & Class */}
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Học sinh</label>
-                                <input
-                                  list={`students-list-${i}`}
-                                  value={v.studentName || ""}
-                                  onChange={(e) => handleFieldChange(i, "studentName", e.target.value)}
-                                  className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent placeholder:font-normal"
-                                  placeholder="Nhập tên..."
-                                />
-                                <datalist id={`students-list-${i}`}>
-                                  {studentOptionsForClass.map((opt: any) => (
-                                    <option key={opt.id} value={opt.value}>{opt.label}</option>
-                                  ))}
-                                </datalist>
-                              </div>
-                              
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Lớp</label>
-                                <input
-                                  value={v.violatingClass}
-                                  onChange={(e) => handleFieldChange(i, "violatingClass", e.target.value)}
-                                  className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent"
-                                />
-                              </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                             <div className="col-span-1 sm:col-span-2 flex items-center justify-between gap-2">
+                               <div className="text-[10px] font-bold text-gray-500 uppercase">Đối tượng</div>
+                               <div className="flex rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                 <button
+                                   onClick={() => {
+                                     const updated = [...parsedViolations];
+                                     updated[i] = { ...updated[i], targetType: "student", studentName: updated[i].studentName || "" };
+                                     setParsedViolations(updated);
+                                   }}
+                                   className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "student" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
+                                   type="button"
+                                 >
+                                   Cá nhân
+                                 </button>
+                                 <button
+                                   onClick={() => {
+                                     const updated = [...parsedViolations];
+                                     updated[i] = { ...updated[i], targetType: "class", studentName: null };
+                                     setParsedViolations(updated);
+                                   }}
+                                   className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "class" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
+                                   type="button"
+                                 >
+                                   Cấp lớp
+                                 </button>
+                               </div>
+                             </div>
+
+                             {/* Class FIRST */}
+                             <div className={`space-y-1 ${v.targetType === "class" ? "col-span-1 sm:col-span-2" : ""}`}>
+                               <label className="text-[10px] font-bold text-gray-500 uppercase">Lớp</label>
+                               <input
+                                 value={v.violatingClass}
+                                 onChange={(e) => handleFieldChange(i, "violatingClass", e.target.value)}
+                                 className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent"
+                                 placeholder="Ví dụ: 10A5"
+                               />
+                             </div>
+
+                             {/* Student SECOND (only if student) */}
+                             {v.targetType === "student" && (
+                               <div className="space-y-1">
+                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Học sinh</label>
+                                 <input
+                                   list={`students-list-${i}`}
+                                   value={v.studentName || ""}
+                                   onChange={(e) => handleFieldChange(i, "studentName", e.target.value)}
+                                   className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent placeholder:font-normal"
+                                   placeholder="Nhập tên..."
+                                 />
+                                 <datalist id={`students-list-${i}`}>
+                                   {studentOptionsForClass.map((opt: any) => (
+                                     <option key={opt.id} value={opt.value}>{opt.label}</option>
+                                   ))}
+                                 </datalist>
+                               </div>
+                             )}
                               
                               {/* Violation Type */}
                               <div className="col-span-1 sm:col-span-2 space-y-1">
@@ -827,14 +917,13 @@ export function AIViolationInputModal({
                  <Button
                     onClick={() => {
                        if (rawText.trim() && !window.confirm("Bỏ qua dữ liệu đã nhập?")) return;
-                       handleAddViolation();
                        setCurrentView("results");
                     }}
                     variant="outline"
                     className="flex-1 sm:flex-none border-gray-300 text-gray-700"
                     disabled={isSubmitting}
                   >
-                    Thủ công
+                    Nhập thủ công
                   </Button>
                   <Button
                     onClick={handleParse}

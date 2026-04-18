@@ -34,6 +34,8 @@ export default function AdminDashboard() {
   const [weekInput, setWeekInput] = useState<number>(1);
   const [activeSection, setActiveSection] = useState<'overview' | 'violations' | 'emulation' | 'roster' | 'users' | 'settings' >('overview');
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
+  const savedAiModel = useQuery(api.users.getSetting, { key: 'aiModel' });
+  const savedAiModels = useQuery(api.users.getSetting, { key: 'aiModels' });
   const saveSetting = useMutation(api.users.setSetting);
   const exportRosterTemplate = useAction(api.adminTools.exportRosterTemplate);
   const importRoster = useAction(api.adminTools.importRoster);
@@ -45,6 +47,9 @@ export default function AdminDashboard() {
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [selectedRosterClass, setSelectedRosterClass] = useState<string>("");
   const [overviewDate, setOverviewDate] = useState<string>(format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy'));
+  const [aiModelsDraft, setAiModelsDraft] = useState<string>("");
+  const [aiModelsSaving, setAiModelsSaving] = useState<boolean>(false);
+  const [aiModelsSavedAt, setAiModelsSavedAt] = useState<number | null>(null);
 
   const formatDateDDMMYYYY = (iso: string) => {
     try {
@@ -159,6 +164,19 @@ export default function AdminDashboard() {
       setWeekBaseDate(savedWeekBase);
     }
   }, [savedWeekBase]);
+
+  useEffect(() => {
+    // Prefer multi-model config, fallback to single model
+    if (typeof savedAiModels === 'string' && savedAiModels.trim()) {
+      setAiModelsDraft(savedAiModels);
+      return;
+    }
+    if (typeof savedAiModel === 'string' && savedAiModel.trim()) {
+      setAiModelsDraft(savedAiModel);
+      return;
+    }
+    setAiModelsDraft('');
+  }, [savedAiModels, savedAiModel]);
 
   return (
     <div className="w-full">
@@ -384,6 +402,63 @@ export default function AdminDashboard() {
               <span className="text-sm text-slate-700">Tuần học hiện tại:</span>
               <span className="font-semibold text-slate-800">{weekNumber}</span>
             </div>
+          </div>
+        </div>
+
+        <div className="glass-card-subtle p-4">
+          <h3 className="text-lg font-semibold mb-3 text-slate-800">AI (OpenRouter)</h3>
+          <p className="text-sm text-slate-600 mb-3">
+            Model mặc định được chọn ở backend. Ví dụ: <span className="font-mono">openai/gpt-4o-mini</span>, <span className="font-mono">anthropic/claude-3.5-sonnet</span>, <span className="font-mono">google/gemini-2.0-flash</span>.
+          </p>
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <label className="text-sm text-slate-700">Danh sách model (ưu tiên từ trên xuống):</label>
+              <div className="text-xs text-slate-600">
+                {aiModelsSavedAt ? `Đã lưu lúc ${format(new Date(aiModelsSavedAt), 'HH:mm:ss')}` : ''}
+              </div>
+            </div>
+            <textarea
+              value={aiModelsDraft}
+              onChange={(e) => setAiModelsDraft(e.target.value)}
+              placeholder={"openai/gpt-4o-mini\nanthropic/claude-3.5-sonnet\ngoogle/gemini-2.0-flash"}
+              className="w-full min-h-[110px] rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+            />
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <button
+                onClick={async () => {
+                  setAiModelsSaving(true);
+                  try {
+                    await saveSetting({ key: 'aiModels', value: aiModelsDraft });
+                    const first = aiModelsDraft.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)[0] || '';
+                    await saveSetting({ key: 'aiModel', value: first });
+                    setAiModelsSavedAt(Date.now());
+                    toast.success('Đã lưu cấu hình AI model.');
+                  } catch (err) {
+                    toast.error((err as Error).message);
+                  } finally {
+                    setAiModelsSaving(false);
+                  }
+                }}
+                disabled={aiModelsSaving}
+                className="btn-glass-primary w-full sm:w-auto"
+              >
+                {aiModelsSaving ? 'Đang lưu...' : 'Lưu AI model'}
+              </button>
+              <button
+                onClick={() => {
+                  if (typeof savedAiModels === 'string' && savedAiModels.trim()) setAiModelsDraft(savedAiModels);
+                  else if (typeof savedAiModel === 'string' && savedAiModel.trim()) setAiModelsDraft(savedAiModel);
+                  else setAiModelsDraft('');
+                }}
+                disabled={aiModelsSaving}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200/80 bg-white/40 text-slate-700 hover:bg-white/60 transition-all"
+              >
+                Hoàn tác
+              </button>
+            </div>
+            <p className="text-xs text-slate-600">
+              Khi model đầu tiên lỗi/timeout, hệ thống sẽ tự động thử model tiếp theo.
+            </p>
           </div>
         </div>
 

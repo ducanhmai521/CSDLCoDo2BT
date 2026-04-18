@@ -7,7 +7,7 @@
 - **Backend**: Convex - nền tảng database thời gian thực
 - **Frontend**: Vite + React với giao diện hiện đại, responsive
 - **Lưu trữ file**: Cloudflare R2 cho ảnh bằng chứng vi phạm
-- **AI Integration**: Groq API để hỗ trợ xử lý dữ liệu thô
+- **AI Integration**: OpenRouter (OpenAI-compatible) để hỗ trợ xử lý dữ liệu thô
 
 ## ✨ Tính Năng Nổi Bật
 
@@ -178,8 +178,13 @@ Cần cấu hình đầy đủ các biến:
 JWT_PRIVATE_KEY=your_jwt_private_key
 JWKS=your_jwks_json
 
-# Groq AI
-GROQ_API_KEY=your_groq_api_key
+# OpenRouter AI
+OPENROUTER_API_KEY=your_openrouter_api_key
+# Optional (fallback if Admin setting `aiModel` is empty)
+OPENROUTER_MODEL=openai/gpt-4o-mini
+# Optional (recommended by OpenRouter)
+OPENROUTER_HTTP_REFERER=http://localhost
+OPENROUTER_APP_NAME=CSDLCoDo2BT
 
 # Cloudflare R2
 R2_ACCOUNT_ID=your_r2_account_id

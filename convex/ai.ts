@@ -1,6 +1,8 @@
+("use node");
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import Groq from "groq-sdk";
+import OpenAI from "openai";
+import { api } from "./_generated/api";
 import { VIOLATION_CATEGORIES } from "./violationPoints";
 
 // Get the full list of violation names
@@ -10,7 +12,7 @@ const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
 
 // Validation action to double-check and correct AI output
 const validateAndCorrectAI = async (
-  groq: Groq,
+  openai: OpenAI,
   model: string,
   originalText: string,
   firstPassJson: any,
@@ -33,6 +35,10 @@ Kiểm tra kết quả phân tích lần 1 và sửa các lỗi sau (nếu có):
 
 1. ⚠️ LỖI NGHIÊM TRỌNG - PHẢI SỬA:
    - Thiếu học sinh: Nếu dữ liệu gốc có tên học sinh nhưng JSON không có
+   - Sai đối tượng (cấp lớp vs học sinh):
+     * Nếu câu chỉ có TÊN LỚP + HÀNH VI/VI PHẠM (không có tên người) → studentName PHẢI là null
+     * Ví dụ: "10A5 trực muộn", "10A5 vệ sinh muộn", "10A5 không trực nhật" → studentName: null
+     * Tuyệt đối KHÔNG tự bịa tên học sinh cho vi phạm cấp lớp
    - Sai tên lớp: Tên lớp không khớp với dữ liệu gốc
    - Sai loại vi phạm: Loại vi phạm không có trong danh sách hợp lệ hoặc không khớp với dữ liệu gốc
    - Thiếu vi phạm: Có vi phạm trong dữ liệu gốc nhưng không có trong JSON
@@ -57,6 +63,7 @@ Kiểm tra kết quả phân tích lần 1 và sửa các lỗi sau (nếu có):
 
 4. QUY TẮC KHÁC:
    - MỖI HỌC SINH = 1 VI PHẠM RIÊNG
+   - VI PHẠM CẤP LỚP (không có tên học sinh): studentName = null
    - Tên lớp viết HOA (10a1 → 10A1)
    - Loại vi phạm PHẢI có trong danh sách hợp lệ
 
@@ -73,7 +80,7 @@ CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
 `;
 
   try {
-    const validationCompletion = await groq.chat.completions.create({
+    const validationCompletion = await openai.chat.completions.create({
       messages: [{ role: "user", content: validationPrompt }],
       model,
       temperature: 0.05,
@@ -108,6 +115,94 @@ CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
   }
 };
 
+const DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini";
+
+function extractJsonFromModelText(text: string): string {
+  let out = text || "";
+  if (out.includes("```json")) {
+    out = out.substring(out.indexOf("```json") + 7, out.lastIndexOf("```"));
+  } else if (out.includes("```")) {
+    out = out.substring(out.indexOf("```") + 3, out.lastIndexOf("```"));
+  }
+  return out.trim();
+}
+
+function parseModelList(raw: string): Array<string> {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((x) => String(x).trim())
+        .filter(Boolean);
+    }
+  } catch {
+    // ignore, try plain split below
+  }
+  return trimmed
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+async function getModelCandidates(ctx: any): Promise<Array<string>> {
+  const configuredModels = await ctx.runQuery(api.users.getSetting, { key: "aiModels" });
+  const configuredModel = await ctx.runQuery(api.users.getSetting, { key: "aiModel" });
+
+  const modelsFromList =
+    typeof configuredModels === "string" ? parseModelList(configuredModels) : [];
+  const modelFromSingle =
+    typeof configuredModel === "string" ? parseModelList(configuredModel) : [];
+  const modelFromEnv =
+    process.env.OPENROUTER_MODEL?.trim() ? [process.env.OPENROUTER_MODEL.trim()] : [];
+
+  const candidates = [
+    ...modelsFromList,
+    ...modelFromSingle,
+    ...modelFromEnv,
+    DEFAULT_OPENROUTER_MODEL,
+  ];
+
+  // de-dupe preserving order
+  const seen = new Set<string>();
+  const out: Array<string> = [];
+  for (const m of candidates) {
+    const key = m.trim();
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+async function createJsonChatWithFallback(args: {
+  openai: OpenAI;
+  models: Array<string>;
+  prompt: string;
+  temperature: number;
+}): Promise<{ text: string; usedModel: string }> {
+  let lastError: unknown = null;
+  for (const m of args.models) {
+    try {
+      const chatCompletion = await args.openai.chat.completions.create({
+        messages: [{ role: "user", content: args.prompt }],
+        model: m,
+        temperature: args.temperature,
+        response_format: { type: "json_object" },
+      });
+      const text = extractJsonFromModelText(chatCompletion.choices[0]?.message?.content || "");
+      return { text, usedModel: m };
+    } catch (err) {
+      lastError = err;
+      console.warn("OpenRouter model failed, trying fallback:", m, err);
+      continue;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("All OpenRouter models failed.");
+}
+
 // Mode for "Cờ đỏ" - attendance checking with violations
 export const parseAttendanceWithAI = action({
   args: {
@@ -127,14 +222,29 @@ export const parseAttendanceWithAI = action({
       absentStudents: v.array(v.string()),
       lateStudents: v.array(v.string()),
     })),
+    usedModel: v.string(),
+    correctionsMade: v.array(v.string()),
   }),
   handler: async (ctx, { rawText, model }) => {
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing GROQ_API_KEY environment variable.");
+      throw new Error("Missing OPENROUTER_API_KEY environment variable.");
     }
 
-    const groq = new Groq({ apiKey });
+    // NOTE: ignore client-provided `model` to avoid client-side model selection
+    void model;
+
+    const openai = new OpenAI({
+      apiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        // Optional but recommended by OpenRouter (safe defaults)
+        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost",
+        "X-Title": process.env.OPENROUTER_APP_NAME ?? "CSDLCoDo2BT",
+      },
+    });
+
+    const modelCandidates = await getModelCandidates(ctx);
 
     const prompt = `
 Bạn là trợ lý phân tích báo cáo CỜ ĐỎ của trường học. Cờ đỏ đi từng lớp để kiểm tra sĩ số và vi phạm.
@@ -153,6 +263,8 @@ NHIỆM VỤ:
 - MỖI HỌC SINH PHẢI CÓ MỘT VI PHẠM RIÊNG BIỆT
 - KHÔNG BAO GIỜ để studentName = null khi có tên học sinh
 - Nếu có nhiều học sinh cùng vi phạm → TẠO NHIỀU MỤC VI PHẠM RIÊNG
+- VI PHẠM CẤP LỚP: nếu dòng chỉ có TÊN LỚP + NỘI DUNG VI PHẠM (không có tên học sinh) → studentName PHẢI là null
+  Ví dụ: "10A5 trực muộn", "10A5 vệ sinh muộn" → { studentName: null, violatingClass: "10A5", ... }
 
 FORMAT LINH HOẠT - AI CẦN HIỂU:
 - "10A1: vắng: An, Bình" → TẠO 2 VI PHẠM:
@@ -175,6 +287,8 @@ FORMAT LINH HOẠT - AI CẦN HIỂU:
 
 - "10A1 vs muộn" → TẠO 1 VI PHẠM CẤP LỚP (KHÔNG có tên học sinh):
   * {studentName: null, violatingClass: "10A1", violationType: "Vệ sinh muộn"}
+- "10A5 trực muộn" → TẠO 1 VI PHẠM CẤP LỚP (KHÔNG có tên học sinh):
+  * {studentName: null, violatingClass: "10A5", violationType: "Trực nhật, vệ sinh tự quản muộn, bẩn.", details: "" }
 
 - "10A1 đủ" hoặc "10A1 ok" → Không có vắng, không có vi phạm
 
@@ -276,32 +390,19 @@ LƯU Ý:
 `;
 
     try {
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        model: model || "moonshotai/kimi-k2-instruct-0905",
+      const firstPass = await createJsonChatWithFallback({
+        openai,
+        models: modelCandidates,
+        prompt,
         temperature: 0.1,
-        response_format: { type: "json_object" },
       });
 
-      let text = chatCompletion.choices[0]?.message?.content || "";
-
-      if (text.includes("```json")) {
-        text = text.substring(text.indexOf("```json") + 7, text.lastIndexOf("```"));
-      } else if (text.includes("```")) {
-        text = text.substring(text.indexOf("```") + 3, text.lastIndexOf("```"));
-      }
-
-      const parsedData = JSON.parse(text);
+      const parsedData = JSON.parse(firstPass.text);
       
       // Double-check with validation pass
       const validatedData = await validateAndCorrectAI(
-        groq,
-        model || "moonshotai/kimi-k2-instruct-0905",
+        openai,
+        firstPass.usedModel,
         rawText,
         parsedData,
         "attendance"
@@ -311,9 +412,11 @@ LƯU Ý:
         violations: validatedData.violations || [],
         checkedClasses: validatedData.checkedClasses || [],
         attendanceByClass: validatedData.attendanceByClass || {},
+        usedModel: firstPass.usedModel,
+        correctionsMade: Array.isArray(validatedData.correctionsMade) ? validatedData.correctionsMade : [],
       };
     } catch (error) {
-      console.error("Error calling Groq API:", error);
+      console.error("Error calling OpenRouter:", error);
       throw new Error("Failed to parse attendance using AI.");
     }
   },
@@ -334,14 +437,28 @@ export const parseViolationsWithAI = action({
       originalText: v.string(),
     })),
     checkedClasses: v.array(v.string()),
+    usedModel: v.string(),
+    correctionsMade: v.array(v.string()),
   }),
   handler: async (ctx, { rawText, model }) => {
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing GROQ_API_KEY environment variable.");
+      throw new Error("Missing OPENROUTER_API_KEY environment variable.");
     }
 
-    const groq = new Groq({ apiKey });
+    // NOTE: ignore client-provided `model` to avoid client-side model selection
+    void model;
+
+    const openai = new OpenAI({
+      apiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost",
+        "X-Title": process.env.OPENROUTER_APP_NAME ?? "CSDLCoDo2BT",
+      },
+    });
+
+    const modelCandidates = await getModelCandidates(ctx);
 
     const prompt = `
 Bạn là trợ lý phân tích báo cáo LỚP TRỰC TUẦN. Lớp trực tuần đứng cổng trường kiểm tra vi phạm của học sinh vào trường.
@@ -353,6 +470,9 @@ ${ALL_VIOLATIONS.join(", ")}
 1. MỌI VI PHẠM PHẢI CÓ studentName (chỉ để null khi là vi phạm cấp lớp)
 2. Nếu có từ KHÔNG phải tên lớp và KHÔNG phải loại vi phạm → ĐÓ LÀ TÊN HỌC SINH
 3. Tên học sinh có thể là BẤT KỲ TỪ NÀO, kể cả "Trường", "Kiểm", "An", "Bình", v.v.
+4. VI PHẠM CẤP LỚP: nếu chỉ có TÊN LỚP + NỘI DUNG VI PHẠM (không có tên người) → studentName PHẢI là null
+   Ví dụ: "10A5 trực muộn", "10A5 không trực nhật" → studentName: null
+   Tuyệt đối KHÔNG tự bịa tên học sinh
 
 NHẬN DẠNG TÊN HỌC SINH:
 - Tên lớp: Pattern [Số][Chữ][Số] (10A1, 11B2, 12C3)
@@ -368,6 +488,8 @@ VÍ DỤ QUAN TRỌNG:
 ✅ "10A1 Dũng, Hùng dp" → TẠO 2 VI PHẠM RIÊNG:
    * {studentName: "Dũng", violatingClass: "10A1", violationType: "Sai đồng phục/đầu tóc,..."}
    * {studentName: "Hùng", violatingClass: "10A1", violationType: "Sai đồng phục/đầu tóc,..."}
+✅ "10A5 trực muộn" → VI PHẠM CẤP LỚP:
+   * {studentName: null, violatingClass: "10A5", violationType: "Trực nhật, vệ sinh tự quản muộn, bẩn.", details: "" }
 
 FORMAT LINH HOẠT:
 - "An 10A1 sai dp" → An, lớp 10A1, sai đồng phục
@@ -415,31 +537,19 @@ TRẢ VỀ JSON:
 
 LƯU Ý CUỐI CÙNG:
 - ⚠️ MỌI TỪ KHÔNG PHẢI TÊN LỚP VÀ KHÔNG PHẢI VI PHẠM = TÊN HỌC SINH
+- Nếu KHÔNG có tên học sinh trong câu → studentName = null (vi phạm cấp lớp)
 - CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM
 `;
 
     try {
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        model: model || "moonshotai/kimi-k2-instruct-0905",
+      const firstPass = await createJsonChatWithFallback({
+        openai,
+        models: modelCandidates,
+        prompt,
         temperature: 0.1,
-        response_format: { type: "json_object" },
       });
 
-      let text = chatCompletion.choices[0]?.message?.content || "";
-
-      if (text.includes("```json")) {
-        text = text.substring(text.indexOf("```json") + 7, text.lastIndexOf("```"));
-      } else if (text.includes("```")) {
-        text = text.substring(text.indexOf("```") + 3, text.lastIndexOf("```"));
-      }
-
-      const parsedData = JSON.parse(text);
+      const parsedData = JSON.parse(firstPass.text);
 
       const normalizedData = Array.isArray(parsedData) 
         ? { violations: parsedData, checkedClasses: [] }
@@ -447,8 +557,8 @@ LƯU Ý CUỐI CÙNG:
 
       // Double-check with validation pass
       const validatedData = await validateAndCorrectAI(
-        groq,
-        model || "moonshotai/kimi-k2-instruct-0905",
+        openai,
+        firstPass.usedModel,
         rawText,
         normalizedData,
         "violations"
@@ -457,9 +567,11 @@ LƯU Ý CUỐI CÙNG:
       return {
         violations: validatedData.violations || [],
         checkedClasses: validatedData.checkedClasses || [],
+        usedModel: firstPass.usedModel,
+        correctionsMade: Array.isArray(validatedData.correctionsMade) ? validatedData.correctionsMade : [],
       };
     } catch (error) {
-      console.error("Error calling Groq API:", error);
+      console.error("Error calling OpenRouter:", error);
       throw new Error("Failed to parse violations using AI.");
     }
   },
