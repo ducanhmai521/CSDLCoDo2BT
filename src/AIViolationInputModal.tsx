@@ -1,4 +1,4 @@
-import { useState, useMemo, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
+import { useState, useMemo } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
@@ -49,6 +49,7 @@ export function AIViolationInputModal({
   const [attendanceByClass, setAttendanceByClass] = useState<Record<string, { absentStudents: string[]; lateStudents: string[] }>>({});
   const [customDate, setCustomDate] = useState<number | null>(null);
   const [customReporterId, setCustomReporterId] = useState<Id<"users"> | null>(null);
+  const [customReporterName, setCustomReporterName] = useState<string>("");
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -57,7 +58,6 @@ export function AIViolationInputModal({
   const [showAdvanced, setShowAdvanced] = useState(false); // New state for collapsible options
   // Model selection is now controlled server-side (Admin setting)
   const [usedModel, setUsedModel] = useState<string | null>(null);
-  const [correctionsMade, setCorrectionsMade] = useState<string[]>([]);
 
   // Lock zoom when modal opens
   React.useEffect(() => {
@@ -160,7 +160,6 @@ export function AIViolationInputModal({
         : await parseViolationsWithAI({ rawText });
 
       const serverUsedModel = (result as any).usedModel as string | undefined;
-      const serverCorrections = Array.isArray((result as any).correctionsMade) ? ((result as any).correctionsMade as string[]) : [];
       toast.message(
         `Model phản hồi: ${serverUsedModel || primaryModel}. Đang ghép tên học sinh...`,
         { id: toastId }
@@ -220,7 +219,6 @@ export function AIViolationInputModal({
       setParsedViolations(matchedResults);
       setCheckedClasses(result.checkedClasses);
       setUsedModel("usedModel" in result ? (result as any).usedModel : null);
-      setCorrectionsMade(serverCorrections);
       
       if (inputMode === "attendance" && 'attendanceByClass' in result) {
         setAttendanceByClass(result.attendanceByClass as Record<string, { absentStudents: string[]; lateStudents: string[] }>);
@@ -232,8 +230,7 @@ export function AIViolationInputModal({
         ("usedModel" in result ? (result as any).usedModel : null) ||
         configuredModelText ||
         "fallback";
-      const correctionLabel = serverCorrections.length > 0 ? ` • AI sửa: ${serverCorrections.length} mục` : "";
-      toast.success(`Xong: ${matchedResults.length} mục • model: ${modelLabel}${correctionLabel} • ${elapsedMs}ms`, { id: toastId });
+      toast.success(`Xong: ${matchedResults.length} mục • model: ${modelLabel} • ${elapsedMs}ms`, { id: toastId });
     } catch (error) {
       toast.error("Lỗi khi phân tích bằng AI: " + (error as Error).message, { id: toastId });
       console.error(error);
@@ -269,6 +266,16 @@ export function AIViolationInputModal({
 
     updatedViolations[index] = violationToUpdate;
     setParsedViolations(updatedViolations);
+  };
+
+  const handleTargetTypeChange = (index: number, type: "student" | "class") => {
+    const updated = [...parsedViolations];
+    updated[index] = { 
+      ...updated[index], 
+      targetType: type, 
+      studentName: type === "student" ? (updated[index].studentName || "") : null 
+    };
+    setParsedViolations(updated);
   };
 
   const handleFileChange = (index: number, files: FileList | null) => {
@@ -498,6 +505,7 @@ export function AIViolationInputModal({
         violations: violationsWithFileIds,
         customDate: customDate ?? undefined,
         customReporterId: customReporterId ?? undefined,
+        customReporterName: customReporterName ? customReporterName.trim() : undefined,
       });
 
       if (result.successCount > 0) {
@@ -514,6 +522,7 @@ export function AIViolationInputModal({
       setParsedViolations([]);
       setCustomDate(null);
       setCustomReporterId(null);
+      setCustomReporterName("");
       setIsOpen(false);
       setCurrentView("input");
       onBulkSubmitSuccess();
@@ -676,10 +685,17 @@ export function AIViolationInputModal({
                           <input
                             list="reporter-list"
                             className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            placeholder="Chọn người..."
+                            placeholder="Nhập hoặc chọn người..."
                             onChange={(e) => {
-                              const p = allUserProfiles?.find(p => p.fullName === e.target.value);
-                              setCustomReporterId(p?.userId || null);
+                              const value = e.target.value;
+                              const p = allUserProfiles?.find(p => p.fullName === value);
+                              if (p) {
+                                setCustomReporterId(p.userId);
+                                setCustomReporterName("");
+                              } else {
+                                setCustomReporterId(null);
+                                setCustomReporterName(value);
+                              }
                             }}
                           />
                           <datalist id="reporter-list">
@@ -687,6 +703,9 @@ export function AIViolationInputModal({
                               <option key={p.userId} value={p.fullName}>{p.fullName} - {p.className}</option>
                             ))}
                           </datalist>
+                          <div className="text-[10px] text-gray-400 leading-tight">
+                            * Có thể chọn tài khoản có sẵn hoặc tự nhập tên người báo (nếu không có tk).
+                          </div>
                         </div>
                       )}
                     </div>
@@ -701,17 +720,6 @@ export function AIViolationInputModal({
                 <div className="bg-white/70 border border-gray-200 rounded-xl p-3 shadow-sm text-xs text-gray-600">
                   AI model đang dùng:{" "}
                   <span className="font-mono text-gray-800">{usedModel || configuredModelText}</span>
-                </div>
-              )}
-              {correctionsMade.length > 0 && (
-                <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3 shadow-sm text-xs text-amber-900">
-                  <div className="font-semibold mb-1">AI đã tự sửa:</div>
-                  <ul className="list-disc list-inside space-y-0.5">
-                    {correctionsMade.slice(0, 6).map((c, idx) => (
-                      <li key={idx}>{c}</li>
-                    ))}
-                    {correctionsMade.length > 6 && <li>... (+{correctionsMade.length - 6} mục)</li>}
-                  </ul>
                 </div>
               )}
                {/* Attendance Summary */}
@@ -773,36 +781,25 @@ export function AIViolationInputModal({
                            )}
 
                            {/* Warning Alert */}
-                           {v.studentName && v.targetType === 'student' && (() => {
-                              const match = allStudents?.some(s => s.fullName.toLowerCase() === v.studentName?.toLowerCase() && normalizeClassName(s.className) === normalizeClassName(v.violatingClass));
-                              return !match ? (
-                                <div className="mb-3 px-2 py-1.5 bg-yellow-50 text-yellow-800 text-[10px] sm:text-xs rounded border border-yellow-200 flex items-center gap-1.5">
-                                  ⚠️ Chưa khớp tên trong danh sách. Vui lòng chọn lại.
-                                </div>
-                              ) : null;
-                           })()}
+                           {v.studentName && v.targetType === 'student' && !allStudents?.some(s => s.fullName.toLowerCase() === v.studentName?.toLowerCase() && normalizeClassName(s.className) === normalizeClassName(v.violatingClass)) && (
+                              <div className="mb-3 px-2 py-1.5 bg-yellow-50 text-yellow-800 text-[10px] sm:text-xs rounded border border-yellow-200 flex items-center gap-1.5">
+                                ⚠️ Chưa khớp tên trong danh sách. Vui lòng chọn lại.
+                              </div>
+                           )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                              <div className="col-span-1 sm:col-span-2 flex items-center justify-between gap-2">
                                <div className="text-[10px] font-bold text-gray-500 uppercase">Đối tượng</div>
                                <div className="flex rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
                                  <button
-                                   onClick={() => {
-                                     const updated = [...parsedViolations];
-                                     updated[i] = { ...updated[i], targetType: "student", studentName: updated[i].studentName || "" };
-                                     setParsedViolations(updated);
-                                   }}
+                                   onClick={() => handleTargetTypeChange(i, "student")}
                                    className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "student" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
                                    type="button"
                                  >
                                    Cá nhân
                                  </button>
                                  <button
-                                   onClick={() => {
-                                     const updated = [...parsedViolations];
-                                     updated[i] = { ...updated[i], targetType: "class", studentName: null };
-                                     setParsedViolations(updated);
-                                   }}
+                                   onClick={() => handleTargetTypeChange(i, "class")}
                                    className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "class" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
                                    type="button"
                                  >

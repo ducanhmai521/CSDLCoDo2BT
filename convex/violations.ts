@@ -360,6 +360,7 @@ export const getViolationById = internalQuery({
             appealReason: v.optional(v.string()),
             grade: v.number(),
             requesterName: v.optional(v.string()),
+            customReporterName: v.optional(v.string()),
         }),
         v.null()
     ),
@@ -421,7 +422,7 @@ export const getPublicEmulationScores = query({
         for (const v of violations) {
             const points = violationPointsMap.get(v.violationType) ?? 0;
             const reporterProfile = reporterProfileMap.get(v.reporterId);
-            const detailedViolation = { ...v, reporterName: reporterProfile?.fullName ?? 'Không rõ', points: points };
+            const detailedViolation = { ...v, reporterName: v.customReporterName || reporterProfile?.fullName || 'Không rõ', points: points };
             if (!scoresByClass[v.violatingClass]) {
                 scoresByClass[v.violatingClass] = { totalPoints: 0, violations: [] };
             }
@@ -545,7 +546,7 @@ export const getViolationsByClass = query({
             
             return {
                 ...v,
-                reporterName: reporterProfileMap.get(v.reporterId) ?? 'Không rõ',
+                reporterName: v.customReporterName || reporterProfileMap.get(v.reporterId) || 'Không rõ',
                 reporterIsSuperUser: reporterSuperUserMap.get(v.reporterId) ?? false,
                 reporterCustomization: reporterCustomizationMap.get(v.reporterId) ?? null,
                 evidenceUrls,
@@ -659,7 +660,7 @@ export const getPublicViolations = query({
             
             return {
                 ...v,
-                reporterName: reporterProfileMap.get(v.reporterId) ?? 'Không rõ',
+                reporterName: v.customReporterName || reporterProfileMap.get(v.reporterId) || 'Không rõ',
                 reporterIsSuperUser: reporterSuperUserMap.get(v.reporterId) ?? false,
                 reporterCustomization: reporterCustomizationMap.get(v.reporterId) ?? null,
                 evidenceUrls,
@@ -780,6 +781,7 @@ export const bulkReportViolations = mutation({
     ),
     customDate: v.optional(v.number()),
     customReporterId: v.optional(v.id("users")),
+    customReporterName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -800,6 +802,10 @@ export const bulkReportViolations = mutation({
     const reporterId = (myProfile.isSuperUser && args.customReporterId) 
       ? args.customReporterId 
       : userId;
+      
+    const customReporterName = (myProfile.isSuperUser && args.customReporterName && !args.customReporterId)
+      ? args.customReporterName
+      : undefined;
 
     const duplicates: string[] = [];
     let successCount = 0;
@@ -838,6 +844,7 @@ export const bulkReportViolations = mutation({
 
         await ctx.db.insert("violations", {
           reporterId: reporterId,
+          customReporterName,
           violationDate,
           violationType: v.violationType,
           details: v.details,

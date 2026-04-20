@@ -19,6 +19,7 @@ const applicationTables = {
 
   violations: defineTable({
     reporterId: v.id("users"),
+    customReporterName: v.optional(v.string()), // For override reporter name
     targetType: v.union(v.literal("student"), v.literal("class")),
     studentName: v.optional(v.string()),
     violatingClass: v.string(),

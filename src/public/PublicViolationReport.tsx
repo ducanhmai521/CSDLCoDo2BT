@@ -69,6 +69,7 @@ const ViolationRow = ({
   const isImportedFromAbsenceRequest = Boolean((violation as any).requesterName);
   const reporterIsSuperUser = (violation as any).reporterIsSuperUser || false;
   const reporterCustomization = (violation as any).reporterCustomization || null;
+  const isCustomReporter = Boolean(violation.customReporterName);
 
   return (
     <div className="border-b border-slate-100 last:border-0 bg-white hover:bg-slate-50 transition-colors">
@@ -110,6 +111,22 @@ const ViolationRow = ({
                            sm:border-r sm:border-emerald-100 sm:pr-1.5 sm:py-0.5
                            border-b border-emerald-50 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
               Nhập từ trang xin nghỉ
+            </span>
+            <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+              {reporterName}
+            </span>
+          </div>
+        </div>
+      </div>
+    ) : isCustomReporter ? (
+      <div className="relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-orange-200 bg-orange-50/80 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05),0_0_0_1px_rgba(254,215,170,0.9)]">
+        <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
+          <User className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-orange-600 shrink-0" strokeWidth={2.5} />
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
+            <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-orange-700 uppercase leading-tight sm:leading-none 
+                           sm:border-r sm:border-orange-200 sm:pr-1.5 sm:py-0.5
+                           border-b border-orange-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+              Nguồn báo cáo
             </span>
             <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
               {reporterName}
