@@ -20,6 +20,37 @@ function getWeekStartAndEnd() {
     return { start: start.getTime(), end: end.getTime() };
 }
 
+function getWeekStart(tsOrDate: number | Date) {
+  return startOfWeek(new Date(tsOrDate), { weekStartsOn: 1 });
+}
+
+function getBreakWindow(baseDateISO: string, breakStartISO?: string | null, breakEndISO?: string | null) {
+  if (!breakStartISO || !breakEndISO) return null;
+  const baseWeekStart = getWeekStart(new Date(baseDateISO));
+  const breakStart = getWeekStart(new Date(breakStartISO));
+  const breakEnd = getWeekStart(new Date(breakEndISO));
+  if (Number.isNaN(breakStart.getTime()) || Number.isNaN(breakEnd.getTime())) return null;
+  const start = breakStart <= breakEnd ? breakStart : breakEnd;
+  const end = breakStart <= breakEnd ? breakEnd : breakStart;
+  const overlapStart = start < baseWeekStart ? baseWeekStart : start;
+  if (overlapStart > end) return null;
+  const startWeekIndex = differenceInCalendarWeeks(overlapStart, baseWeekStart, { weekStartsOn: 1 }) + 1;
+  const skippedWeeks = differenceInCalendarWeeks(end, overlapStart, { weekStartsOn: 1 }) + 1;
+  return { startWeekIndex, skippedWeeks };
+}
+
+function toAcademicWeek(rawWeek: number, breakWindow: ReturnType<typeof getBreakWindow>) {
+  if (!breakWindow) return rawWeek;
+  if (rawWeek < breakWindow.startWeekIndex) return rawWeek;
+  return Math.max(1, rawWeek - breakWindow.skippedWeeks);
+}
+
+function toCalendarWeek(academicWeek: number, breakWindow: ReturnType<typeof getBreakWindow>) {
+  if (!breakWindow) return academicWeek;
+  if (academicWeek < breakWindow.startWeekIndex) return academicWeek;
+  return academicWeek + breakWindow.skippedWeeks;
+}
+
 export default function AdminDashboard() {
   const [gradeFilter, setGradeFilter] = useState<string>("");
   const [classFilter, setClassFilter] = useState<string>("");
@@ -30,10 +61,14 @@ export default function AdminDashboard() {
   const [filterMode, setFilterMode] = useState<'month' | 'week' | 'custom'>('week');
   const [monthInput, setMonthInput] = useState<string>('');
   const [weekBaseDate, setWeekBaseDate] = useState<string>(new Date().toISOString().slice(0,10));
+  const [holidayBreakStartDate, setHolidayBreakStartDate] = useState<string>("");
+  const [holidayBreakEndDate, setHolidayBreakEndDate] = useState<string>("");
   const [weekNumber, setWeekNumber] = useState<number>(1);
   const [weekInput, setWeekInput] = useState<number>(1);
   const [activeSection, setActiveSection] = useState<'overview' | 'violations' | 'emulation' | 'roster' | 'users' | 'settings' >('overview');
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
+  const savedBreakStart = useQuery(api.users.getSetting, { key: 'holidayBreakStartDate' });
+  const savedBreakEnd = useQuery(api.users.getSetting, { key: 'holidayBreakEndDate' });
   const savedAiModel = useQuery(api.users.getSetting, { key: 'aiModel' });
   const savedAiModels = useQuery(api.users.getSetting, { key: 'aiModels' });
   const savedGeminiModels = useQuery(api.users.getSetting, { key: 'geminiModels' });
@@ -136,9 +171,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const now = toZonedTime(new Date(), TIME_ZONE);
+    const breakWindow = getBreakWindow(weekBaseDate, holidayBreakStartDate || null, holidayBreakEndDate || null);
     if (filterMode === 'week') {
       const base = toZonedTime(new Date(weekBaseDate), TIME_ZONE);
-      const mondayMs = startOfWeek(base, { weekStartsOn: 1 }).getTime() + (weekInput - 1) * 7 * 24 * 60 * 60 * 1000;
+      const calendarWeekInput = toCalendarWeek(weekInput, breakWindow);
+      const mondayMs = startOfWeek(base, { weekStartsOn: 1 }).getTime() + (calendarWeekInput - 1) * 7 * 24 * 60 * 60 * 1000;
       const start = mondayMs;
       const end = endOfDay(new Date(mondayMs + 6 * 24 * 60 * 60 * 1000)).getTime();
       setDateRange({ start, end });
@@ -151,23 +188,35 @@ export default function AdminDashboard() {
       handleCustomDateChange();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterMode, monthInput, weekBaseDate, weekInput]);
+  }, [filterMode, monthInput, weekBaseDate, weekInput, holidayBreakStartDate, holidayBreakEndDate]);
 
   useEffect(() => {
     try {
       const base = toZonedTime(new Date(weekBaseDate), TIME_ZONE);
       const current = toZonedTime(new Date(), TIME_ZONE);
-      const weeks = differenceInCalendarWeeks(current, base, { weekStartsOn: 1 });
-      setWeekNumber(weeks + 1);
-      if (filterMode === 'week') setWeekInput(weeks + 1);
+      const breakWindow = getBreakWindow(weekBaseDate, holidayBreakStartDate || null, holidayBreakEndDate || null);
+      const weeks = differenceInCalendarWeeks(current, base, { weekStartsOn: 1 }) + 1;
+      const academicWeek = toAcademicWeek(weeks, breakWindow);
+      setWeekNumber(academicWeek);
+      if (filterMode === 'week') setWeekInput(academicWeek);
     } catch {}
-  }, [weekBaseDate]);
+  }, [weekBaseDate, holidayBreakStartDate, holidayBreakEndDate, filterMode]);
 
   useEffect(() => {
     if (savedWeekBase && typeof savedWeekBase === 'string') {
       setWeekBaseDate(savedWeekBase);
     }
   }, [savedWeekBase]);
+
+  useEffect(() => {
+    if (typeof savedBreakStart === 'string' && savedBreakStart) setHolidayBreakStartDate(savedBreakStart);
+    else setHolidayBreakStartDate("");
+  }, [savedBreakStart]);
+
+  useEffect(() => {
+    if (typeof savedBreakEnd === 'string' && savedBreakEnd) setHolidayBreakEndDate(savedBreakEnd);
+    else setHolidayBreakEndDate("");
+  }, [savedBreakEnd]);
 
   useEffect(() => {
     // Prefer multi-model config, fallback to single model
@@ -410,25 +459,51 @@ export default function AdminDashboard() {
         
         <div className="glass-card-subtle p-4">
           <h3 className="text-lg font-semibold mb-3 text-slate-800">Tuần học</h3>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <label className="text-sm text-slate-700">Ngày bắt đầu học kỳ/tuần gốc:</label>
-            <input
-              type="text"
-              placeholder="dd/mm/yyyy"
-              value={formatDateDDMMYYYY(weekBaseDate)}
-              onChange={async (e) => {
-                const v = e.target.value;
-                const parsed = parseDDMMYYYY(v);
-                if (!parsed) return;
-                const iso = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000).toISOString().slice(0,10);
-                setWeekBaseDate(iso);
-                try { await saveSetting({ key: 'weekBaseDate', value: iso }); } catch (err) { toast.error((err as Error).message); }
-              }}
-              className="auth-input-field min-w-[160px]"
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-700">Tuần học hiện tại:</span>
-              <span className="font-semibold text-slate-800">{weekNumber}</span>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <label className="text-sm text-slate-700">Ngày bắt đầu học kỳ/tuần gốc:</label>
+              <input
+                type="text"
+                placeholder="dd/mm/yyyy"
+                value={formatDateDDMMYYYY(weekBaseDate)}
+                onChange={async (e) => {
+                  const v = e.target.value;
+                  const parsed = parseDDMMYYYY(v);
+                  if (!parsed) return;
+                  const iso = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+                  setWeekBaseDate(iso);
+                  try { await saveSetting({ key: 'weekBaseDate', value: iso }); } catch (err) { toast.error((err as Error).message); }
+                }}
+                className="auth-input-field min-w-[160px]"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-700">Tuần học hiện tại:</span>
+                <span className="font-semibold text-slate-800">{weekNumber}</span>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <label className="text-sm text-slate-700">Tuần nghỉ (Tết/Lễ):</label>
+              <input
+                type="date"
+                value={holidayBreakStartDate}
+                onChange={async (e) => {
+                  const v = e.target.value;
+                  setHolidayBreakStartDate(v);
+                  try { await saveSetting({ key: 'holidayBreakStartDate', value: v }); } catch (err) { toast.error((err as Error).message); }
+                }}
+                className="auth-input-field min-w-[160px]"
+              />
+              <span className="text-sm text-slate-500">đến</span>
+              <input
+                type="date"
+                value={holidayBreakEndDate}
+                onChange={async (e) => {
+                  const v = e.target.value;
+                  setHolidayBreakEndDate(v);
+                  try { await saveSetting({ key: 'holidayBreakEndDate', value: v }); } catch (err) { toast.error((err as Error).message); }
+                }}
+                className="auth-input-field min-w-[160px]"
+              />
             </div>
           </div>
         </div>

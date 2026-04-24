@@ -126,6 +126,37 @@ function displayStudentHeading(violation: any): string {
   return "Không có tên";
 }
 
+function getWeekStart(tsOrDate: number | Date) {
+  return startOfWeek(new Date(tsOrDate), { weekStartsOn: 1 });
+}
+
+function getBreakWindow(baseDateISO: string, breakStartISO?: string | null, breakEndISO?: string | null) {
+  if (!breakStartISO || !breakEndISO) return null;
+  const baseWeekStart = getWeekStart(new Date(baseDateISO));
+  const breakStart = getWeekStart(new Date(breakStartISO));
+  const breakEnd = getWeekStart(new Date(breakEndISO));
+  if (Number.isNaN(breakStart.getTime()) || Number.isNaN(breakEnd.getTime())) return null;
+  const start = breakStart <= breakEnd ? breakStart : breakEnd;
+  const end = breakStart <= breakEnd ? breakEnd : breakStart;
+  const overlapStart = start < baseWeekStart ? baseWeekStart : start;
+  if (overlapStart > end) return null;
+  const startWeekIndex = differenceInCalendarWeeks(overlapStart, baseWeekStart, { weekStartsOn: 1 }) + 1;
+  const skippedWeeks = differenceInCalendarWeeks(end, overlapStart, { weekStartsOn: 1 }) + 1;
+  return { startWeekIndex, skippedWeeks };
+}
+
+function toAcademicWeek(rawWeek: number, breakWindow: ReturnType<typeof getBreakWindow>) {
+  if (!breakWindow) return rawWeek;
+  if (rawWeek < breakWindow.startWeekIndex) return rawWeek;
+  return Math.max(1, rawWeek - breakWindow.skippedWeeks);
+}
+
+function toCalendarWeek(academicWeek: number, breakWindow: ReturnType<typeof getBreakWindow>) {
+  if (!breakWindow) return academicWeek;
+  if (academicWeek < breakWindow.startWeekIndex) return academicWeek;
+  return academicWeek + breakWindow.skippedWeeks;
+}
+
 // --- SUB-COMPONENT: VIOLATION ROW (Clean & Intuitive) ---
 const ViolationRow = ({ 
   violation, 
@@ -395,9 +426,6 @@ const PublicViolationReport = () => {
     return localStorage.getItem('violationReportUnderstood_v2') === 'true';
   });
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem("publicViolationDarkMode");
-    if (saved === "dark") return true;
-    if (saved === "light") return false;
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
   const [dontShowAgain, setDontShowAgain] = useState(false);
@@ -417,6 +445,8 @@ const PublicViolationReport = () => {
 
   // Convex Hooks
   const baseDateStr = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
+  const breakStartDateStr = useQuery(api.users.getSetting, { key: 'holidayBreakStartDate' });
+  const breakEndDateStr = useQuery(api.users.getSetting, { key: 'holidayBreakEndDate' });
   const violations = useQuery(
     api.violations.getPublicViolations,
     (dateRange && hasAcknowledged) ? { start: dateRange.start, end: dateRange.end } : "skip"
@@ -444,14 +474,19 @@ const PublicViolationReport = () => {
   }, [violations]);
 
   const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
+  const breakWindow = useMemo(
+    () => (baseDateStr ? getBreakWindow(baseDateStr, breakStartDateStr || null, breakEndDateStr || null) : null),
+    [baseDateStr, breakStartDateStr, breakEndDateStr]
+  );
   
   // Tuần hiện tại (độc lập với tuần đang chọn ở tab chính)
   const currentWeekNumber = useMemo(() => {
     if (!baseDateStr) return 1;
     const base = new Date(baseDateStr);
     const now = new Date();
-    return differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
-  }, [baseDateStr]);
+    const rawWeek = differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
+    return toAcademicWeek(rawWeek, breakWindow);
+  }, [baseDateStr, breakWindow]);
 
   // Group Class Violations by Week
   const classViolationsByWeek = useMemo(() => {
@@ -472,7 +507,8 @@ const PublicViolationReport = () => {
           // Assuming base date is Monday of Week 1
           // If vDate is before base, it's week 0 or negative?
           // Let's assume valid weeks are >= 1
-          const w = Math.floor(diffDays / 7) + 1;
+          const rawWeek = Math.floor(diffDays / 7) + 1;
+          const w = toAcademicWeek(rawWeek, breakWindow);
           
           if (!grouped.has(w)) grouped.set(w, []);
           grouped.get(w)!.push(v);
@@ -495,22 +531,19 @@ const PublicViolationReport = () => {
           });
       }
       return weeks;
-  }, [classViolations, baseDateStr, currentWeekNumber, hideExcusedAbsence]);
+  }, [classViolations, baseDateStr, currentWeekNumber, hideExcusedAbsence, breakWindow]);
 
   // Side Effects
   useEffect(() => {
     if (baseDateStr) {
       const base = new Date(baseDateStr);
       const now = new Date();
-      const weeks = differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
-      setWeekNumber(weeks);
-      setWeekInput(weeks.toString());
+      const rawWeek = differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
+      const academicWeek = toAcademicWeek(rawWeek, breakWindow);
+      setWeekNumber(academicWeek);
+      setWeekInput(academicWeek.toString());
     }
-  }, [baseDateStr]);
-
-  useEffect(() => {
-    localStorage.setItem("publicViolationDarkMode", isDarkMode ? "dark" : "light");
-  }, [isDarkMode]);
+  }, [baseDateStr, breakWindow]);
 
   useEffect(() => {
     if (modalMedia) {
@@ -525,13 +558,14 @@ const PublicViolationReport = () => {
     if (baseDateStr && !weekError) {
       const base = new Date(baseDateStr);
       const monday = startOfWeek(base, { weekStartsOn: 1 });
-      const start = new Date(monday.getTime() + (weekNumber - 1) * 7 * 24 * 60 * 60 * 1000);
+      const calendarWeek = toCalendarWeek(weekNumber, breakWindow);
+      const start = new Date(monday.getTime() + (calendarWeek - 1) * 7 * 24 * 60 * 60 * 1000);
       const end = endOfWeek(start, { weekStartsOn: 1 });
       setDateRange({ start: start.getTime(), end: end.getTime() });
     } else {
       setDateRange(undefined);
     }
-  }, [weekNumber, baseDateStr, weekError]);
+  }, [weekNumber, baseDateStr, weekError, breakWindow]);
 
   // Helper Functions
   const resetTransform = () => {
@@ -678,7 +712,7 @@ const PublicViolationReport = () => {
   return (
     <div className={`public-report-shell ${isDarkMode ? "theme-dark" : "theme-light"} min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-10 relative overflow-x-hidden`}>
       <style>{premiumStyles}</style>
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
         <div className="aurora-blob absolute -top-24 -left-16 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl" />
         <div className="aurora-blob absolute top-40 right-0 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl [animation-delay:4s]" />
       </div>
