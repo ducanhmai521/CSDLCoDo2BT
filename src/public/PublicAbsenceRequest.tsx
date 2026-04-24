@@ -320,8 +320,8 @@ const PublicAbsenceRequest = () => {
             <div className="flex items-center gap-2">
               <div className="bg-white/20 p-1.5 rounded-xl backdrop-blur-sm flex-shrink-0">
                 <img 
-                  src="https://www.dropbox.com/scl/fi/u87nv68fgwiz832u6nqpi/csdl.png?rlkey=isvujv52b8ubn3zrv6uigw9se&st=u00piegm&raw=1" 
-                  alt="Logo trường" 
+                  src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1" 
+                  alt="Logo" 
                   className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg" 
                 />
               </div>
