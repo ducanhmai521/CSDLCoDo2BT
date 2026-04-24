@@ -330,6 +330,13 @@ function HomepageHero() {
 }
 
 function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
+      const adminViolations = useQuery(
+        api.violations.getAllViolationsForAdmin,
+        profile.role === "admin" ? ({} as any) : "skip"
+      );
+      const appealedCount = profile.role === "admin"
+        ? (adminViolations || []).filter((v: any) => v.status === "appealed").length
+        : 0;
       return (
         <div>
           <div className="glass-card mb-6">
@@ -338,6 +345,17 @@ function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
               Vai trò của bạn: <span className="font-semibold text-slate-800">{translateRole(profile.role)}</span>
               {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
             </p>
+            {profile.role === "admin" && (
+              <p className="text-sm">
+                {appealedCount > 0 ? (
+                  <span className="text-amber-700 font-semibold">
+                    Cảnh báo: Có {appealedCount} báo cáo đang ở trạng thái kháng cáo.
+                  </span>
+                ) : (
+                  <span className="text-emerald-700 font-semibold">Ổn: Hiện không có báo cáo kháng cáo.</span>
+                )}
+              </p>
+            )}
           </div>
           
           {profile.role === 'admin' && <AdminDashboard />}

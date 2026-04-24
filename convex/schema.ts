@@ -39,6 +39,7 @@ const applicationTables = {
     requesterName: v.optional(v.string()), // Name of person who submitted the absence request
   })
     .index("by_grade", ["grade"])
+    .index("by_reporterId", ["reporterId"])
     .index("by_violatingClass", ["violatingClass"]),
 
   violationLogs: defineTable({

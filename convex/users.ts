@@ -182,6 +182,7 @@ import { v } from "convex/values";
     export const getAllUserProfiles = query({
       args: {},
       returns: v.array(v.object({
+        profileId: v.id("userProfiles"),
         userId: v.id("users"),
         fullName: v.string(),
         className: v.string(),
@@ -190,6 +191,10 @@ import { v } from "convex/values";
           v.literal("gradeManager"),
           v.literal("admin")
         ),
+        isSuperUser: v.optional(v.boolean()),
+        lastActiveAt: v.optional(v.number()),
+        purchasedItems: v.array(v.string()),
+        purchaseCount: v.number(),
       })),
       handler: async (ctx) => {
         const userId = await getAuthUserId(ctx);
@@ -206,12 +211,180 @@ import { v } from "convex/values";
         }
         
         const profiles = await ctx.db.query("userProfiles").collect();
-        return profiles.map(p => ({
-          userId: p.userId,
-          fullName: p.fullName,
-          className: p.className,
-          role: p.role,
-        }));
+        const result = [];
+        for (const p of profiles) {
+          const purchases = await ctx.db
+            .query("userPurchases")
+            .withIndex("by_userId", (q) => q.eq("userId", p.userId))
+            .collect();
+          const purchaseDates = purchases.map((x) => x.purchaseDate);
+
+          const purchasedItemNames = new Set<string>();
+          for (const purchase of purchases) {
+            const item = await ctx.db.get(purchase.itemId);
+            if (item?.name) {
+              purchasedItemNames.add(item.name);
+            }
+          }
+
+          const latestViolation = await ctx.db
+            .query("violations")
+            .withIndex("by_reporterId", (q) => q.eq("reporterId", p.userId))
+            .order("desc")
+            .take(1);
+          const latestViolationAt = latestViolation[0]?._creationTime;
+
+          const lastActiveCandidates = [
+            p._creationTime,
+            latestViolationAt,
+            ...purchaseDates,
+          ].filter((x): x is number => typeof x === "number");
+          const lastActiveAt =
+            lastActiveCandidates.length > 0
+              ? Math.max(...lastActiveCandidates)
+              : undefined;
+
+          result.push({
+            profileId: p._id,
+            userId: p.userId,
+            fullName: p.fullName,
+            className: p.className,
+            role: p.role,
+            isSuperUser: p.isSuperUser,
+            lastActiveAt,
+            purchasedItems: Array.from(purchasedItemNames),
+            purchaseCount: purchases.length,
+          });
+        }
+        return result;
+      },
+    });
+
+    export const deleteUserProfile = mutation({
+      args: {
+        profileId: v.id("userProfiles"),
+      },
+      returns: v.null(),
+      handler: async (ctx, args) => {
+        const me = await ctx.runQuery(api.users.getMyProfile);
+        if (!me || (me.role !== "admin" && !me.isSuperUser)) {
+          throw new Error("Không có quyền.");
+        }
+
+        const target = await ctx.db.get(args.profileId);
+        if (!target) {
+          throw new Error("Không tìm thấy hồ sơ user.");
+        }
+
+        if (target.userId === me.userId) {
+          throw new Error("Không thể tự xóa hồ sơ của chính mình.");
+        }
+
+        // Safety: do not allow deleting users that already have reported violations.
+        const violationsByTarget = await ctx.db
+          .query("violations")
+          .withIndex("by_reporterId", (q) => q.eq("reporterId", target.userId))
+          .collect();
+        if (violationsByTarget.length > 0) {
+          throw new Error("User đã có dữ liệu báo cáo, không thể xóa hồ sơ để tránh mất liên kết.");
+        }
+
+        const pointsRows = await ctx.db
+          .query("reportingPoints")
+          .withIndex("by_userId", (q) => q.eq("userId", target.userId))
+          .collect();
+        for (const row of pointsRows) {
+          await ctx.db.delete(row._id);
+        }
+
+        await ctx.db.delete(target._id);
+        return null;
+      },
+    });
+
+    export const migrateUserDataAndDeleteProfile = mutation({
+      args: {
+        fromProfileId: v.id("userProfiles"),
+        toProfileId: v.id("userProfiles"),
+      },
+      returns: v.null(),
+      handler: async (ctx, args) => {
+        const me = await ctx.runQuery(api.users.getMyProfile);
+        if (!me || (me.role !== "admin" && !me.isSuperUser)) {
+          throw new Error("Không có quyền.");
+        }
+
+        if (args.fromProfileId === args.toProfileId) {
+          throw new Error("Tài khoản nguồn và đích không được trùng nhau.");
+        }
+
+        const fromProfile = await ctx.db.get(args.fromProfileId);
+        const toProfile = await ctx.db.get(args.toProfileId);
+        if (!fromProfile || !toProfile) {
+          throw new Error("Không tìm thấy hồ sơ nguồn hoặc đích.");
+        }
+
+        if (fromProfile.userId === me.userId) {
+          throw new Error("Không thể migrate từ chính tài khoản đang đăng nhập.");
+        }
+
+        // 1) Move violation ownership
+        const sourceViolations = await ctx.db
+          .query("violations")
+          .withIndex("by_reporterId", (q) => q.eq("reporterId", fromProfile.userId))
+          .collect();
+        for (const row of sourceViolations) {
+          await ctx.db.patch(row._id, { reporterId: toProfile.userId });
+        }
+
+        // 2) Merge reporting points
+        const fromPointsRows = await ctx.db
+          .query("reportingPoints")
+          .withIndex("by_userId", (q) => q.eq("userId", fromProfile.userId))
+          .collect();
+        const toPointsRows = await ctx.db
+          .query("reportingPoints")
+          .withIndex("by_userId", (q) => q.eq("userId", toProfile.userId))
+          .collect();
+
+        const fromPoints = fromPointsRows.reduce((acc, r) => acc + r.points, 0);
+        const fromReports = fromPointsRows.reduce((acc, r) => acc + r.totalReports, 0);
+        const toPoints = toPointsRows.reduce((acc, r) => acc + r.points, 0);
+        const toReports = toPointsRows.reduce((acc, r) => acc + r.totalReports, 0);
+
+        if (toPointsRows.length > 0) {
+          const targetRow = toPointsRows[0];
+          await ctx.db.patch(targetRow._id, {
+            points: toPoints + fromPoints,
+            totalReports: toReports + fromReports,
+          });
+          for (const extra of toPointsRows.slice(1)) {
+            await ctx.db.delete(extra._id);
+          }
+        } else if (fromPoints > 0 || fromReports > 0) {
+          await ctx.db.insert("reportingPoints", {
+            userId: toProfile.userId,
+            points: fromPoints,
+            totalReports: fromReports,
+          });
+        }
+
+        for (const row of fromPointsRows) {
+          await ctx.db.delete(row._id);
+        }
+
+        // 3) Move user purchases
+        const fromPurchases = await ctx.db
+          .query("userPurchases")
+          .withIndex("by_userId", (q) => q.eq("userId", fromProfile.userId))
+          .collect();
+        for (const p of fromPurchases) {
+          await ctx.db.patch(p._id, { userId: toProfile.userId });
+        }
+
+        // 4) Delete source profile
+        await ctx.db.delete(fromProfile._id);
+        return null;
       },
     });
 

@@ -4,11 +4,12 @@ import { toast } from "sonner";
 import { Doc } from "../convex/_generated/dataModel";
 import ViolationList from "./ViolationList";
 import EmulationScoreTable from "./EmulationScoreTable";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { startOfWeek, startOfDay, endOfDay, toDate, differenceInCalendarWeeks, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
 import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2 } from 'lucide-react';
+import { AIViolationInputModal } from "./AIViolationInputModal";
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -65,7 +66,7 @@ export default function AdminDashboard() {
   const [holidayBreakEndDate, setHolidayBreakEndDate] = useState<string>("");
   const [weekNumber, setWeekNumber] = useState<number>(1);
   const [weekInput, setWeekInput] = useState<number>(1);
-  const [activeSection, setActiveSection] = useState<'overview' | 'violations' | 'emulation' | 'roster' | 'users' | 'settings' >('overview');
+  const [activeSection, setActiveSection] = useState<'actions' | 'overview' | 'violations' | 'emulation' | 'roster' | 'users' | 'systemUsers' | 'settings' >('actions');
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
   const savedBreakStart = useQuery(api.users.getSetting, { key: 'holidayBreakStartDate' });
   const savedBreakEnd = useQuery(api.users.getSetting, { key: 'holidayBreakEndDate' });
@@ -79,6 +80,8 @@ export default function AdminDashboard() {
   const setupPublicAbsenceSystemUser = useAction(api.adminTools.setupPublicAbsenceSystemUser);
   const migrateExistingViolations = useMutation(api.reportingPoints.migrateExistingViolations);
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
+  const deleteUserProfile = useMutation(api.users.deleteUserProfile);
+  const migrateUserDataAndDeleteProfile = useMutation(api.users.migrateUserDataAndDeleteProfile);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const roster = useQuery(api.users.listRoster);
   const [showRosterModal, setShowRosterModal] = useState(false);
@@ -89,6 +92,8 @@ export default function AdminDashboard() {
   const [openRouterModelsDraft, setOpenRouterModelsDraft] = useState<string>("");
   const [aiModelsSaving, setAiModelsSaving] = useState<boolean>(false);
   const [aiModelsSavedAt, setAiModelsSavedAt] = useState<number | null>(null);
+  const [migrateFromProfileId, setMigrateFromProfileId] = useState<string>("");
+  const [migrateToProfileId, setMigrateToProfileId] = useState<string>("");
 
   const formatDateDDMMYYYY = (iso: string) => {
     try {
@@ -107,7 +112,13 @@ export default function AdminDashboard() {
   };
 
   const pendingUsers = useQuery(api.users.getPendingUsers);
+  const allUserProfiles = useQuery(api.users.getAllUserProfiles);
   const allViolations = useQuery(api.violations.getAllViolationsForAdmin, filters);
+  const allViolationsForActions = useQuery(api.violations.getAllViolationsForAdmin, {} as any);
+  const appealedViolations = useMemo(
+    () => (allViolationsForActions || []).filter((v: any) => v.status === "appealed"),
+    [allViolationsForActions]
+  );
   // Overview: selected date range
   const _parsedOverview = parseDDMMYYYY(overviewDate);
   const _overviewStart = _parsedOverview ? startOfDay(toZonedTime(_parsedOverview, TIME_ZONE)).getTime() : startOfDay(toZonedTime(new Date(), TIME_ZONE)).getTime();
@@ -258,23 +269,27 @@ export default function AdminDashboard() {
   return (
     <div className="w-full">
       <div className="md:flex gap-6">
-        <div className="md:hidden -mx-4 mb-3 sticky top-16 z-10 nav-glass">
+        <div className="md:hidden -mx-4 mb-3 sticky top-24 z-10 nav-glass">
           <div className="flex overflow-x-auto gap-2 px-4 py-2">
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='actions' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('actions')}>Hành động</button>
             <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
             <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}>Vi phạm</button>
             <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}>Điểm thi đua</button>
             <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}>DS học sinh</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}>Xét duyệt thành viên</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}>Xét duyệt</button>
+            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='systemUsers' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('systemUsers')}>User hệ thống</button>
             <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}>Cài đặt</button>
           </div>
         </div>
         <aside className="hidden md:block w-60 shrink-0">
-          <nav className="sticky top-20 space-y-2 glass-card-subtle p-4">
+          <nav className="sticky top-24 space-y-2 glass-card-subtle p-4">
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='actions' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('actions')}><Clipboard className="w-5 h-5 inline-block mr-1" /> Hành động</button>
             <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}><BarChart className="w-5 h-5 inline-block mr-1" /> Tổng hợp</button>
             <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}><AlertTriangle className="w-5 h-5 inline-block mr-1" /> Quản lý Vi phạm</button>
             <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}><Trophy className="w-5 h-5 inline-block mr-1" /> Điểm thi đua</button>
             <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}><Users className="w-5 h-5 inline-block mr-1" /> Danh sách học sinh</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}><CheckCircle className="w-5 h-5 inline-block mr-1" /> Xét duyệt thành viên</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}><CheckCircle className="w-5 h-5 inline-block mr-1" /> Xét duyệt</button>
+            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='systemUsers' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('systemUsers')}><UserCheck className="w-5 h-5 inline-block mr-1" /> User hệ thống</button>
             <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}><Settings className="w-5 h-5 inline-block mr-1" /> Cài đặt</button>
           </nav>
         </aside>
@@ -286,6 +301,49 @@ export default function AdminDashboard() {
           </div>
       {activeSection === 'emulation' && (
         <EmulationScoreTable />
+      )}
+      {activeSection === 'actions' && (
+      <div className="w-full space-y-6">
+        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Hành động</h2>
+        <div className="glass-card-subtle p-4">
+          <h3 className="text-lg font-semibold mb-3 text-slate-800">Nhập liệu nhanh</h3>
+          <AIViolationInputModal onBulkSubmitSuccess={() => {}} />
+        </div>
+        <div className="glass-card-subtle p-4">
+          <h3 className="text-lg font-semibold mb-3 text-slate-800">
+            Báo cáo đang kháng cáo ({appealedViolations.length})
+          </h3>
+          {allViolationsForActions === undefined ? (
+            <p className="text-sm text-slate-600">Đang tải...</p>
+          ) : appealedViolations.length === 0 ? (
+            <p className="text-sm text-emerald-700">Ổn rồi, hiện không có báo cáo nào ở trạng thái kháng cáo.</p>
+          ) : (
+            <div className="space-y-3">
+              {appealedViolations.slice(0, 20).map((v: any) => (
+                <div key={v._id} className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-3">
+                  <div className="text-sm font-semibold text-slate-800">
+                    {v.violatingClass} - {v.studentName || "Vi phạm cấp lớp"} - {v.violationType}
+                  </div>
+                  <div className="text-xs text-slate-600 mt-1">
+                    Lý do kháng cáo: {v.appealReason || "Không có ghi chú."}
+                  </div>
+                </div>
+              ))}
+              {appealedViolations.length > 20 && (
+                <div className="text-xs text-slate-500">
+                  Còn {appealedViolations.length - 20} mục khác. Vào tab "Vi phạm" để xử lý đầy đủ.
+                </div>
+              )}
+              <button
+                onClick={() => setActiveSection('violations')}
+                className="btn-glass-primary"
+              >
+                Mở tab Vi phạm để giải quyết
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
       )}
       {activeSection === 'users' && (
       <div className="w-full">
@@ -310,6 +368,148 @@ export default function AdminDashboard() {
                 <tbody>
                   {pendingUsers.map((u: any) => (
                     <PendingUserRow key={u._id} user={u} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+      )}
+      {activeSection === 'systemUsers' && (
+      <div className="w-full">
+        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">User hệ thống</h2>
+        <div className="glass-card-subtle p-4">
+          <p className="text-sm text-slate-600 mb-3">
+            Danh sách hồ sơ user trong hệ thống. Có thể xóa hồ sơ nếu user chưa có dữ liệu báo cáo.
+          </p>
+          {allUserProfiles && allUserProfiles.length > 1 && (
+            <div className="mb-4 rounded-xl border border-indigo-200/70 bg-indigo-50/60 p-3 space-y-2">
+              <div className="text-sm font-semibold text-indigo-800">
+                Gộp tài khoản trùng (migrate dữ liệu acc A {"->"} acc B, rồi xóa acc A)
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <select
+                  value={migrateFromProfileId}
+                  onChange={(e) => setMigrateFromProfileId(e.target.value)}
+                  className="auth-input-field"
+                >
+                  <option value="">Chọn tài khoản nguồn (sẽ bị xóa)</option>
+                  {allUserProfiles.map((u: any) => (
+                    <option key={`from-${u.profileId}`} value={u.profileId}>
+                      {u.fullName} - {u.className} ({u.role})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={migrateToProfileId}
+                  onChange={(e) => setMigrateToProfileId(e.target.value)}
+                  className="auth-input-field"
+                >
+                  <option value="">Chọn tài khoản đích (giữ lại)</option>
+                  {allUserProfiles.map((u: any) => (
+                    <option key={`to-${u.profileId}`} value={u.profileId}>
+                      {u.fullName} - {u.className} ({u.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!migrateFromProfileId || !migrateToProfileId) {
+                    toast.error("Vui lòng chọn đủ tài khoản nguồn và đích.");
+                    return;
+                  }
+                  if (migrateFromProfileId === migrateToProfileId) {
+                    toast.error("Nguồn và đích không được trùng nhau.");
+                    return;
+                  }
+                  const from = allUserProfiles.find((u: any) => u.profileId === migrateFromProfileId);
+                  const to = allUserProfiles.find((u: any) => u.profileId === migrateToProfileId);
+                  const ok = window.confirm(
+                    `Gộp dữ liệu từ "${from?.fullName || "Nguồn"}" sang "${to?.fullName || "Đích"}" và xóa hồ sơ nguồn?`
+                  );
+                  if (!ok) return;
+                  try {
+                    await migrateUserDataAndDeleteProfile({
+                      fromProfileId: migrateFromProfileId as any,
+                      toProfileId: migrateToProfileId as any,
+                    });
+                    toast.success("Đã migrate dữ liệu và xóa hồ sơ nguồn.");
+                    setMigrateFromProfileId("");
+                    setMigrateToProfileId("");
+                  } catch (err) {
+                    toast.error((err as Error).message);
+                  }
+                }}
+                className="btn-glass-primary"
+              >
+                Migrate & Xóa tài khoản nguồn
+              </button>
+              <p className="text-xs text-indigo-700">
+                Dữ liệu được migrate: báo cáo vi phạm (reporter), điểm báo cáo, vật phẩm đã mua.
+              </p>
+            </div>
+          )}
+          {allUserProfiles === undefined ? (
+            <p className="text-sm text-slate-500">Đang tải...</p>
+          ) : allUserProfiles.length === 0 ? (
+            <p className="text-sm text-slate-500">Không có user nào.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-slate-200/80">
+                    <th className="py-2 px-4">Họ tên</th>
+                    <th className="py-2 px-4">Lớp</th>
+                    <th className="py-2 px-4">Vai trò</th>
+                    <th className="py-2 px-4">SuperUser</th>
+                    <th className="py-2 px-4">Last active</th>
+                    <th className="py-2 px-4">Vật phẩm đã mua</th>
+                    <th className="py-2 px-4">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allUserProfiles.map((u: any) => (
+                    <tr key={u.userId} className="border-b border-slate-200/60 hover:bg-slate-50/60">
+                      <td className="py-2 px-4 text-slate-700">{u.fullName}</td>
+                      <td className="py-2 px-4 text-slate-700">{u.className}</td>
+                      <td className="py-2 px-4 text-slate-700">{u.role}</td>
+                      <td className="py-2 px-4 text-slate-700">{u.isSuperUser ? "Có" : "Không"}</td>
+                      <td className="py-2 px-4 text-slate-700 whitespace-nowrap">
+                        {u.lastActiveAt
+                          ? format(toZonedTime(new Date(u.lastActiveAt), TIME_ZONE), "dd/MM/yyyy HH:mm")
+                          : "Chưa có"}
+                      </td>
+                      <td className="py-2 px-4 text-slate-700">
+                        {u.purchaseCount > 0 ? (
+                          <span title={u.purchasedItems?.join(", ") || ""}>
+                            {u.purchaseCount} món
+                            {u.purchasedItems?.length ? `: ${u.purchasedItems.slice(0, 3).join(", ")}` : ""}
+                            {u.purchasedItems?.length > 3 ? "..." : ""}
+                          </span>
+                        ) : (
+                          "Chưa mua"
+                        )}
+                      </td>
+                      <td className="py-2 px-4">
+                        <button
+                          onClick={async () => {
+                            const ok = window.confirm(`Xóa hồ sơ user "${u.fullName}"?`);
+                            if (!ok) return;
+                            try {
+                              await deleteUserProfile({ profileId: u.profileId });
+                              toast.success("Đã xóa hồ sơ user.");
+                            } catch (err) {
+                              toast.error((err as Error).message);
+                            }
+                          }}
+                          className="px-3 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+                        >
+                          Xóa hồ sơ
+                        </button>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
