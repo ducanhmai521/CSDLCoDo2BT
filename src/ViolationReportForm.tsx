@@ -11,6 +11,18 @@ import imageCompression from 'browser-image-compression';
 
 const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(category => category.violations);
 
+const PERSONAL_VIOLATIONS = [
+  "Nghỉ học có phép",
+  "Sai đồng phục/đầu tóc,...",
+  "Đi học muộn có phép",
+  "Sử dụng điện thoại sai mục đích",
+  "Đi học muộn/nghỉ học không phép",
+  "Nói tục, chửi thề.",
+  "Hút thuốc lá.",
+  "Vi phạm ATGT.",
+  "Có học sinh đánh nhau."
+];
+
 export default function ViolationReportForm() {
   const [targetType, setTargetType] = useState<"student" | "class">("class");
   const [studentSearch, setStudentSearch] = useState("");
@@ -242,15 +254,19 @@ export default function ViolationReportForm() {
           disabled={isSubmitting}
           onChange={(e) => setViolationType(e.target.value)}
         >
-          {VIOLATION_CATEGORIES.map((category) => (
-            <optgroup key={category.name} label={`${category.name} (-${category.points} điểm)`}>
-              {category.violations.map((violation) => (
-                <option key={violation} value={violation}>
-                  {violation}
-                </option>
-              ))}
-            </optgroup>
-          ))}
+          {VIOLATION_CATEGORIES.map((category) => {
+            const filteredViolations = category.violations.filter(v => targetType === "student" || !PERSONAL_VIOLATIONS.includes(v));
+            if (filteredViolations.length === 0) return null;
+            return (
+              <optgroup key={category.name} label={`${category.name} (-${category.points} điểm)`}>
+                {filteredViolations.map((violation) => (
+                  <option key={violation} value={violation}>
+                    {violation}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
         </select>
   
         <div>

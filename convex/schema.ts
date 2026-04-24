@@ -15,6 +15,8 @@ const applicationTables = {
     ),
     isSuperUser: v.optional(v.boolean()),
     webVer: v.optional(v.number()),
+    aiRequestCount: v.optional(v.number()),
+    lastAiRequestDate: v.optional(v.string()), // 'YYYY-MM-DD' GMT+7
   }).index("by_userId", ["userId"]),
 
   violations: defineTable({

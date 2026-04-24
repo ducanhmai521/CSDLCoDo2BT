@@ -6,6 +6,18 @@ import { toast } from "sonner";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
 import { Loader2, X, Trash2, AlertTriangle } from "lucide-react";
 
+const PERSONAL_VIOLATIONS = [
+  "Nghỉ học có phép",
+  "Sai đồng phục/đầu tóc,...",
+  "Đi học muộn có phép",
+  "Sử dụng điện thoại sai mục đích",
+  "Đi học muộn/nghỉ học không phép",
+  "Nói tục, chửi thề.",
+  "Hút thuốc lá.",
+  "Vi phạm ATGT.",
+  "Có học sinh đánh nhau."
+];
+
 export default function ViolationList({ violations, isLoading, isAdminView = false }: { violations: ViolationWithDetails[] | undefined, isLoading: boolean, isAdminView?: boolean }) {
     const currentUser = useQuery(api.users.getLoggedInUser);
     if (isLoading) {
@@ -165,13 +177,17 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Loại vi phạm</label>
                             <select className="auth-input-field w-full" value={editType} onChange={(e) => setEditType(e.target.value)}>
-                                {VIOLATION_CATEGORIES.map(category => (
-                                    <optgroup label={`${category.name} (-${category.points}đ)`} key={category.name}>
-                                        {category.violations.map(v => (
-                                            <option key={v} value={v}>{v}</option>
-                                        ))}
-                                    </optgroup>
-                                ))}
+                                {VIOLATION_CATEGORIES.map(category => {
+                                    const filteredViolations = category.violations.filter(v => editTargetType === "student" || !PERSONAL_VIOLATIONS.includes(v));
+                                    if (filteredViolations.length === 0) return null;
+                                    return (
+                                        <optgroup label={`${category.name} (-${category.points}đ)`} key={category.name}>
+                                            {filteredViolations.map(v => (
+                                                <option key={v} value={v}>{v}</option>
+                                            ))}
+                                        </optgroup>
+                                    );
+                                })}
                             </select>
                         </div>
                     </div>

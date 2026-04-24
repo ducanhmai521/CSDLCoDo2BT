@@ -9,11 +9,8 @@ import { Link } from "react-router-dom";
 import { Trophy, TrendingUp, Star, Target, ChevronRight, Zap, Users } from "lucide-react";
 
 export default function GradeManagerDashboard({ profile }: { profile: Doc<"userProfiles"> }) {
-    const [showViolations, setShowViolations] = useState(false);
-    const violations = useQuery(
-        api.violations.getViolationsForGradeManager,
-        showViolations ? {} : "skip"
-    );
+    const [viewMode, setViewMode] = useState<"class" | "grade">("class");
+    const violations = useQuery(api.violations.getViolationsForGradeManager);
     const myPoints = useQuery(api.reportingPoints.getMyReportingPoints);
     const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`;
     return (
@@ -103,25 +100,21 @@ export default function GradeManagerDashboard({ profile }: { profile: Doc<"userP
                 </div>
                 <div className="lg:col-span-2">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-xl font-semibold">Vi phạm trong Khối của bạn</h3>
+                        <h3 className="text-xl font-semibold">
+                            {viewMode === "class" ? `Vi phạm Lớp ${profile.className}` : "Vi phạm trong Khối của bạn"}
+                        </h3>
                         <Button
-                            onClick={() => setShowViolations(!showViolations)}
-                            variant={showViolations ? "outline" : "default"}
-                            className="text-sm"
+                            onClick={() => setViewMode(viewMode === "class" ? "grade" : "class")}
+                            variant="outline"
+                            className="text-sm font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
                         >
-                            {showViolations ? "Ẩn danh sách" : "Xem danh sách"}
+                            {viewMode === "class" ? "Xem toàn khối" : "Xem vi phạm lớp"}
                         </Button>
                     </div>
-                    {showViolations && (
+                    {viewMode === "class" ? (
+                        <ViolationList violations={violations?.filter(v => v.violatingClass.toUpperCase().replace(/\s+/g, '') === profile.className.toUpperCase().replace(/\s+/g, ''))} isLoading={violations === undefined} />
+                    ) : (
                         <ViolationList violations={violations} isLoading={violations === undefined} />
-                    )}
-                    {!showViolations && (
-                        <div className="glass-card-subtle p-8 text-center">
-                            <svg className="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <p className="text-gray-600 font-medium">Nhấn "Xem danh sách" để tải vi phạm</p>
-                        </div>
                     )}
                 </div>
             </div>

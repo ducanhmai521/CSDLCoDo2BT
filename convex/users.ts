@@ -20,6 +20,8 @@ import { v } from "convex/values";
           ),
           isSuperUser: v.optional(v.boolean()),
           webVer: v.optional(v.number()),
+          aiRequestCount: v.optional(v.number()),
+          lastAiRequestDate: v.optional(v.string()),
         }),
         v.null()
       ),
@@ -510,4 +512,73 @@ import { v } from "convex/values";
 
         return newRole;
       },
+    });
+
+    export const checkAndIncrementAiRequest = mutation({
+      args: {},
+      returns: v.object({ allowed: v.boolean(), remaining: v.number(), error: v.optional(v.string()) }),
+      handler: async (ctx) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return { allowed: false, remaining: 0, error: "Chưa đăng nhập" };
+
+        const profile = await ctx.db
+          .query("userProfiles")
+          .withIndex("by_userId", (q) => q.eq("userId", userId))
+          .unique();
+        if (!profile) return { allowed: false, remaining: 0, error: "Không tìm thấy hồ sơ" };
+
+        if (profile.isSuperUser) {
+          return { allowed: true, remaining: 999 };
+        }
+
+        const today = new Date();
+        today.setUTCHours(today.getUTCHours() + 7); // GMT+7
+        const todayStr = today.toISOString().split('T')[0];
+
+        let count = profile.aiRequestCount || 0;
+        if (profile.lastAiRequestDate !== todayStr) {
+          count = 0;
+        }
+
+        if (count >= 5) {
+          return { allowed: false, remaining: 0, error: "Bạn đã hết lượt dùng AI hôm nay (tối đa 5 lượt/ngày). Lượt dùng sẽ được reset vào 0h." };
+        }
+
+        await ctx.db.patch(profile._id, {
+          aiRequestCount: count + 1,
+          lastAiRequestDate: todayStr,
+        });
+
+        return { allowed: true, remaining: 5 - (count + 1) };
+      }
+    });
+
+    export const getAiRequestStatus = query({
+      args: {},
+      returns: v.object({ count: v.number(), remaining: v.number(), isSuperUser: v.boolean() }),
+      handler: async (ctx) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return { count: 0, remaining: 0, isSuperUser: false };
+        
+        const profile = await ctx.db
+          .query("userProfiles")
+          .withIndex("by_userId", (q) => q.eq("userId", userId))
+          .unique();
+        if (!profile) return { count: 0, remaining: 0, isSuperUser: false };
+
+        if (profile.isSuperUser) {
+          return { count: 0, remaining: 999, isSuperUser: true };
+        }
+
+        const today = new Date();
+        today.setUTCHours(today.getUTCHours() + 7);
+        const todayStr = today.toISOString().split('T')[0];
+
+        let count = profile.aiRequestCount || 0;
+        if (profile.lastAiRequestDate !== todayStr) {
+          count = 0;
+        }
+
+        return { count, remaining: Math.max(0, 5 - count), isSuperUser: false };
+      }
     });

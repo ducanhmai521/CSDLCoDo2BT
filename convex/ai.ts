@@ -334,6 +334,12 @@ export const parseAttendanceWithAI = action({
   handler: async (ctx, { rawText, model, debug }) => {
     // NOTE: ignore client-provided `model` to avoid client-side model selection
     void model;
+
+    const checkResult = await ctx.runMutation(api.users.checkAndIncrementAiRequest);
+    if (!checkResult.allowed) {
+      throw new Error(checkResult.error || "Không thể sử dụng AI lúc này");
+    }
+
     const geminiApiKey = process.env.GEMINI_API_KEY;
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
     const geminiModels = await getGeminiModelCandidates(ctx);
@@ -523,6 +529,12 @@ export const parseViolationsWithAI = action({
   handler: async (ctx, { rawText, model, debug }) => {
     // NOTE: ignore client-provided `model` to avoid client-side model selection
     void model;
+
+    const checkResult = await ctx.runMutation(api.users.checkAndIncrementAiRequest);
+    if (!checkResult.allowed) {
+      throw new Error(checkResult.error || "Không thể sử dụng AI lúc này");
+    }
+
     const geminiApiKey = process.env.GEMINI_API_KEY;
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
     const geminiModels = await getGeminiModelCandidates(ctx);

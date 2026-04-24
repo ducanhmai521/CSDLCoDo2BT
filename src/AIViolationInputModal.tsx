@@ -24,6 +24,18 @@ const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
   (category) => category.violations
 );
 
+const PERSONAL_VIOLATIONS = [
+  "Nghỉ học có phép",
+  "Sai đồng phục/đầu tóc,...",
+  "Đi học muộn có phép",
+  "Sử dụng điện thoại sai mục đích",
+  "Đi học muộn/nghỉ học không phép",
+  "Nói tục, chửi thề.",
+  "Hút thuốc lá.",
+  "Vi phạm ATGT.",
+  "Có học sinh đánh nhau."
+];
+
 interface ParsedViolation {
   studentName: string | null;
   violatingClass: string;
@@ -93,6 +105,7 @@ export function AIViolationInputModal({
   const savedOpenRouterModels = useQuery(api.users.getSetting, { key: "openrouterModels" });
   const savedAiModels = useQuery(api.users.getSetting, { key: "aiModels" });
   const savedAiModel = useQuery(api.users.getSetting, { key: "aiModel" });
+  const aiStatus = useQuery(api.users.getAiRequestStatus);
 
   const { classRosterCounts } = useMemo(() => {
     if (!allStudents)
@@ -146,6 +159,10 @@ export function AIViolationInputModal({
     }
     if (!allStudents) {
       toast.error("Chưa tải được danh sách học sinh, vui lòng thử lại.");
+      return;
+    }
+    if (aiStatus !== undefined && !aiStatus.isSuperUser && aiStatus.remaining <= 0) {
+      toast.error("Bạn đã hết lượt dùng AI hôm nay.");
       return;
     }
 
@@ -660,7 +677,14 @@ export function AIViolationInputModal({
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-semibold text-gray-700">Nội dung báo cáo</label>
-                  <span className="text-[10px] text-gray-400 bg-white px-2 py-0.5 rounded-full border">{rawText.length} ký tự</span>
+                  <div className="flex gap-2">
+                    {aiStatus !== undefined && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${aiStatus.remaining <= 0 && !aiStatus.isSuperUser ? 'bg-red-50 text-red-500 border-red-100' : 'bg-blue-50 text-blue-500 border-blue-100'}`}>
+                        AI: {aiStatus.isSuperUser ? "vô hạn" : `${aiStatus.remaining} lượt`}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-gray-400 bg-white px-2 py-0.5 rounded-full border">{rawText.length} ký tự</span>
+                  </div>
                 </div>
                 <Textarea
                   placeholder={inputMode === "attendance" 
@@ -924,15 +948,19 @@ export function AIViolationInputModal({
                                   onChange={(e) => handleFieldChange(i, "violationType", e.target.value)}
                                   className="w-full text-sm border border-gray-200 rounded px-3 py-2 bg-gray-50 focus:bg-white transition-colors focus:ring-1 focus:ring-blue-500 outline-none"
                                 >
-                                  {VIOLATION_CATEGORIES.map((category) => (
-                                    <optgroup key={category.name} label={`${category.name} (${category.points} điểm)`}>
-                                      {category.violations.map((violation) => (
-                                        <option key={violation} value={violation}>
-                                          {violation}
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  ))}
+                                  {VIOLATION_CATEGORIES.map((category) => {
+                                    const filteredViolations = category.violations.filter(violation => v.targetType === "student" || !PERSONAL_VIOLATIONS.includes(violation));
+                                    if (filteredViolations.length === 0) return null;
+                                    return (
+                                      <optgroup key={category.name} label={`${category.name} (${category.points} điểm)`}>
+                                        {filteredViolations.map((violation) => (
+                                          <option key={violation} value={violation}>
+                                            {violation}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    );
+                                  })}
                                 </select>
                               </div>
 
@@ -1002,7 +1030,7 @@ export function AIViolationInputModal({
                   </Button>
                   <Button
                     onClick={handleParse}
-                    disabled={isParsing || isSubmitting || !allStudents}
+                    disabled={isParsing || isSubmitting || !allStudents || (aiStatus !== undefined && !aiStatus.isSuperUser && aiStatus.remaining <= 0)}
                     className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all"
                   >
                     {isParsing ? "Đang xử lý..." : "Phân tích AI"}
