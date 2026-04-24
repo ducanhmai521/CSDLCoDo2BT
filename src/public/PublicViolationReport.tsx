@@ -111,7 +111,11 @@ const premiumStyles = `
     color: #fecaca !important;
   }
   .public-report-shell.theme-dark .reporter-label {
-    color: #cbd5e1 !important; /* slate-300-ish */
+    color: #e2e8f0 !important;
+    border-color: rgba(148, 163, 184, 0.45) !important;
+  }
+  .public-report-shell.theme-dark .admin-shield {
+    color: #bfdbfe !important;
   }
 `;
 
@@ -219,7 +223,7 @@ const ViolationRow = ({
         />
         <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
           <ShieldCheck
-            className="w-3.5 h-3.5 text-indigo-100 shrink-0 [filter:drop-shadow(0_0_0.5px_rgba(236,72,153,0.35))_drop-shadow(0_0_0.5px_rgba(14,165,233,0.30))]"
+            className="admin-shield w-3.5 h-3.5 text-indigo-700 shrink-0 [filter:drop-shadow(0_0_0.5px_rgba(236,72,153,0.35))_drop-shadow(0_0_0.5px_rgba(14,165,233,0.30))]"
             strokeWidth={2.5}
           />
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
@@ -243,7 +247,7 @@ const ViolationRow = ({
             </span>
           )}
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-            <span className={`text-[8px] sm:text-[9px] font-extrabold tracking-wider text-${reporterCustomization.colorFrom} uppercase leading-tight sm:leading-none 
+            <span className={`reporter-label text-[8px] sm:text-[9px] font-extrabold tracking-wider text-${reporterCustomization.colorFrom} uppercase leading-tight sm:leading-none 
                            sm:border-r sm:border-${reporterCustomization.colorFrom} sm:pr-1.5 sm:py-0.5
                            border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit`}>
               {reporterCustomization.label || 'Nhập bởi'}
