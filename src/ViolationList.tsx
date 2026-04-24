@@ -135,7 +135,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                         {new Date(violation.violationDate).toLocaleString('vi-VN')} bởi {(violation as any).requesterName || violation.reporterName}
                     </p>
                 </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColor(violation.status)}`}>
+                <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-1 text-xs font-semibold rounded-md border ${statusColor(violation.status)}`}>
                     {translateStatus(violation.status)}
                 </span>
             </div>
@@ -461,9 +461,9 @@ function translateStatus(status: string) {
 
 function statusColor(status: string) {
     switch (status) {
-        case 'reported': return 'bg-red-100 text-red-800';
-        case 'appealed': return 'bg-amber-100 text-amber-800';
-        case 'resolved': return 'bg-green-100 text-green-800';
-        default: return 'bg-slate-100 text-slate-800';
+        case 'reported': return 'bg-rose-50 text-rose-700 border-rose-200';
+        case 'appealed': return 'bg-amber-50 text-amber-700 border-amber-200';
+        case 'resolved': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
 }

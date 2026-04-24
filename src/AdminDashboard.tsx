@@ -318,28 +318,15 @@ export default function AdminDashboard() {
           ) : appealedViolations.length === 0 ? (
             <p className="text-sm text-emerald-700">Ổn rồi, hiện không có báo cáo nào ở trạng thái kháng cáo.</p>
           ) : (
-            <div className="space-y-3">
-              {appealedViolations.slice(0, 20).map((v: any) => (
-                <div key={v._id} className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-3">
-                  <div className="text-sm font-semibold text-slate-800">
-                    {v.violatingClass} - {v.studentName || "Vi phạm cấp lớp"} - {v.violationType}
-                  </div>
-                  <div className="text-xs text-slate-600 mt-1">
-                    Lý do kháng cáo: {v.appealReason || "Không có ghi chú."}
-                  </div>
-                </div>
-              ))}
-              {appealedViolations.length > 20 && (
-                <div className="text-xs text-slate-500">
-                  Còn {appealedViolations.length - 20} mục khác. Vào tab "Vi phạm" để xử lý đầy đủ.
-                </div>
-              )}
-              <button
-                onClick={() => setActiveSection('violations')}
-                className="btn-glass-primary"
-              >
-                Mở tab Vi phạm để giải quyết
-              </button>
+            <div>
+              <p className="text-xs text-slate-600 mb-3">
+                Có thể xử lý trực tiếp tại đây: xem chi tiết, bằng chứng, chỉnh sửa, xóa, xử lý kháng cáo.
+              </p>
+              <ViolationList
+                violations={appealedViolations}
+                isLoading={false}
+                isAdminView={true}
+              />
             </div>
           )}
         </div>
