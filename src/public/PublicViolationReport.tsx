@@ -84,8 +84,8 @@ const premiumStyles = `
     background-color: rgba(15, 23, 42, 0.72) !important;
   }
   .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) {
-    background: linear-gradient(90deg, rgba(245, 158, 11, 0.24), rgba(251, 191, 36, 0.22)) !important;
-    border-color: rgba(251, 191, 36, 0.62) !important;
+    background: rgba(245, 158, 11, 0.12) !important;
+    border-color: rgba(251, 191, 36, 0.42) !important;
   }
   .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) .text-slate-700 {
     color: #f8fafc !important;
@@ -109,6 +109,9 @@ const premiumStyles = `
     background-color: rgba(239, 68, 68, 0.18) !important;
     border-color: rgba(248, 113, 113, 0.38) !important;
     color: #fecaca !important;
+  }
+  .public-report-shell.theme-dark .reporter-label {
+    color: #cbd5e1 !important; /* slate-300-ish */
   }
 `;
 
@@ -193,7 +196,7 @@ const ViolationRow = ({
         </div>
       </div>
     ) : isCustomReporter ? (
-      <div className="reporter-badge relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-amber-200/90 bg-gradient-to-r from-amber-50/90 via-orange-50/90 to-amber-50/90 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05),0_0_0_1px_rgba(252,211,77,0.42)]">
+      <div className="reporter-badge relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-amber-200/70 bg-amber-50/60 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
           <User className="w-3.5 h-3.5 text-amber-500 shrink-0" strokeWidth={2.5} />
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
@@ -255,7 +258,7 @@ const ViolationRow = ({
       <div className="reporter-badge relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-white overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05),0_0_0_1px_rgba(226,232,240,0.9)]">
         <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
           <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-            <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-tight sm:leading-none 
+            <span className="reporter-label text-[8px] sm:text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-tight sm:leading-none 
                            sm:border-r sm:border-slate-200 sm:pr-1.5 sm:py-0.5
                            border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
               Nhập bởi
@@ -938,8 +941,8 @@ const PublicViolationReport = () => {
                   }`}
                 >
                   <img
-                    src="/favicon.ico"
-                    alt="favicon"
+                    src="https://www.dropbox.com/scl/fi/u87nv68fgwiz832u6nqpi/csdl.png?rlkey=isvujv52b8ubn3zrv6uigw9se&st=u00piegm&raw=1"
+                    alt="logo"
                     className="w-8 h-8 sm:w-7 sm:h-7 rounded-full"
                   />
                 </div>

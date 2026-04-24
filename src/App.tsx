@@ -47,7 +47,11 @@ function App() {
       <header className="sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl bg-white/50 backdrop-blur-md shadow-lg">
         <div className="flex items-center gap-3">
           <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm">
-            <img src="/favicon.ico" alt="favicon" className="w-8 h-8 rounded-lg" />
+            <img
+              src="https://www.dropbox.com/scl/fi/u87nv68fgwiz832u6nqpi/csdl.png?rlkey=isvujv52b8ubn3zrv6uigw9se&st=u00piegm&raw=1"
+              alt="logo"
+              className="w-8 h-8 rounded-lg"
+            />
           </div>
           <div>
             <h2 className="text-sm font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPTS2BT</h2>
@@ -141,7 +145,7 @@ function HomepageHero() {
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-white/40 backdrop-blur-sm border border-white/50 shadow-lg shrink-0 overflow-hidden flex items-center justify-center">
                 <img
-                  src="/favicon.ico"
+                  src="https://www.dropbox.com/scl/fi/u87nv68fgwiz832u6nqpi/csdl.png?rlkey=isvujv52b8ubn3zrv6uigw9se&st=u00piegm&raw=1"
                   alt="logo"
                   className="w-full h-full object-cover"
                 />
