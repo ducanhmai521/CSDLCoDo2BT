@@ -94,6 +94,23 @@ export default function AdminDashboard() {
   const [aiModelsSavedAt, setAiModelsSavedAt] = useState<number | null>(null);
   const [migrateFromProfileId, setMigrateFromProfileId] = useState<string>("");
   const [migrateToProfileId, setMigrateToProfileId] = useState<string>("");
+  const navButtonClass = (active: boolean) =>
+    `shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition-all whitespace-nowrap ${
+      active
+        ? "bg-indigo-900/80 text-white shadow-md"
+        : "text-slate-700 hover:bg-white/40 hover:text-slate-900"
+    }`;
+  const sideNavButtonClass = (active: boolean) =>
+    `w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all ${
+      active
+        ? "bg-indigo-900/80 text-white shadow-md"
+        : "text-slate-700 hover:bg-white/40 hover:text-slate-900"
+    }`;
+  const panelClass = "rounded-2xl border border-white/70 bg-white/75 backdrop-blur-sm shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-4 md:p-5";
+  const primaryButtonClass =
+    "inline-flex items-center justify-center rounded-lg bg-indigo-900/90 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-900 disabled:cursor-not-allowed disabled:opacity-60";
+  const secondaryButtonClass =
+    "inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white";
 
   const formatDateDDMMYYYY = (iso: string) => {
     try {
@@ -268,48 +285,73 @@ export default function AdminDashboard() {
 
   return (
     <div className="w-full">
-      <div className="md:flex gap-6">
-        <div className="md:hidden -mx-4 mb-3 sticky top-24 z-10 nav-glass">
-          <div className="flex overflow-x-auto gap-2 px-4 py-2">
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='actions' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('actions')}>Hành động</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}>Vi phạm</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}>Điểm thi đua</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}>DS học sinh</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}>Xét duyệt</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='systemUsers' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('systemUsers')}>User hệ thống</button>
-            <button className={`shrink-0 px-3 py-2 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}>Cài đặt</button>
+      <div className="mx-auto max-w-[1400px] md:flex gap-6">
+        <div className="md:hidden mb-4 sticky top-24 z-10">
+          <div
+            className="flex overflow-x-auto gap-2 px-1 py-1 rounded-2xl border border-white/30 bg-white/20 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ boxShadow: '0 4px 16px rgba(31,38,135,0.15)' }}
+          >
+            <button className={navButtonClass(activeSection==='actions')} onClick={() => setActiveSection('actions')}>Hành động</button>
+            <button className={navButtonClass(activeSection==='overview')} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
+            <button className={navButtonClass(activeSection==='violations')} onClick={() => setActiveSection('violations')}>Vi phạm</button>
+            <button className={navButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}>Thi đua</button>
+            <button className={navButtonClass(activeSection==='roster')} onClick={() => setActiveSection('roster')}>Học sinh</button>
+            <button className={navButtonClass(activeSection==='users')} onClick={() => setActiveSection('users')}>Xét duyệt</button>
+            <button className={navButtonClass(activeSection==='systemUsers')} onClick={() => setActiveSection('systemUsers')}>Users</button>
+            <button className={navButtonClass(activeSection==='settings')} onClick={() => setActiveSection('settings')}>Cài đặt</button>
           </div>
         </div>
         <aside className="hidden md:block w-60 shrink-0">
-          <nav className="sticky top-24 space-y-2 glass-card-subtle p-4">
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='actions' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('actions')}><Clipboard className="w-5 h-5 inline-block mr-1" /> Hành động</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='overview' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('overview')}><BarChart className="w-5 h-5 inline-block mr-1" /> Tổng hợp</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='violations' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('violations')}><AlertTriangle className="w-5 h-5 inline-block mr-1" /> Quản lý Vi phạm</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='emulation' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('emulation')}><Trophy className="w-5 h-5 inline-block mr-1" /> Điểm thi đua</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='roster' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('roster')}><Users className="w-5 h-5 inline-block mr-1" /> Danh sách học sinh</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='users' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('users')}><CheckCircle className="w-5 h-5 inline-block mr-1" /> Xét duyệt</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='systemUsers' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('systemUsers')}><UserCheck className="w-5 h-5 inline-block mr-1" /> User hệ thống</button>
-            <button className={`w-full text-left px-4 py-3 rounded-xl transition-all ${activeSection==='settings' ? 'bg-white/30 text-slate-800 font-semibold shadow-lg' : 'bg-white/10 text-slate-700 hover:bg-white/20 hover:text-slate-800'}`} onClick={() => setActiveSection('settings')}><Settings className="w-5 h-5 inline-block mr-1" /> Cài đặt</button>
+          <nav
+            className="sticky top-24 space-y-1 rounded-3xl border border-white/30 bg-white/20 backdrop-blur-xl p-3"
+            style={{ boxShadow: '0 8px 32px rgba(31,38,135,0.2)' }}
+          >
+            <button className={sideNavButtonClass(activeSection==='actions')} onClick={() => setActiveSection('actions')}><Clipboard className="w-4 h-4 inline-block mr-2" /> Hành động</button>
+            <button className={sideNavButtonClass(activeSection==='overview')} onClick={() => setActiveSection('overview')}><BarChart className="w-4 h-4 inline-block mr-2" /> Tổng hợp</button>
+            <button className={sideNavButtonClass(activeSection==='violations')} onClick={() => setActiveSection('violations')}><AlertTriangle className="w-4 h-4 inline-block mr-2" /> Quản lý Vi phạm</button>
+            <button className={sideNavButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}><Trophy className="w-4 h-4 inline-block mr-2" /> Điểm thi đua</button>
+            <button className={sideNavButtonClass(activeSection==='roster')} onClick={() => setActiveSection('roster')}><Users className="w-4 h-4 inline-block mr-2" /> Danh sách học sinh</button>
+            <button className={sideNavButtonClass(activeSection==='users')} onClick={() => setActiveSection('users')}><CheckCircle className="w-4 h-4 inline-block mr-2" /> Xét duyệt</button>
+            <button className={sideNavButtonClass(activeSection==='systemUsers')} onClick={() => setActiveSection('systemUsers')}><UserCheck className="w-4 h-4 inline-block mr-2" /> User hệ thống</button>
+            <button className={sideNavButtonClass(activeSection==='settings')} onClick={() => setActiveSection('settings')}><Settings className="w-4 h-4 inline-block mr-2" /> Cài đặt</button>
           </nav>
         </aside>
         <div className="flex-1 space-y-8">
-          <div className="glass-card-subtle p-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-slate-700">
-              <div><Clock className="w-5 h-5 inline-block mr-1" /> Giờ hệ thống (GMT+7): <span className="font-semibold text-slate-800">{format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy HH:mm:ss')}</span></div>
-            </div>
-          </div>
       {activeSection === 'emulation' && (
         <EmulationScoreTable />
       )}
       {activeSection === 'actions' && (
       <div className="w-full space-y-6">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Hành động</h2>
-        <div className="glass-card-subtle p-4">
+        <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800">Nhập liệu nhanh</h3>
           <AIViolationInputModal onBulkSubmitSuccess={() => {}} />
         </div>
-        <div className="glass-card-subtle p-4">
+        {pendingUsers && pendingUsers.length > 0 && (
+          <div className={panelClass}>
+            <h3 className="text-lg font-semibold mb-3 text-slate-800 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-amber-500" />
+              Người dùng chờ duyệt ({pendingUsers.length})
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-slate-200/80">
+                    <th className="py-2 px-4">Họ tên</th>
+                    <th className="py-2 px-4">Email</th>
+                    <th className="py-2 px-4">Lớp</th>
+                    <th className="py-2 px-4">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingUsers.map((u: any) => (
+                    <PendingUserRow key={u._id} user={u} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800">
             Báo cáo đang kháng cáo ({appealedViolations.length})
           </h3>
@@ -334,7 +376,6 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'users' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2">Quản lý Người dùng</h2>
         <div className="bg-white/80 rounded-lg border border-slate-200/80 p-4">
           <h3 className="text-lg font-semibold mb-3">Người dùng chờ duyệt</h3>
           {pendingUsers === undefined ? (
@@ -365,8 +406,7 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'systemUsers' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">User hệ thống</h2>
-        <div className="glass-card-subtle p-4">
+        <div className={panelClass}>
           <p className="text-sm text-slate-600 mb-3">
             Danh sách hồ sơ user trong hệ thống. Có thể xóa hồ sơ nếu user chưa có dữ liệu báo cáo.
           </p>
@@ -429,7 +469,7 @@ export default function AdminDashboard() {
                     toast.error((err as Error).message);
                   }
                 }}
-                className="btn-glass-primary"
+                className={primaryButtonClass}
               >
                 Migrate & Xóa tài khoản nguồn
               </button>
@@ -458,7 +498,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {allUserProfiles.map((u: any) => (
-                    <tr key={u.userId} className="border-b border-slate-200/60 hover:bg-slate-50/60">
+                    <tr key={u.userId} className="border-b border-slate-200/60 hover:bg-white/60">
                       <td className="py-2 px-4 text-slate-700">{u.fullName}</td>
                       <td className="py-2 px-4 text-slate-700">{u.className}</td>
                       <td className="py-2 px-4 text-slate-700">{u.role}</td>
@@ -507,8 +547,7 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'overview' && (
       <div className="w-full">
-        <div className="glass-card">
-          <h2 className="text-2xl font-bold mb-6 text-slate-800"><BarChart className="w-6 h-6 inline-block mr-2" /> Thông tin tổng hợp theo ngày</h2>
+        <div className="rounded-2xl border border-white/70 bg-white/75 backdrop-blur-sm shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-5 md:p-6">
           <div className="flex flex-wrap items-center gap-3 mb-6">
             <label className="text-sm text-slate-700">Chọn ngày:</label>
             <input
@@ -521,18 +560,18 @@ export default function AdminDashboard() {
             <span className="text-sm text-slate-600">Khoảng: {format(toZonedTime(new Date(_overviewStart), TIME_ZONE), 'dd/MM/yyyy')} - {format(toZonedTime(new Date(_overviewEnd), TIME_ZONE), 'dd/MM/yyyy')}</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="glass-card-subtle p-6 text-center">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
               <div className="text-sm text-slate-600 mb-2">Tổng vi phạm</div>
               <div className="text-4xl font-bold text-slate-900">{overviewViolations ? overviewViolations.length : '...'}</div>
             </div>
-            <div className="glass-card-subtle p-6 text-center">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
               <div className="text-sm text-slate-600 mb-2">Tuần hiện tại</div>
               <div className="text-4xl font-bold text-slate-900">{weekNumber}</div>
             </div>
           </div>
         </div>
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="glass-card-subtle p-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
             <h3 className="font-semibold mb-4 text-slate-800"><School className="w-5 h-5 inline-block mr-1" /> Theo lớp</h3>
             {overviewViolations === undefined ? (
               <p className="text-sm text-slate-600">Đang tải...</p>
@@ -555,7 +594,7 @@ export default function AdminDashboard() {
               </ul>
             )}
           </div>
-          <div className="glass-card-subtle p-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
             <h3 className="font-semibold mb-4 text-slate-800"><GraduationCap className="w-5 h-5 inline-block mr-1" /> Theo học sinh</h3>
             {overviewViolations === undefined ? (
               <p className="text-sm text-slate-600">Đang tải...</p>
@@ -580,7 +619,7 @@ export default function AdminDashboard() {
               </ul>
             )}
           </div>
-          <div className="glass-card-subtle p-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
             <h3 className="font-semibold mb-4 text-slate-800"><UserCheck className="w-5 h-5 inline-block mr-1" /> Theo người báo cáo</h3>
             {overviewViolations === undefined ? (
               <p className="text-sm text-slate-600">Đang tải...</p>
@@ -605,7 +644,7 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
-        <div className="mt-6 glass-card-subtle p-6">
+        <div className="mt-6 rounded-2xl border border-white/70 bg-white/75 backdrop-blur-sm shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-6">
           <h3 className="font-semibold mb-4 text-slate-800"><Clipboard className="w-5 h-5 inline-block mr-1" /> Chi tiết vi phạm</h3>
           {overviewViolations === undefined ? (
             <p className="text-sm text-slate-600">Đang tải...</p>
@@ -642,9 +681,15 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'settings' && (
       <div className="w-full space-y-6">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Cài đặt</h2>
+        <div className={panelClass}>
+          <div className="flex items-center gap-2 text-slate-700">
+            <Clock className="w-4 h-4 text-slate-500" />
+            <span className="text-sm">Giờ hệ thống (GMT+7):</span>
+            <span className="font-semibold text-slate-800 text-sm">{format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy HH:mm:ss')}</span>
+          </div>
+        </div>
         
-        <div className="glass-card-subtle p-4">
+        <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800">Tuần học</h3>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -695,7 +740,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="glass-card-subtle p-4">
+        <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800">AI Provider Fallback</h3>
           <p className="text-sm text-slate-600 mb-3">
             Luồng chạy: thử toàn bộ danh sách <span className="font-semibold">Gemini AI Studio</span> trước, nếu vẫn lỗi thì mới chuyển qua danh sách <span className="font-semibold">OpenRouter</span>.
@@ -751,7 +796,7 @@ export default function AdminDashboard() {
                   }
                 }}
                 disabled={aiModelsSaving}
-                className="btn-glass-primary w-full sm:w-auto"
+                className={`${primaryButtonClass} w-full sm:w-auto`}
               >
                 {aiModelsSaving ? 'Đang lưu...' : 'Lưu AI model'}
               </button>
@@ -771,7 +816,7 @@ export default function AdminDashboard() {
                   }
                 }}
                 disabled={aiModelsSaving}
-                className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200/80 bg-white/40 text-slate-700 hover:bg-white/60 transition-all"
+                className={`${secondaryButtonClass} w-full sm:w-auto`}
               >
                 Hoàn tác
               </button>
@@ -782,7 +827,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="glass-card-subtle p-4">
+        <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800">Điểm báo cáo</h3>
           <p className="text-sm text-slate-600 mb-3">
             Chạy migration để cộng điểm cho các vi phạm hiện có trong database (10 điểm/vi phạm).
@@ -796,13 +841,13 @@ export default function AdminDashboard() {
                 toast.error((err as Error).message);
               }
             }}
-            className="btn-glass-primary"
+            className={primaryButtonClass}
           >
             <Settings className="w-5 h-5 inline-block mr-1" /> Migrate điểm báo cáo
           </button>
         </div>
 
-        <div className="glass-card-subtle p-4">
+        <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800">Form xin phép công khai</h3>
           <p className="text-sm text-slate-600 mb-3">
             Cấu hình system user để form xin phép công khai có thể hoạt động. Chỉ cần chạy một lần.
@@ -816,7 +861,7 @@ export default function AdminDashboard() {
                 toast.error((err as Error).message);
               }
             }}
-            className="btn-glass-primary"
+            className={primaryButtonClass}
           >
             <Settings className="w-5 h-5 inline-block mr-1" /> Cấu hình System User
           </button>
@@ -825,7 +870,6 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'roster' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Danh sách học sinh</h2>
         <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:items-center">
             <button
                 onClick={async () => {
@@ -834,7 +878,7 @@ export default function AdminDashboard() {
                         if (url) window.open(url, '_blank');
                     } catch (e) { toast.error((e as Error).message); }
                 }}
-                className="btn-glass-primary w-full sm:w-auto"
+                className={`${primaryButtonClass} w-full sm:w-auto`}
             >
                 Tải mẫu danh sách HS
             </button>
@@ -859,11 +903,11 @@ export default function AdminDashboard() {
                         }
                     }}
                 />
-                <span className="inline-block bg-gradient-to-r from-indigo-500/80 to-blue-600/80 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-semibold hover:from-indigo-600/90 hover:to-blue-700/90 cursor-pointer transition-all duration-300 shadow-xl hover:shadow-2xl border border-white/20">Tải lên & nhập danh sách HS</span>
+                <span className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors">Tải lên & nhập danh sách HS</span>
             </label>
         </div>
-        <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 glass-card-subtle mt-4">
-            <div className="md:col-span-1 glass-card-subtle p-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 rounded-2xl border border-white/70 bg-white/75 backdrop-blur-sm shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-4 md:grid-cols-4">
+            <div className="md:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm font-medium mb-2 text-slate-800">Chọn lớp</p>
                 <div className="max-h-64 overflow-auto space-y-1">
                     {roster === undefined ? (
@@ -885,7 +929,7 @@ export default function AdminDashboard() {
             </div>
             <div className="md:col-span-3">
                 <p className="text-sm font-medium mb-2 text-slate-800">Học sinh</p>
-                <div className="max-h-96 overflow-auto glass-card-subtle p-3">
+                <div className="max-h-96 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
                     {selectedRosterClass && roster && (
                         (() => {
                             const cls = roster.find((c: any) => c.className === selectedRosterClass);
@@ -907,9 +951,8 @@ export default function AdminDashboard() {
       )}
       {activeSection === 'violations' && (
       <div className="w-full">
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-slate-800">Quản lý Vi phạm</h2>
 
-        <div className="my-4 glass-card-subtle p-4">
+        <div className="my-4 rounded-2xl border border-white/70 bg-white/75 backdrop-blur-sm shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-4">
             <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-4">
                 <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="auth-input-field">
                     <option value="">Tất cả các khối</option>
@@ -956,7 +999,7 @@ export default function AdminDashboard() {
                 <button
                     onClick={handleExport}
                     disabled={isExporting}
-                    className="btn-glass-primary w-full sm:w-auto"
+                    className={`${primaryButtonClass} w-full sm:w-auto`}
                 >
                     {isExporting ? (
                         <>
