@@ -195,6 +195,7 @@ import { v } from "convex/values";
         lastActiveAt: v.optional(v.number()),
         purchasedItems: v.array(v.string()),
         purchaseCount: v.number(),
+        reportCount: v.number(),
       })),
       handler: async (ctx) => {
         const userId = await getAuthUserId(ctx);
@@ -227,12 +228,14 @@ import { v } from "convex/values";
             }
           }
 
-          const latestViolation = await ctx.db
+          const violations = await ctx.db
             .query("violations")
             .withIndex("by_reporterId", (q) => q.eq("reporterId", p.userId))
-            .order("desc")
-            .take(1);
-          const latestViolationAt = latestViolation[0]?._creationTime;
+            .collect();
+          const reportCount = violations.length;
+          const latestViolationAt = violations.length > 0
+            ? Math.max(...violations.map((v) => v._creationTime))
+            : undefined;
 
           const lastActiveCandidates = [
             p._creationTime,
@@ -254,6 +257,7 @@ import { v } from "convex/values";
             lastActiveAt,
             purchasedItems: Array.from(purchasedItemNames),
             purchaseCount: purchases.length,
+            reportCount,
           });
         }
         return result;

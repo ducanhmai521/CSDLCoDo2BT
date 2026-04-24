@@ -424,7 +424,7 @@ export default function AdminDashboard() {
                   <option value="">Chọn tài khoản nguồn (sẽ bị xóa)</option>
                   {allUserProfiles.map((u: any) => (
                     <option key={`from-${u.profileId}`} value={u.profileId}>
-                      {u.fullName} - {u.className} ({u.role})
+                      {u.fullName} - {u.className} ({u.role}) · {u.reportCount} BC · #{u.profileId.slice(-6)}
                     </option>
                   ))}
                 </select>
@@ -436,7 +436,7 @@ export default function AdminDashboard() {
                   <option value="">Chọn tài khoản đích (giữ lại)</option>
                   {allUserProfiles.map((u: any) => (
                     <option key={`to-${u.profileId}`} value={u.profileId}>
-                      {u.fullName} - {u.className} ({u.role})
+                      {u.fullName} - {u.className} ({u.role}) · {u.reportCount} BC · #{u.profileId.slice(-6)}
                     </option>
                   ))}
                 </select>
@@ -491,8 +491,10 @@ export default function AdminDashboard() {
                     <th className="py-2 px-4">Lớp</th>
                     <th className="py-2 px-4">Vai trò</th>
                     <th className="py-2 px-4">SuperUser</th>
+                    <th className="py-2 px-4">Báo cáo</th>
                     <th className="py-2 px-4">Last active</th>
                     <th className="py-2 px-4">Vật phẩm đã mua</th>
+                    <th className="py-2 px-4">ID</th>
                     <th className="py-2 px-4">Hành động</th>
                   </tr>
                 </thead>
@@ -503,6 +505,7 @@ export default function AdminDashboard() {
                       <td className="py-2 px-4 text-slate-700">{u.className}</td>
                       <td className="py-2 px-4 text-slate-700">{u.role}</td>
                       <td className="py-2 px-4 text-slate-700">{u.isSuperUser ? "Có" : "Không"}</td>
+                      <td className="py-2 px-4 text-slate-700 font-semibold">{u.reportCount}</td>
                       <td className="py-2 px-4 text-slate-700 whitespace-nowrap">
                         {u.lastActiveAt
                           ? format(toZonedTime(new Date(u.lastActiveAt), TIME_ZONE), "dd/MM/yyyy HH:mm")
@@ -518,6 +521,9 @@ export default function AdminDashboard() {
                         ) : (
                           "Chưa mua"
                         )}
+                      </td>
+                      <td className="py-2 px-4 text-slate-500 font-mono text-xs" title={u.profileId}>
+                        {u.profileId.slice(-8)}
                       </td>
                       <td className="py-2 px-4">
                         <button
