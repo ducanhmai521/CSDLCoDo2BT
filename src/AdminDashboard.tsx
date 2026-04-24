@@ -36,6 +36,8 @@ export default function AdminDashboard() {
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
   const savedAiModel = useQuery(api.users.getSetting, { key: 'aiModel' });
   const savedAiModels = useQuery(api.users.getSetting, { key: 'aiModels' });
+  const savedGeminiModels = useQuery(api.users.getSetting, { key: 'geminiModels' });
+  const savedOpenRouterModels = useQuery(api.users.getSetting, { key: 'openrouterModels' });
   const saveSetting = useMutation(api.users.setSetting);
   const exportRosterTemplate = useAction(api.adminTools.exportRosterTemplate);
   const importRoster = useAction(api.adminTools.importRoster);
@@ -48,6 +50,8 @@ export default function AdminDashboard() {
   const [selectedRosterClass, setSelectedRosterClass] = useState<string>("");
   const [overviewDate, setOverviewDate] = useState<string>(format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy'));
   const [aiModelsDraft, setAiModelsDraft] = useState<string>("");
+  const [geminiModelsDraft, setGeminiModelsDraft] = useState<string>("");
+  const [openRouterModelsDraft, setOpenRouterModelsDraft] = useState<string>("");
   const [aiModelsSaving, setAiModelsSaving] = useState<boolean>(false);
   const [aiModelsSavedAt, setAiModelsSavedAt] = useState<number | null>(null);
 
@@ -177,6 +181,30 @@ export default function AdminDashboard() {
     }
     setAiModelsDraft('');
   }, [savedAiModels, savedAiModel]);
+
+  useEffect(() => {
+    if (typeof savedGeminiModels === 'string') {
+      setGeminiModelsDraft(savedGeminiModels);
+      return;
+    }
+    setGeminiModelsDraft('');
+  }, [savedGeminiModels]);
+
+  useEffect(() => {
+    if (typeof savedOpenRouterModels === 'string' && savedOpenRouterModels.trim()) {
+      setOpenRouterModelsDraft(savedOpenRouterModels);
+      return;
+    }
+    if (typeof savedAiModels === 'string' && savedAiModels.trim()) {
+      setOpenRouterModelsDraft(savedAiModels);
+      return;
+    }
+    if (typeof savedAiModel === 'string' && savedAiModel.trim()) {
+      setOpenRouterModelsDraft(savedAiModel);
+      return;
+    }
+    setOpenRouterModelsDraft('');
+  }, [savedOpenRouterModels, savedAiModels, savedAiModel]);
 
   return (
     <div className="w-full">
@@ -406,9 +434,9 @@ export default function AdminDashboard() {
         </div>
 
         <div className="glass-card-subtle p-4">
-          <h3 className="text-lg font-semibold mb-3 text-slate-800">AI (OpenRouter)</h3>
+          <h3 className="text-lg font-semibold mb-3 text-slate-800">AI Provider Fallback</h3>
           <p className="text-sm text-slate-600 mb-3">
-            Model mặc định được chọn ở backend. Ví dụ: <span className="font-mono">openai/gpt-4o-mini</span>, <span className="font-mono">anthropic/claude-3.5-sonnet</span>, <span className="font-mono">google/gemini-2.0-flash</span>.
+            Luồng chạy: thử toàn bộ danh sách <span className="font-semibold">Gemini AI Studio</span> trước, nếu vẫn lỗi thì mới chuyển qua danh sách <span className="font-semibold">OpenRouter</span>.
           </p>
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -417,22 +445,43 @@ export default function AdminDashboard() {
                 {aiModelsSavedAt ? `Đã lưu lúc ${format(new Date(aiModelsSavedAt), 'HH:mm:ss')}` : ''}
               </div>
             </div>
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-1">Gemini models (AI Studio)</div>
+              <textarea
+                value={geminiModelsDraft}
+                onChange={(e) => setGeminiModelsDraft(e.target.value)}
+                placeholder={"gemini-2.5-flash\ngemini-2.0-flash"}
+                className="w-full min-h-[90px] rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-1">OpenRouter models (fallback cuối)</div>
+              <textarea
+                value={openRouterModelsDraft}
+                onChange={(e) => setOpenRouterModelsDraft(e.target.value)}
+                placeholder={"openai/gpt-4o-mini\nanthropic/claude-3.5-sonnet\ngoogle/gemini-2.0-flash"}
+                className="w-full min-h-[90px] rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              />
+            </div>
             <textarea
               value={aiModelsDraft}
               onChange={(e) => setAiModelsDraft(e.target.value)}
               placeholder={"openai/gpt-4o-mini\nanthropic/claude-3.5-sonnet\ngoogle/gemini-2.0-flash"}
-              className="w-full min-h-[110px] rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              className="hidden"
             />
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
               <button
                 onClick={async () => {
                   setAiModelsSaving(true);
                   try {
-                    await saveSetting({ key: 'aiModels', value: aiModelsDraft });
-                    const first = aiModelsDraft.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)[0] || '';
+                    await saveSetting({ key: 'geminiModels', value: geminiModelsDraft });
+                    await saveSetting({ key: 'openrouterModels', value: openRouterModelsDraft });
+                    // Legacy keys kept for compatibility with older code paths.
+                    await saveSetting({ key: 'aiModels', value: openRouterModelsDraft });
+                    const first = openRouterModelsDraft.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)[0] || '';
                     await saveSetting({ key: 'aiModel', value: first });
                     setAiModelsSavedAt(Date.now());
-                    toast.success('Đã lưu cấu hình AI model.');
+                    toast.success('Đã lưu cấu hình Gemini + OpenRouter.');
                   } catch (err) {
                     toast.error((err as Error).message);
                   } finally {
@@ -446,9 +495,18 @@ export default function AdminDashboard() {
               </button>
               <button
                 onClick={() => {
-                  if (typeof savedAiModels === 'string' && savedAiModels.trim()) setAiModelsDraft(savedAiModels);
-                  else if (typeof savedAiModel === 'string' && savedAiModel.trim()) setAiModelsDraft(savedAiModel);
-                  else setAiModelsDraft('');
+                  if (typeof savedGeminiModels === 'string') setGeminiModelsDraft(savedGeminiModels);
+                  else setGeminiModelsDraft('');
+
+                  if (typeof savedOpenRouterModels === 'string' && savedOpenRouterModels.trim()) {
+                    setOpenRouterModelsDraft(savedOpenRouterModels);
+                  } else if (typeof savedAiModels === 'string' && savedAiModels.trim()) {
+                    setOpenRouterModelsDraft(savedAiModels);
+                  } else if (typeof savedAiModel === 'string' && savedAiModel.trim()) {
+                    setOpenRouterModelsDraft(savedAiModel);
+                  } else {
+                    setOpenRouterModelsDraft('');
+                  }
                 }}
                 disabled={aiModelsSaving}
                 className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200/80 bg-white/40 text-slate-700 hover:bg-white/60 transition-all"
@@ -457,7 +515,7 @@ export default function AdminDashboard() {
               </button>
             </div>
             <p className="text-xs text-slate-600">
-              Khi model đầu tiên lỗi/timeout, hệ thống sẽ tự động thử model tiếp theo.
+              Khi model Gemini đầu tiên lỗi, hệ thống tự thử model Gemini tiếp theo; hết Gemini mới qua OpenRouter.
             </p>
           </div>
         </div>

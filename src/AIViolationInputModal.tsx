@@ -58,6 +58,13 @@ export function AIViolationInputModal({
   const [showAdvanced, setShowAdvanced] = useState(false); // New state for collapsible options
   // Model selection is now controlled server-side (Admin setting)
   const [usedModel, setUsedModel] = useState<string | null>(null);
+  const [showAiDebugDetails, setShowAiDebugDetails] = useState(false);
+  const [aiDebugInfo, setAiDebugInfo] = useState<{
+    firstPassTrace: string[];
+    verificationChanged: boolean;
+    verificationMode: string;
+    correctionsMade: string[];
+  } | null>(null);
 
   // Lock zoom when modal opens
   React.useEffect(() => {
@@ -82,6 +89,8 @@ export function AIViolationInputModal({
   const allStudents = useQuery(api.users.getAllStudents);
   const allUserProfiles = useQuery(api.users.getAllUserProfiles);
   const myProfile = useQuery(api.users.getMyProfile);
+  const savedGeminiModels = useQuery(api.users.getSetting, { key: "geminiModels" });
+  const savedOpenRouterModels = useQuery(api.users.getSetting, { key: "openrouterModels" });
   const savedAiModels = useQuery(api.users.getSetting, { key: "aiModels" });
   const savedAiModel = useQuery(api.users.getSetting, { key: "aiModel" });
 
@@ -141,24 +150,38 @@ export function AIViolationInputModal({
     }
 
     setIsParsing(true);
+    setAiDebugInfo(null);
     const startedAt = performance.now();
     const configuredModelList =
-      (typeof savedAiModels === "string" && savedAiModels.trim()
-        ? savedAiModels.trim().split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean)
-        : typeof savedAiModel === "string" && savedAiModel.trim()
-          ? [savedAiModel.trim()]
-          : []) as string[];
-    const primaryModel = configuredModelList[0] || "fallback";
+      (typeof savedGeminiModels === "string" && savedGeminiModels.trim()
+        ? savedGeminiModels.trim().split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean)
+        : []) as string[];
+    const primaryModel = configuredModelList[0] || "gemini-fallback";
     const toastId = toast.loading("Đang chuẩn bị yêu cầu AI...");
     try {
       toast.message(
-        `Đang gửi yêu cầu đến model ưu tiên: ${primaryModel}${configuredModelList.length > 1 ? " (có fallback)" : ""}`,
+        `Đang gửi yêu cầu đến Gemini model ưu tiên: ${primaryModel}${configuredModelList.length > 1 ? " (có fallback)" : ""}`,
         { id: toastId }
       );
+      const debugEnabled = Boolean(isSuperUser && showAiDebugDetails);
       const result = inputMode === "attendance" 
-        ? await parseAttendanceWithAI({ rawText })
-        : await parseViolationsWithAI({ rawText });
+        ? await parseAttendanceWithAI({ rawText, debug: debugEnabled })
+        : await parseViolationsWithAI({ rawText, debug: debugEnabled });
 
+      const backendDebug = ((result as any).aiDebug || null) as
+        | {
+            firstPassTrace?: string[];
+            verificationChanged?: boolean;
+            verificationMode?: string;
+          }
+        | null;
+      const corrections = (result as any).correctionsMade as string[] | undefined;
+      setAiDebugInfo({
+        firstPassTrace: Array.isArray(backendDebug?.firstPassTrace) ? backendDebug!.firstPassTrace! : [],
+        verificationChanged: Boolean(backendDebug?.verificationChanged),
+        verificationMode: backendDebug?.verificationMode || "unknown",
+        correctionsMade: Array.isArray(corrections) ? corrections : [],
+      });
       const serverUsedModel = (result as any).usedModel as string | undefined;
       toast.message(
         `Model phản hồi: ${serverUsedModel || primaryModel}. Đang ghép tên học sinh...`,
@@ -240,10 +263,20 @@ export function AIViolationInputModal({
   };
 
   const configuredModelText =
-    (typeof savedAiModels === "string" && savedAiModels.trim()
-      ? savedAiModels.trim().split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0]
+    (typeof savedGeminiModels === "string" && savedGeminiModels.trim()
+      ? savedGeminiModels.trim().split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0]
       : null) ||
     (typeof savedAiModel === "string" && savedAiModel.trim() ? savedAiModel.trim() : null);
+
+  const configuredOpenRouterText =
+    (typeof savedOpenRouterModels === "string" && savedOpenRouterModels.trim()
+      ? savedOpenRouterModels.trim().split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0]
+      : null) ||
+    (typeof savedAiModels === "string" && savedAiModels.trim()
+      ? savedAiModels.trim().split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0]
+      : null);
+  const isSuperUser = Boolean(myProfile?.isSuperUser);
+  const canShowDebugDetails = isSuperUser && showAiDebugDetails;
 
   const handleFieldChange = (
     index: number,
@@ -674,7 +707,13 @@ export function AIViolationInputModal({
                             {configuredModelText || "Chưa đặt (sẽ dùng fallback)"}
                           </span>
                           <div className="mt-1 text-[11px] text-gray-500">
-                            (Cấu hình ở Admin Dashboard → Cài đặt → AI)
+                            (Ưu tiên Gemini, fallback OpenRouter. Cấu hình ở Admin Dashboard → Cài đặt → AI)
+                          </div>
+                          <div className="mt-1 text-[11px] text-gray-500">
+                            OpenRouter fallback:{" "}
+                            <span className="font-mono text-gray-700">
+                              {configuredOpenRouterText || "Chưa đặt"}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -708,6 +747,19 @@ export function AIViolationInputModal({
                           </div>
                         </div>
                       )}
+                      {myProfile?.isSuperUser && (
+                        <div className="space-y-1">
+                          <label className="text-xs text-gray-500">Debug AI chi tiết</label>
+                          <label className="flex items-center gap-2 text-xs text-gray-700 bg-white border border-gray-200 rounded-md px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={showAiDebugDetails}
+                              onChange={(e) => setShowAiDebugDetails(e.target.checked)}
+                            />
+                            Bật hiển thị trace provider/model + verify details
+                          </label>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -720,6 +772,32 @@ export function AIViolationInputModal({
                 <div className="bg-white/70 border border-gray-200 rounded-xl p-3 shadow-sm text-xs text-gray-600">
                   AI model đang dùng:{" "}
                   <span className="font-mono text-gray-800">{usedModel || configuredModelText}</span>
+                </div>
+              )}
+              {aiDebugInfo && (
+                <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3 shadow-sm text-xs text-slate-700 space-y-2">
+                  <div>
+                    Verify:{" "}
+                    {aiDebugInfo.verificationChanged ? "có chỉnh sửa" : "không chỉnh sửa"}
+                  </div>
+                  {canShowDebugDetails && (
+                    <div>
+                      Verify mode: <span className="font-mono text-slate-800">{aiDebugInfo.verificationMode}</span>
+                    </div>
+                  )}
+                  {canShowDebugDetails && aiDebugInfo.correctionsMade.length > 0 && (
+                    <div className="text-[11px] text-slate-600">
+                      Sửa bởi verifier: {aiDebugInfo.correctionsMade.join(" | ")}
+                    </div>
+                  )}
+                  {canShowDebugDetails && aiDebugInfo.firstPassTrace.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-[11px] text-slate-600">Trace provider/model</summary>
+                      <div className="mt-2 font-mono text-[10px] text-slate-700 whitespace-pre-wrap break-all">
+                        {aiDebugInfo.firstPassTrace.join("\n")}
+                      </div>
+                    </details>
+                  )}
                 </div>
               )}
                {/* Attendance Summary */}

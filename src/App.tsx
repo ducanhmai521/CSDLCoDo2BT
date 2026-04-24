@@ -44,18 +44,18 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-cyan-300/25 via-blue-200/20 to-teal-300/25 animated-gradient-bg bg-size-200 animate-gradient-slow">
-      <Authenticated>
-        <header className="sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl bg-white/50 backdrop-blur-md shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm">
-              <img src="https://www.dropbox.com/scl/fi/23fj64gvknqcw0fu6ibzw/icon.ico?rlkey=t0qmc0ffbkoh5z16g5xts105w&st=for1a0hd&raw=1" alt="favicon" className="w-8 h-8 rounded-lg" />
-            </div>
-            <div>
-              <h2 className="text-sm font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPTS2BT</h2>
-              <p className="hidden md:block text-xs text-slate-600">Nền tảng quản lý vi phạm và nền nếp của trường THPT Số 2 Bảo Thắng</p>
-            </div>
+      <header className="sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl bg-white/50 backdrop-blur-md shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm">
+            <img src="/favicon.ico" alt="favicon" className="w-8 h-8 rounded-lg" />
           </div>
-          <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPTS2BT</h2>
+            <p className="hidden md:block text-xs text-slate-600">Nền tảng quản lý vi phạm và nền nếp của trường THPT Số 2 Bảo Thắng</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <Authenticated>
             {myProfile?.isSuperUser && (
               <button
                 onClick={handleSwitchRole}
@@ -66,9 +66,9 @@ function App() {
               </button>
             )}
             <SignOutButton />
-          </div>
-        </header>
-      </Authenticated>
+          </Authenticated>
+        </div>
+      </header>
       
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
         <Content />
@@ -141,7 +141,7 @@ function HomepageHero() {
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-white/40 backdrop-blur-sm border border-white/50 shadow-lg shrink-0 overflow-hidden flex items-center justify-center">
                 <img
-                  src="https://www.dropbox.com/scl/fi/23fj64gvknqcw0fu6ibzw/icon.ico?rlkey=t0qmc0ffbkoh5z16g5xts105w&st=for1a0hd&raw=1"
+                  src="/favicon.ico"
                   alt="logo"
                   className="w-full h-full object-cover"
                 />

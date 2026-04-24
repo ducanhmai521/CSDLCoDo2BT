@@ -18,8 +18,9 @@ const validateAndCorrectAI = async (
   model: string,
   originalText: string,
   firstPassJson: any,
-  mode: "attendance" | "violations"
-): Promise<any> => {
+  mode: "attendance" | "violations",
+  debug: boolean
+): Promise<{ data: any; correctionsMade: string[]; changed: boolean; verificationMode: "diff" | "full_fallback" }> => {
   const validationPrompt = `
 Bạn là trợ lý kiểm tra và sửa lỗi kết quả phân tích báo cáo.
 
@@ -64,23 +65,30 @@ Kiểm tra kết quả phân tích lần 1 và sửa các lỗi sau (nếu có):
    - VI PHẠM CẤP LỚP (không có tên học sinh): studentName = null
    - Tên lớp viết HOA (10a1 → 10A1)
 
-TRẢ VỀ JSON ĐÃ SỬA (hoặc giữ nguyên nếu không có lỗi):
+TRẢ VỀ JSON THEO CHẾ ĐỘ DIFF ĐỂ TIẾT KIỆM TOKEN:
 {
-  "violations": [
-    {
-      "studentName": "string | null",
-      "violatingClass": "string",
-      "violationId": number,
-      "details": "string",
-      "originalText": "string"
-    }
-  ],
-  "checkedClasses": [...],
-  ${mode === "attendance" ? '"attendanceByClass": {...},' : ""}
-  "isValid": true/false
+  "changed": true/false,
+  ${debug ? '"correctionsMade": ["..."],' : ""}
+  "correctedData": {
+    "violations": [
+      {
+        "studentName": "string | null",
+        "violatingClass": "string",
+        "violationId": number,
+        "details": "string",
+        "originalText": "string"
+      }
+    ],
+    "checkedClasses": [...],
+    ${mode === "attendance" ? '"attendanceByClass": {...},' : ""}
+    "isValid": true/false
+  }
 }
 
-CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
+QUY TẮC OUTPUT:
+- Nếu KHÔNG cần sửa gì: trả {"changed": false${debug ? ', "correctionsMade": []' : ""}} và KHÔNG gửi correctedData.
+- Nếu CÓ sửa: trả changed=true và đặt correctedData đầy đủ.${debug ? ' Nếu có thể, ghi correctionsMade ngắn gọn.' : ' KHÔNG trả correctionsMade.'}
+- CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
 `;
 
   try {
@@ -105,21 +113,46 @@ CHỈ TRẢ VỀ JSON, KHÔNG TEXT THÊM.
       );
     }
 
-    const validatedData = JSON.parse(validationText);
-    
-    // Log corrections if any were made
-    if (validatedData.correctionsMade && validatedData.correctionsMade.length > 0) {
-      console.log("AI Corrections made:", validatedData.correctionsMade);
+    const validatedData = JSON.parse(validationText) as {
+      changed?: boolean;
+      correctionsMade?: string[];
+      correctedData?: any;
+    };
+    const changed = Boolean(validatedData?.changed);
+    const correctionsMade = Array.isArray(validatedData?.correctionsMade)
+      ? validatedData.correctionsMade.map((x) => String(x))
+      : [];
+    if (!changed) {
+      return {
+        data: firstPassJson,
+        correctionsMade,
+        changed: false,
+        verificationMode: "diff",
+      };
     }
-    
-    return validatedData;
+    const correctedData = validatedData?.correctedData;
+    if (!correctedData || typeof correctedData !== "object") {
+      return {
+        data: firstPassJson,
+        correctionsMade: correctionsMade.length > 0 ? correctionsMade : ["Verifier returned changed=true but missing correctedData"],
+        changed: false,
+        verificationMode: "full_fallback",
+      };
+    }
+    return {
+      data: correctedData,
+      correctionsMade,
+      changed: true,
+      verificationMode: "diff",
+    };
   } catch (error) {
     console.error("Validation failed, using original result:", error);
-    return { ...firstPassJson, correctionsMade: [], isValid: true };
+    return { data: { ...firstPassJson, isValid: true }, correctionsMade: [], changed: false, verificationMode: "full_fallback" };
   }
 };
 
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini";
+const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 
 function extractJsonFromModelText(text: string): string {
   let out = text || "";
@@ -181,30 +214,93 @@ async function getModelCandidates(ctx: any): Promise<Array<string>> {
   return out;
 }
 
-async function createJsonChatWithFallback(args: {
-  openai: OpenAI;
+type ProviderName = "gemini" | "openrouter";
+
+type ProviderAttempt = {
+  provider: ProviderName;
+  client: OpenAI;
   models: Array<string>;
+};
+
+type ProviderCallResult = {
+  text: string;
+  usedModel: string;
+  usedProvider: ProviderName;
+  client: OpenAI;
+  trace: string[];
+};
+
+async function getGeminiModelCandidates(ctx: any): Promise<Array<string>> {
+  const configuredGeminiModels = await ctx.runQuery(api.users.getSetting, { key: "geminiModels" });
+  const modelsFromSetting =
+    typeof configuredGeminiModels === "string" ? parseModelList(configuredGeminiModels) : [];
+  const modelFromEnv =
+    process.env.GEMINI_MODEL?.trim() ? [process.env.GEMINI_MODEL.trim()] : [];
+
+  const candidates = [...modelsFromSetting, ...modelFromEnv, DEFAULT_GEMINI_MODEL];
+
+  const seen = new Set<string>();
+  const out: Array<string> = [];
+  for (const m of candidates) {
+    const key = m.trim();
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+async function getOpenRouterModelCandidates(ctx: any): Promise<Array<string>> {
+  const configuredOpenRouterModels = await ctx.runQuery(api.users.getSetting, { key: "openrouterModels" });
+  const modelsFromDedicatedSetting =
+    typeof configuredOpenRouterModels === "string" ? parseModelList(configuredOpenRouterModels) : [];
+  const legacyModels = await getModelCandidates(ctx);
+
+  const candidates = [...modelsFromDedicatedSetting, ...legacyModels];
+  const seen = new Set<string>();
+  const out: Array<string> = [];
+  for (const m of candidates) {
+    const key = m.trim();
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+async function createJsonChatWithFallback(args: {
+  attempts: Array<ProviderAttempt>;
   prompt: string;
   temperature: number;
-}): Promise<{ text: string; usedModel: string }> {
+}): Promise<ProviderCallResult> {
   let lastError: unknown = null;
-  for (const m of args.models) {
-    try {
-      const chatCompletion = await args.openai.chat.completions.create({
-        messages: [{ role: "user", content: args.prompt }],
-        model: m,
-        temperature: args.temperature,
-        response_format: { type: "json_object" },
-      });
-      const text = extractJsonFromModelText(chatCompletion.choices[0]?.message?.content || "");
-      return { text, usedModel: m };
-    } catch (err) {
-      lastError = err;
-      console.warn("OpenRouter model failed, trying fallback:", m, err);
-      continue;
+  const trace: string[] = [];
+  for (const attempt of args.attempts) {
+    trace.push(`provider:${attempt.provider}:start`);
+    for (const m of attempt.models) {
+      trace.push(`provider:${attempt.provider}:model:${m}:try`);
+      try {
+        const chatCompletion = await attempt.client.chat.completions.create({
+          messages: [{ role: "user", content: args.prompt }],
+          model: m,
+          temperature: args.temperature,
+          response_format: { type: "json_object" },
+        });
+        const text = extractJsonFromModelText(chatCompletion.choices[0]?.message?.content || "");
+        trace.push(`provider:${attempt.provider}:model:${m}:ok`);
+        return { text, usedModel: m, usedProvider: attempt.provider, client: attempt.client, trace };
+      } catch (err) {
+        lastError = err;
+        console.warn(`${attempt.provider} model failed, trying fallback:`, m, err);
+        trace.push(`provider:${attempt.provider}:model:${m}:fail`);
+        continue;
+      }
     }
+    trace.push(`provider:${attempt.provider}:exhausted`);
   }
-  throw lastError instanceof Error ? lastError : new Error("All OpenRouter models failed.");
+  throw lastError instanceof Error ? lastError : new Error("All Gemini/OpenRouter models failed.");
 }
 
 // Mode for "Cờ đỏ" - attendance checking with violations
@@ -212,6 +308,7 @@ export const parseAttendanceWithAI = action({
   args: {
     rawText: v.string(),
     model: v.optional(v.string()),
+    debug: v.optional(v.boolean()),
   },
   returns: v.object({
     violations: v.array(v.object({
@@ -228,27 +325,50 @@ export const parseAttendanceWithAI = action({
     })),
     usedModel: v.string(),
     correctionsMade: v.array(v.string()),
+    aiDebug: v.object({
+      firstPassTrace: v.array(v.string()),
+      verificationChanged: v.boolean(),
+      verificationMode: v.string(),
+    }),
   }),
-  handler: async (ctx, { rawText, model }) => {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      throw new Error("Missing OPENROUTER_API_KEY environment variable.");
-    }
-
+  handler: async (ctx, { rawText, model, debug }) => {
     // NOTE: ignore client-provided `model` to avoid client-side model selection
     void model;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    const geminiModels = await getGeminiModelCandidates(ctx);
+    const openRouterModels = await getOpenRouterModelCandidates(ctx);
+    const attempts: Array<ProviderAttempt> = [];
 
-    const openai = new OpenAI({
-      apiKey,
-      baseURL: "https://openrouter.ai/api/v1",
-      defaultHeaders: {
-        // Optional but recommended by OpenRouter (safe defaults)
-        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost",
-        "X-Title": process.env.OPENROUTER_APP_NAME ?? "CSDLCoDo2BT",
-      },
-    });
+    if (geminiApiKey && geminiModels.length > 0) {
+      attempts.push({
+        provider: "gemini",
+        client: new OpenAI({
+          apiKey: geminiApiKey,
+          baseURL: process.env.GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta/openai/",
+        }),
+        models: geminiModels,
+      });
+    }
 
-    const modelCandidates = await getModelCandidates(ctx);
+    if (openRouterApiKey && openRouterModels.length > 0) {
+      attempts.push({
+        provider: "openrouter",
+        client: new OpenAI({
+          apiKey: openRouterApiKey,
+          baseURL: "https://openrouter.ai/api/v1",
+          defaultHeaders: {
+            "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost",
+            "X-Title": process.env.OPENROUTER_APP_NAME ?? "CSDLCoDo2BT",
+          },
+        }),
+        models: openRouterModels,
+      });
+    }
+
+    if (attempts.length === 0) {
+      throw new Error("Missing AI provider config. Please set GEMINI_API_KEY or OPENROUTER_API_KEY.");
+    }
 
     const prompt = `
 Bạn là trợ lý phân tích báo cáo CỜ ĐỎ của trường học. Cờ đỏ đi từng lớp để kiểm tra sĩ số và vi phạm.
@@ -325,8 +445,7 @@ LƯU Ý:
 
     try {
       const firstPass = await createJsonChatWithFallback({
-        openai,
-        models: modelCandidates,
+        attempts,
         prompt,
         temperature: 0.1,
       });
@@ -334,15 +453,17 @@ LƯU Ý:
       const parsedData = JSON.parse(firstPass.text);
       
       // Double-check with validation pass
-      const validatedData = await validateAndCorrectAI(
-        openai,
+      const validationResult = await validateAndCorrectAI(
+        firstPass.client,
         firstPass.usedModel,
         rawText,
         parsedData,
-        "attendance"
+        "attendance",
+        Boolean(debug)
       );
       
-      const mappedViolations = (validatedData.violations || []).map((v: any) => {
+      const finalData = validationResult.data ?? parsedData;
+      const mappedViolations = (finalData.violations || []).map((v: any) => {
         const type = typeof v.violationId === 'number' && ALL_VIOLATIONS[v.violationId] 
           ? ALL_VIOLATIONS[v.violationId] 
           : v.violationType || ALL_VIOLATIONS[0];
@@ -358,13 +479,18 @@ LƯU Ý:
       
       return {
         violations: mappedViolations,
-        checkedClasses: validatedData.checkedClasses || [],
-        attendanceByClass: validatedData.attendanceByClass || {},
-        usedModel: firstPass.usedModel,
-        correctionsMade: [],
+        checkedClasses: finalData.checkedClasses || [],
+        attendanceByClass: finalData.attendanceByClass || {},
+        usedModel: `${firstPass.usedProvider}:${firstPass.usedModel}`,
+        correctionsMade: debug ? validationResult.correctionsMade : [],
+        aiDebug: {
+          firstPassTrace: firstPass.trace,
+          verificationChanged: validationResult.changed,
+          verificationMode: validationResult.verificationMode,
+        },
       };
     } catch (error) {
-      console.error("Error calling OpenRouter:", error);
+      console.error("Error calling AI providers:", error);
       throw new Error("Failed to parse attendance using AI.");
     }
   },
@@ -375,6 +501,7 @@ export const parseViolationsWithAI = action({
   args: {
     rawText: v.string(),
     model: v.optional(v.string()),
+    debug: v.optional(v.boolean()),
   },
   returns: v.object({
     violations: v.array(v.object({
@@ -387,26 +514,50 @@ export const parseViolationsWithAI = action({
     checkedClasses: v.array(v.string()),
     usedModel: v.string(),
     correctionsMade: v.array(v.string()),
+    aiDebug: v.object({
+      firstPassTrace: v.array(v.string()),
+      verificationChanged: v.boolean(),
+      verificationMode: v.string(),
+    }),
   }),
-  handler: async (ctx, { rawText, model }) => {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      throw new Error("Missing OPENROUTER_API_KEY environment variable.");
-    }
-
+  handler: async (ctx, { rawText, model, debug }) => {
     // NOTE: ignore client-provided `model` to avoid client-side model selection
     void model;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    const geminiModels = await getGeminiModelCandidates(ctx);
+    const openRouterModels = await getOpenRouterModelCandidates(ctx);
+    const attempts: Array<ProviderAttempt> = [];
 
-    const openai = new OpenAI({
-      apiKey,
-      baseURL: "https://openrouter.ai/api/v1",
-      defaultHeaders: {
-        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost",
-        "X-Title": process.env.OPENROUTER_APP_NAME ?? "CSDLCoDo2BT",
-      },
-    });
+    if (geminiApiKey && geminiModels.length > 0) {
+      attempts.push({
+        provider: "gemini",
+        client: new OpenAI({
+          apiKey: geminiApiKey,
+          baseURL: process.env.GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta/openai/",
+        }),
+        models: geminiModels,
+      });
+    }
 
-    const modelCandidates = await getModelCandidates(ctx);
+    if (openRouterApiKey && openRouterModels.length > 0) {
+      attempts.push({
+        provider: "openrouter",
+        client: new OpenAI({
+          apiKey: openRouterApiKey,
+          baseURL: "https://openrouter.ai/api/v1",
+          defaultHeaders: {
+            "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "http://localhost",
+            "X-Title": process.env.OPENROUTER_APP_NAME ?? "CSDLCoDo2BT",
+          },
+        }),
+        models: openRouterModels,
+      });
+    }
+
+    if (attempts.length === 0) {
+      throw new Error("Missing AI provider config. Please set GEMINI_API_KEY or OPENROUTER_API_KEY.");
+    }
 
     const prompt = `
 Bạn là trợ lý phân tích báo cáo LỚP TRỰC TUẦN. Lớp trực tuần đứng cổng trường kiểm tra vi phạm của học sinh vào trường.
@@ -470,8 +621,7 @@ LƯU Ý CUỐI CÙNG:
 
     try {
       const firstPass = await createJsonChatWithFallback({
-        openai,
-        models: modelCandidates,
+        attempts,
         prompt,
         temperature: 0.1,
       });
@@ -483,15 +633,17 @@ LƯU Ý CUỐI CÙNG:
         : { violations: parsedData.violations || [], checkedClasses: parsedData.checkedClasses || [] };
 
       // Double-check with validation pass
-      const validatedData = await validateAndCorrectAI(
-        openai,
+      const validationResult = await validateAndCorrectAI(
+        firstPass.client,
         firstPass.usedModel,
         rawText,
         normalizedData,
-        "violations"
+        "violations",
+        Boolean(debug)
       );
-      
-      const mappedViolations = (validatedData.violations || []).map((v: any) => {
+
+      const finalData = validationResult.data ?? normalizedData;
+      const mappedViolations = (finalData.violations || []).map((v: any) => {
         const type = typeof v.violationId === 'number' && ALL_VIOLATIONS[v.violationId] 
           ? ALL_VIOLATIONS[v.violationId] 
           : v.violationType || ALL_VIOLATIONS[0];
@@ -507,12 +659,17 @@ LƯU Ý CUỐI CÙNG:
 
       return {
         violations: mappedViolations,
-        checkedClasses: validatedData.checkedClasses || [],
-        usedModel: firstPass.usedModel,
-        correctionsMade: [],
+        checkedClasses: finalData.checkedClasses || [],
+        usedModel: `${firstPass.usedProvider}:${firstPass.usedModel}`,
+        correctionsMade: debug ? validationResult.correctionsMade : [],
+        aiDebug: {
+          firstPassTrace: firstPass.trace,
+          verificationChanged: validationResult.changed,
+          verificationMode: validationResult.verificationMode,
+        },
       };
     } catch (error) {
-      console.error("Error calling OpenRouter:", error);
+      console.error("Error calling AI providers:", error);
       throw new Error("Failed to parse violations using AI.");
     }
   },
