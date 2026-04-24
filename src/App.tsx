@@ -145,7 +145,7 @@ function HomepageHero() {
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-white/40 backdrop-blur-sm border border-white/50 shadow-lg shrink-0 overflow-hidden flex items-center justify-center">
                 <img
-                  src="https://www.dropbox.com/scl/fi/u87nv68fgwiz832u6nqpi/csdl.png?rlkey=isvujv52b8ubn3zrv6uigw9se&st=u00piegm&raw=1"
+                  src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
                   alt="logo"
                   className="w-full h-full object-cover"
                 />
