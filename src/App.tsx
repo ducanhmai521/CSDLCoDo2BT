@@ -1,5 +1,5 @@
 import { Authenticated, Unauthenticated, useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../convex/_generated/api";
 import { authClient } from "./lib/authClient";
 import { SignInForm } from "./SignInForm";
@@ -9,7 +9,7 @@ import { Doc } from "../convex/_generated/dataModel";
 import AdminDashboard from "./AdminDashboard";
 import GradeManagerDashboard from "./GradeManagerDashboard";
 import { ForceRefresh } from "./ForceRefresh";
-import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw, FiZap, FiTrendingUp, FiLock, FiUser, FiChevronDown, FiLogOut } from "react-icons/fi";
+import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw, FiZap, FiTrendingUp, FiLock, FiUser, FiChevronDown, FiLogOut, FiAlertTriangle } from "react-icons/fi";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
@@ -108,13 +108,13 @@ function App() {
           </Authenticated>
         </div>
       </header>
-      
+
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
         <Content />
       </main>
-      
+
       <Toaster position="bottom-center" richColors />
-      
+
       <footer className="py-6 text-center text-sm text-slate-700 border-t border-white/40 mt-8 nav-glass">
         <div className="max-w-7xl mx-auto px-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-2">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
@@ -134,133 +134,93 @@ function App() {
       )}
     </div>
   );
-    }
+}
 
 function Content() {
-  const myProfile = useQuery(api.users.getMyProfile);
   const { data: session, isPending: sessionPending } = authClient.useSession();
+  const myProfile = useQuery(api.users.getMyProfile);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
-  const isLoading = myProfile === undefined || sessionPending;
+  useEffect(() => {
+    if (!sessionPending) {
+      setHasCheckedAuth(true);
+    }
+  }, [sessionPending]);
+
+  // Loading if initial check isn't done, or if we have a session but profile is loading
+  const isLoading = !hasCheckedAuth || (!!session && myProfile === undefined);
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64 glass-card">
         <div className="flex flex-col items-center gap-4">
-          <div className="form-loading-spinner w-12 h-12"></div>
+          <div className="form-loading-spinner w-12 h-12 border-t-blue-600"></div>
           <p className="text-slate-700 font-medium">Đang tải dữ liệu...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div>
-      <Authenticated>
-        {session && !myProfile ? (
-          <div className="glass-card">
-            <ProfileCreationForm />
-          </div>
-        ) : (
-          myProfile && <Dashboard profile={myProfile} />
-        )}
-      </Authenticated>
-      <Unauthenticated>
-        <HomepageHero />
-      </Unauthenticated>
-    </div>
-  );
-    }
+  if (!session) {
+    return <HomepageHero />;
+  }
+
+  if (!myProfile) {
+    return (
+      <div className="glass-card">
+        <ProfileCreationForm />
+      </div>
+    );
+  }
+
+  return <Dashboard profile={myProfile} />;
+}
 
 function HomepageHero() {
   return (
     <div>
       {/* ── Hero Section ── */}
-      <section className="min-h-screen flex items-center py-12">
+      <section className="min-h-[calc(100vh-8rem)] flex items-center py-12">
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          {/* Left — logo + branding + tagline */}
-          <div className="flex flex-col gap-7">
-            {/* Logo + identity stack */}
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-white/40 backdrop-blur-sm border border-white/50 shadow-lg shrink-0 overflow-hidden flex items-center justify-center">
-                <img
-                  src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
-                  alt="logo"
-                  className="w-full h-full object-cover"
-                />
+          {/* Left — tagline + features */}
+          <div className="flex flex-col text-center lg:text-left gap-8 w-full max-w-2xl mx-auto lg:mx-0">
+            {/* Title Area */}
+            <div className="space-y-5 flex flex-col items-center lg:items-start">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-sm font-semibold">
+                <FiZap className="text-blue-600" />
+                Phiên bản 2025-2026
               </div>
-              <div className="flex flex-col gap-1">
-
-                {/* School name */}
-                <p className="text-sm font-semibold text-slate-600 leading-tight">Đoàn trường THPT Số 2 Bảo Thắng</p>
-                {/* System name */}
-                <h2 className="text-xl font-extrabold text-slate-900 font-display leading-tight tracking-tight">CSDL Cờ Đỏ</h2>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="w-12 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full"></div>
-
-            {/* Title */}
-            <div>
-              <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-extrabold text-slate-900 font-display leading-[1.15] tracking-tight">
+              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold text-slate-900 font-display leading-[1.15] tracking-tight">
                 Quản lý nền nếp
-                <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600">
-                  thông minh
-                </span>
+                <br className="hidden sm:block" />
+                <span className="text-blue-600"> thông minh & hiệu quả</span>
               </h1>
-              <p className="mt-4 text-slate-600 text-lg leading-relaxed max-w-md">
-                Nền tảng chính thức của Đoàn trường THPT Số 2 Bảo Thắng.
+              <p className="text-slate-600 text-lg md:text-xl leading-relaxed max-w-lg">
+                Nền tảng chính thức của Đoàn trường THPT Số 2 Bảo Thắng. Giúp số hóa toàn bộ quy trình ghi nhận và xử lý vi phạm.
               </p>
             </div>
 
-            {/* Stats row */}
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <p className="text-2xl font-extrabold text-slate-800 font-display">100%</p>
-                <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Số hóa</p>
-              </div>
-              <div className="w-px h-10 bg-white/40"></div>
-              <div className="text-center">
-                <p className="text-2xl font-extrabold text-slate-800 font-display">AI</p>
-                <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Nhập liệu</p>
-              </div>
-              <div className="w-px h-10 bg-white/40"></div>
-              <div className="text-center">
-                <p className="text-2xl font-extrabold text-slate-800 font-display">Real-time</p>
-                <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Đồng bộ</p>
-              </div>
-            </div>
-
-            {/* Quick links */}
-            <div className="flex flex-wrap gap-3">
+            {/* Quick links as buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mt-2 w-full sm:w-auto px-4 sm:px-0">
               <Link
                 to="/bang-bao-cao-vi-pham"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/25 border border-white/40 backdrop-blur-sm text-sm font-semibold text-slate-700 hover:bg-white/40 hover:text-slate-900 hover:shadow-md transition-all duration-200"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-blue-600 text-white font-bold shadow-md hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
               >
-                <FiBarChart2 className="text-cyan-600" />
-                Báo cáo vi phạm công khai
+                <FiBarChart2 className="text-xl" />
+                Bảng điểm thi đua
               </Link>
               <Link
                 to="/xin-phep"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/25 border border-white/40 backdrop-blur-sm text-sm font-semibold text-slate-700 hover:bg-white/40 hover:text-slate-900 hover:shadow-md transition-all duration-200"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white text-slate-700 font-bold shadow-md border border-slate-200 hover:bg-slate-50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
               >
-                <FiCheckCircle className="text-teal-600" />
+                <FiCheckCircle className="text-teal-600 text-xl" />
                 Xin phép nghỉ học
               </Link>
-            </div>
-
-            {/* Scroll hint */}
-            <div className="hidden lg:flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-widest">
-              <span>Xem tính năng</span>
-              <svg className="w-4 h-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
             </div>
           </div>
 
           {/* Right — sign-in form */}
-          <div className="w-full max-w-md mx-auto lg:mx-0 lg:ml-auto">
+          <div className="w-full max-w-sm mx-auto lg:mr-0">
             <SignInForm />
           </div>
         </div>
@@ -354,65 +314,63 @@ function HomepageHero() {
             </div>
           </div>
         </div>
-
-        {/* Bottom note */}
-        <div className="mt-10 flex justify-center">
-          <div className="glass-card-subtle px-6 py-3 flex items-center gap-3 text-sm text-slate-600">
-            <FiCheckCircle className="text-green-500 shrink-0" />
-            <span>Hệ thống được cập nhật liên tục — năm học 2025–2026</span>
-          </div>
-        </div>
       </section>
     </div>
   );
 }
 
 function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
-      const appealedViolations = useQuery(
-        api.violations.getAppealedViolations,
-        profile.role === "admin" ? {} : "skip"
-      );
-      const appealedCount = profile.role === "admin"
-        ? (appealedViolations ?? []).length
-        : 0;
-      return (
-        <div>
-          <div className="glass-card mb-6">
-            <h1 className="text-3xl font-bold mb-2 text-slate-900">Xin chào, {profile.fullName}!</h1>
-            <p className="text-slate-700 mb-4">
-              Vai trò của bạn: <span className="font-semibold text-slate-800">{translateRole(profile.role)}</span>
-              {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
-            </p>
-            {profile.role === "admin" && (
-              <p className="text-sm">
-                {appealedCount > 0 ? (
-                  <span className="text-amber-700 font-semibold">
-                    Cảnh báo: Có {appealedCount} báo cáo đang ở trạng thái kháng cáo.
-                  </span>
-                ) : (
-                  <span className="text-emerald-700 font-semibold">Ổn: Hiện không có báo cáo kháng cáo.</span>
-                )}
-              </p>
+  const appealedViolations = useQuery(
+    api.violations.getAppealedViolations,
+    profile.role === "admin" ? {} : "skip"
+  );
+  const appealedCount = profile.role === "admin"
+    ? (appealedViolations ?? []).length
+    : 0;
+  return (
+    <div>
+      <div className="glass-card mb-6">
+        <h1 className="text-3xl font-bold mb-2 text-slate-900">Xin chào, {profile.fullName}!</h1>
+        <p className="text-slate-700 mb-4">
+          Vai trò của bạn: <span className="font-semibold text-slate-800">{translateRole(profile.role)}</span>
+          {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
+        </p>
+        {profile.role === "admin" && (
+          <div className="mt-2">
+            {appealedViolations === undefined ? (
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-500/10 border border-slate-500/20 text-slate-600 text-sm font-semibold shadow-sm animate-pulse">
+                Đang kiểm tra báo cáo kháng cáo...
+              </div>
+            ) : appealedCount > 0 ? (
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm font-semibold shadow-sm">
+                Có {appealedCount} báo cáo đang chờ xử lý kháng cáo
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-sm font-semibold shadow-sm">
+                Hiện không có báo cáo nào bị kháng cáo.
+              </div>
             )}
           </div>
-          
-          {profile.role === 'admin' && <AdminDashboard />}
-          {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} />}
-          {profile.role === 'pending' && 
-            <div className="glass-card-subtle p-6 border-l-4 border-blue-600">
-              <p className="font-bold text-slate-800">⏳ Tài khoản của bạn đang được xem xét</p>
-              <p className="text-slate-700">Vui lòng chờ Quản trị viên xác minh và cấp quyền truy cập.</p>
-            </div>
-          }
-        </div>
-      );
-    }
+        )}
+      </div>
 
-    function translateRole(role: string) {
-      switch (role) {
-        case 'admin': return 'Quản trị viên';
-        case 'gradeManager': return 'Quản lý Khối';
-        case 'pending': return 'Chờ duyệt';
-        default: return 'Không xác định';
+      {profile.role === 'admin' && <AdminDashboard />}
+      {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} />}
+      {profile.role === 'pending' &&
+        <div className="glass-card-subtle p-6 border-l-4 border-blue-600">
+          <p className="font-bold text-slate-800">Tài khoản của bạn đang được xem xét</p>
+          <p className="text-slate-700">Vui lòng chờ Quản trị viên xác minh và cấp quyền truy cập.</p>
+        </div>
       }
-    }
+    </div>
+  );
+}
+
+function translateRole(role: string) {
+  switch (role) {
+    case 'admin': return 'Quản trị viên';
+    case 'gradeManager': return 'Quản lý Khối';
+    case 'pending': return 'Chờ duyệt';
+    default: return 'Không xác định';
+  }
+}

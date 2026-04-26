@@ -4,10 +4,9 @@ import { useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { useState } from "react";
 import { toast } from "sonner";
-import { FiUser, FiLock, FiLogIn, FiUserPlus } from "react-icons/fi";
+import { FiUser, FiLock, FiLogIn, FiHelpCircle } from "react-icons/fi";
 
 export function SignInForm() {
-  const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [submitting, setSubmitting] = useState(false);
   const syncBetterAuthUser = useMutation(api.users.syncBetterAuthUser);
 
@@ -19,67 +18,25 @@ export function SignInForm() {
     const username = (formData.get("username") as string).trim();
     const password = formData.get("password") as string;
     
-    if (flow === "signUp") {
-      const confirmPassword = formData.get("confirmPassword") as string;
-      if (password.length < 8) {
-        toast.error("Mật khẩu phải có ít nhất 8 ký tự.");
-        setSubmitting(false);
-        return;
-      }
-      if (password !== confirmPassword) {
-        toast.error("Mật khẩu không khớp.");
-        setSubmitting(false);
-        return;
-      }
-    }
-
     try {
-      if (flow === "signIn") {
-        const result = await authClient.signIn.username({ username, password });
-        if (result.error) {
-          const msg = result.error.message ?? "";
-          if (msg.toLowerCase().includes("invalid") || msg.toLowerCase().includes("password") || msg.toLowerCase().includes("credentials")) {
-            toast.error("Sai tên đăng nhập hoặc mật khẩu.");
-          } else {
-            toast.error("Không thể đăng nhập, vui lòng thử lại.");
-          }
-          return;
+      const result = await authClient.signIn.username({ username, password });
+      if (result.error) {
+        const msg = result.error.message ?? "";
+        if (msg.toLowerCase().includes("invalid") || msg.toLowerCase().includes("password") || msg.toLowerCase().includes("credentials")) {
+          toast.error("Sai tên đăng nhập hoặc mật khẩu.");
+        } else {
+          toast.error("Không thể đăng nhập, vui lòng thử lại.");
         }
-        // Sync user to Convex users table
-        if (result.data?.user) {
-          const u = result.data.user as any;
-          await syncBetterAuthUser({
-            betterAuthId: u.id,
-            username: u.username ?? username,
-            email: u.email ?? `${username}@internal.local`,
-          });
-        }
-      } else {
-        const email = `${username}@internal.local`;
-        const result = await authClient.signUp.email({
-          email,
-          password,
-          name: username,
-          username,
-        } as any);
-        if (result.error) {
-          const msg = result.error.message ?? "";
-          if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("exist") || msg.toLowerCase().includes("taken")) {
-            toast.error("Tên đăng nhập đã tồn tại.");
-          } else {
-            toast.error("Không thể đăng ký, vui lòng thử lại.");
-          }
-          return;
-        }
-        // Sync user to Convex users table
-        if (result.data?.user) {
-          const u = result.data.user as any;
-          await syncBetterAuthUser({
-            betterAuthId: u.id,
-            username: u.username ?? username,
-            email: u.email ?? email,
-          });
-        }
+        return;
+      }
+      // Sync user to Convex users table
+      if (result.data?.user) {
+        const u = result.data.user as any;
+        await syncBetterAuthUser({
+          betterAuthId: u.id,
+          username: u.username ?? username,
+          email: u.email ?? `${username}@internal.local`,
+        });
       }
     } catch (error: unknown) {
       toast.error("Không thể kết nối. Vui lòng thử lại.");
@@ -89,48 +46,19 @@ export function SignInForm() {
     }
   };
 
+  const handleForgotPassword = () => {
+    toast.info("Để cấp lại mật khẩu, vui lòng nhắn tin Zalo cho quản trị viên qua SĐT: 0375530961", { duration: 8000 });
+  };
+
   return (
     <div className="w-full glass-card-strong">
       <div className="mb-6 text-center">
         <h2 className="text-2xl font-extrabold text-slate-800 flex items-center justify-center gap-2">
-          {flow === "signIn" ? (
-            <>
-              <FiLogIn className="text-primary" /> Đăng nhập
-            </>
-          ) : (
-            <>
-              <FiUserPlus className="text-primary" /> Tạo tài khoản
-            </>
-          )}
+          <FiLogIn className="text-cyan-600" /> Đăng nhập
         </h2>
         <p className="mt-2 text-sm text-slate-700">
-          Truy cập hệ thống CSDL Cờ đỏ và quản lý thông tin hiệu quả
+          Truy cập hệ thống quản lý CSDL Cờ đỏ
         </p>
-      </div>
-      
-      <div className="flex items-center justify-center gap-3 mb-6">
-        <button
-          type="button"
-          className={`px-4 py-2 text-sm rounded-2xl border transition-all flex items-center gap-2 ${
-            flow === "signIn"
-              ? "bg-white/30 text-slate-800 border-white/50 shadow-lg backdrop-blur-sm"
-              : "bg-white/10 text-slate-700 border-white/30 hover:bg-white/20 hover:text-slate-800 hover:shadow-md backdrop-blur-sm"
-          }`}
-          onClick={() => setFlow("signIn")}
-        >
-          <FiLogIn className="text-primary" /> Đăng nhập
-        </button>
-        <button
-          type="button"
-          className={`px-4 py-2 text-sm rounded-2xl border transition-all flex items-center gap-2 ${
-            flow === "signUp"
-              ? "bg-white/30 text-slate-800 border-white/50 shadow-lg backdrop-blur-sm"
-              : "bg-white/10 text-slate-700 border-white/30 hover:bg-white/20 hover:text-slate-800 hover:shadow-md backdrop-blur-sm"
-          }`}
-          onClick={() => setFlow("signUp")}
-        >
-          <FiUserPlus className="text-primary" /> Đăng ký
-        </button>
       </div>
       
       <form
@@ -139,7 +67,7 @@ export function SignInForm() {
       >
         <div className="space-y-2">
           <label htmlFor="username" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-            <FiUser className="text-primary" /> Tên đăng nhập
+            <FiUser className="text-cyan-600" /> Tên đăng nhập
           </label>
           <div className="relative">
             <input
@@ -156,7 +84,7 @@ export function SignInForm() {
         
         <div className="space-y-2">
           <label htmlFor="password" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-            <FiLock className="text-primary" /> Mật khẩu
+            <FiLock className="text-cyan-600" /> Mật khẩu
           </label>
           <div className="relative">
             <input
@@ -171,40 +99,14 @@ export function SignInForm() {
           </div>
         </div>
         
-        {flow === "signUp" && (
-          <div className="space-y-2">
-            <label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <FiLock className="text-primary" /> Nhập lại mật khẩu
-            </label>
-            <div className="relative">
-              <input
-                id="confirmPassword"
-                className="auth-input-field w-full"
-                type="password"
-                name="confirmPassword"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-          </div>
-        )}
-        
         <button 
           className="auth-button mt-4 flex items-center justify-center gap-2 relative" 
           type="submit" 
           disabled={submitting}
         >
-          {flow === "signIn" ? (
-            <>
-              <FiLogIn /> Đăng nhập
-            </>
-          ) : (
-            <>
-              <FiUserPlus /> Đăng ký
-            </>
-          )}
+          <FiLogIn /> Đăng nhập
           {submitting && (
-            <div className="form-loading-spinner ml-2"></div>
+            <div className="form-loading-spinner ml-2 border-t-white"></div>
           )}
         </button>
         
@@ -212,24 +114,21 @@ export function SignInForm() {
         {submitting && (
           <div className="form-loading-overlay">
             <div className="text-center">
-              <div className="form-loading-spinner mx-auto mb-4"></div>
+              <div className="form-loading-spinner mx-auto mb-4 border-t-cyan-500 border-white/50 w-10 h-10 border-[3px]"></div>
               <p className="text-slate-800 font-semibold">
-                {flow === "signIn" ? "Đang đăng nhập..." : "Đang tạo tài khoản..."}
+                Đang đăng nhập...
               </p>
             </div>
           </div>
         )}
         
         <div className="text-center text-sm text-slate-700 mt-4 pt-4 border-t border-white/40">
-          <span>
-            {flow === "signIn" ? "Chưa có tài khoản? " : "Đã có tài khoản? "}
-          </span>
           <button
             type="button"
-            className="text-primary hover:text-primary-hover hover:underline font-bold cursor-pointer transition-colors"
-            onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
+            className="text-cyan-700 hover:text-cyan-800 hover:underline font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 mx-auto"
+            onClick={handleForgotPassword}
           >
-            {flow === "signIn" ? "Đăng ký ngay" : "Đăng nhập ngay"}
+            <FiHelpCircle /> Quên mật khẩu?
           </button>
         </div>
       </form>

@@ -433,15 +433,12 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-        <div className={panelClass}>
-          <h3 className="text-lg font-semibold mb-3 text-slate-800">
-            Báo cáo đang kháng cáo ({appealedViolations.length})
-          </h3>
-          {appealedViolations === undefined ? (
-            <p className="text-sm text-slate-600">Đang tải...</p>
-          ) : appealedViolations.length === 0 ? (
-            <p className="text-sm text-emerald-700">Ổn rồi, hiện không có báo cáo nào ở trạng thái kháng cáo.</p>
-          ) : (
+        {appealedViolations && appealedViolations.length > 0 && (
+          <div className={panelClass}>
+            <h3 className="text-lg font-semibold mb-3 text-slate-800 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Báo cáo đang kháng cáo ({appealedViolations.length})
+            </h3>
             <div>
               <p className="text-xs text-slate-600 mb-3">
                 Có thể xử lý trực tiếp tại đây: xem chi tiết, bằng chứng, chỉnh sửa, xóa, xử lý kháng cáo.
@@ -452,8 +449,8 @@ export default function AdminDashboard() {
                 isAdminView={true}
               />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       )}
 

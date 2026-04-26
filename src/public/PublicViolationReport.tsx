@@ -1077,10 +1077,10 @@ const PublicViolationReport = () => {
       )}
 
       {/* Sticky Header (title row + tab row only) */}
-      <div className="glass-header border-b border-slate-200 shadow-sm sticky top-0 z-10">
+      <div className={`glass-header border-b ${isDarkMode ? "border-slate-700/50" : "border-slate-200"} shadow-sm sticky top-0 z-10`}>
         <div className="max-w-7xl mx-auto">
           {/* Header Row: Title + Week/Class Selector */}
-          <div className="px-3 sm:px-4 py-2 border-b border-slate-100">
+          <div className={`px-3 sm:px-4 py-2 border-b ${isDarkMode ? "border-slate-700/50" : "border-slate-100"}`}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
               <div className="flex items-center justify-center gap-2">
                 <div
@@ -1166,7 +1166,7 @@ const PublicViolationReport = () => {
           {/* Tab Selector Row */}
           <div className="px-3 sm:px-4 py-0">
             {/* Tab buttons: centered on mobile, left-aligned on desktop */}
-            <div className="flex items-end justify-center sm:justify-start border-b-2 border-slate-200">
+            <div className={`flex items-end justify-center sm:justify-start border-b-2 ${isDarkMode ? "border-slate-700/50" : "border-slate-200"}`}>
               <button
                 onClick={() => handleTabChange('violations')}
                 className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${
@@ -1213,7 +1213,7 @@ const PublicViolationReport = () => {
       </div>
 
       {/* Disclaimer & Actions — NOT sticky */}
-      <div className="glass-header border-b border-slate-100">
+      <div className={`glass-header border-b ${isDarkMode ? "border-slate-700/50" : "border-slate-100"}`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[10px] sm:text-xs text-slate-500 leading-relaxed flex-1 min-w-[200px]">
               {activeTab === 'violations' ? (
