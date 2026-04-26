@@ -263,10 +263,12 @@ function toCalendarWeek(academicWeek: number, breakWindow: ReturnType<typeof get
 // --- SUB-COMPONENT: VIOLATION ROW (Clean & Intuitive) ---
 const ViolationRow = ({
   violation,
-  onOpenEvidence
+  onOpenEvidence,
+  isDarkMode
 }: {
   violation: any,
-  onOpenEvidence: (v: any, url: string) => void
+  onOpenEvidence: (v: any, url: string) => void,
+  isDarkMode: boolean
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const violationTimestamp = (() => {
@@ -474,7 +476,11 @@ const ViolationRow = ({
                           e.stopPropagation(); // Ngăn click lan ra ngoài làm đóng accordion
                           onOpenEvidence(violation, url);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:border-indigo-300 dark:hover:border-indigo-800 hover:shadow-sm transition-all text-xs font-medium"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg hover:shadow-sm transition-all text-xs font-medium ${
+                          isDarkMode
+                            ? "bg-slate-800 border-indigo-900/50 text-indigo-400 hover:bg-indigo-950/30 hover:border-indigo-800"
+                            : "bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300"
+                        }`}
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Xem bằng chứng {i + 1}</span>
@@ -1334,6 +1340,7 @@ const PublicViolationReport = () => {
                               key={v._id}
                               violation={v}
                               onOpenEvidence={handleOpenModal}
+                              isDarkMode={isDarkMode}
                             />
                           ))}
                         </div>
@@ -1501,6 +1508,7 @@ const PublicViolationReport = () => {
                             key={v._id}
                             violation={v}
                             onOpenEvidence={handleOpenModal}
+                            isDarkMode={isDarkMode}
                           />
                         ))}
                       </div>
