@@ -36,21 +36,119 @@ const premiumStyles = `
     background-size: 200% auto;
     animation: gradient-xy 3s linear infinite;
   }
-  @keyframes aurora-float {
-    0% { transform: translate3d(0, 0, 0) scale(1); }
-    50% { transform: translate3d(2%, -2%, 0) scale(1.04); }
-    100% { transform: translate3d(0, 0, 0) scale(1); }
+
+  /* ===== ANIMATED BACKGROUND SYSTEM ===== */
+  @keyframes blob-drift-1 {
+    0%   { transform: translate(0px, 0px) scale(1); }
+    25%  { transform: translate(40px, -60px) scale(1.08); }
+    50%  { transform: translate(-30px, 40px) scale(0.94); }
+    75%  { transform: translate(60px, 20px) scale(1.05); }
+    100% { transform: translate(0px, 0px) scale(1); }
   }
-  .aurora-blob {
-    animation: aurora-float 16s ease-in-out infinite;
+  @keyframes blob-drift-2 {
+    0%   { transform: translate(0px, 0px) scale(1); }
+    33%  { transform: translate(-50px, 30px) scale(1.1); }
+    66%  { transform: translate(30px, -50px) scale(0.92); }
+    100% { transform: translate(0px, 0px) scale(1); }
+  }
+  @keyframes blob-drift-3 {
+    0%   { transform: translate(0px, 0px) scale(1.02); }
+    40%  { transform: translate(35px, 55px) scale(0.96); }
+    70%  { transform: translate(-45px, -20px) scale(1.07); }
+    100% { transform: translate(0px, 0px) scale(1.02); }
+  }
+  @keyframes bg-hue-shift {
+    0%, 100% { filter: hue-rotate(0deg) brightness(1); }
+    33%  { filter: hue-rotate(20deg) brightness(1.05); }
+    66%  { filter: hue-rotate(-15deg) brightness(0.97); }
+  }
+
+  .aurora-blob-1 {
+    animation: blob-drift-1 22s ease-in-out infinite;
     will-change: transform;
   }
-  .public-report-shell.theme-dark {
-    background: radial-gradient(1200px circle at 15% 0%, rgba(30, 64, 175, 0.16), transparent 45%),
-      radial-gradient(900px circle at 85% 20%, rgba(8, 145, 178, 0.12), transparent 45%),
-      #020617;
-    color: #e2e8f0;
+  .aurora-blob-2 {
+    animation: blob-drift-2 28s ease-in-out infinite;
+    will-change: transform;
   }
+  .aurora-blob-3 {
+    animation: blob-drift-3 18s ease-in-out infinite;
+    will-change: transform;
+  }
+  .aurora-blob-4 {
+    animation: blob-drift-1 34s ease-in-out infinite reverse;
+    will-change: transform;
+  }
+  .aurora-blob-5 {
+    animation: blob-drift-2 24s ease-in-out infinite 6s;
+    will-change: transform;
+  }
+  .aurora-bg-layer {
+    animation: bg-hue-shift 20s ease-in-out infinite;
+  }
+  .public-report-shell.theme-dark {
+    background: radial-gradient(1200px circle at 15% 0%, rgba(59, 130, 246, 0.2), transparent 45%),
+      radial-gradient(900px circle at 85% 20%, rgba(6, 182, 212, 0.18), transparent 45%),
+      #0f172a;
+    color: #f8fafc;
+  }
+  
+  /* Tăng hiệu ứng blob trong darkmode */
+  .public-report-shell.theme-dark .aurora-blob-1 { background-color: rgba(59, 130, 246, 0.35); }
+  .public-report-shell.theme-dark .aurora-blob-2 { background-color: rgba(99, 102, 241, 0.3); }
+  .public-report-shell.theme-dark .aurora-blob-3 { background-color: rgba(6, 182, 212, 0.3); }
+  .public-report-shell.theme-dark .aurora-blob-4 { background-color: rgba(139, 92, 246, 0.25); }
+  .public-report-shell.theme-dark .aurora-blob-5 { background-color: rgba(20, 184, 166, 0.3); }
+
+  /* GLASSMORPHISM - Performant approach */
+  .glass-header {
+    background-color: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .public-report-shell.theme-dark .glass-header {
+    background-color: rgba(15, 23, 42, 0.65) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .glass-card {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: rgba(255, 255, 255, 0.4) !important;
+  }
+  .public-report-shell.theme-dark .glass-card {
+    background-color: rgba(30, 41, 59, 0.45) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .glass-day-expanded {
+    background: linear-gradient(to right, rgba(79, 70, 229, 0.85), rgba(99, 102, 241, 0.85)) !important;
+  }
+  
+  .glass-row {
+    background-color: transparent !important;
+  }
+  .glass-row:hover {
+    background-color: rgba(255, 255, 255, 0.4) !important;
+  }
+  .public-report-shell.theme-dark .glass-row:hover {
+    background-color: rgba(51, 65, 85, 0.4) !important;
+  }
+
+  .glass-details {
+    background-color: rgba(248, 250, 252, 0.4) !important;
+  }
+  .public-report-shell.theme-dark .glass-details {
+    background-color: rgba(15, 23, 42, 0.3) !important;
+  }
+
   .public-report-shell.theme-dark .bg-white {
     background-color: rgba(15, 23, 42, 0.88) !important;
   }
@@ -73,7 +171,8 @@ const premiumStyles = `
   }
   .public-report-shell.theme-dark .border-slate-100,
   .public-report-shell.theme-dark .border-slate-200,
-  .public-report-shell.theme-dark .border-slate-300 {
+  .public-report-shell.theme-dark .border-slate-300,
+  .public-report-shell.theme-dark .border-slate-200\/60 {
     border-color: rgba(148, 163, 184, 0.26) !important;
   }
   .public-report-shell.theme-dark .reporter-badge {
@@ -184,13 +283,13 @@ const ViolationRow = ({
   const isCustomReporter = Boolean(violation.customReporterName);
 
   return (
-    <div className="border-b border-slate-100 last:border-0 bg-white hover:bg-slate-50 transition-colors">
+    <div className="glass-row transition-colors w-full">
       {/* TẦNG 1: OVERVIEW - Click để mở/đóng */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center justify-between p-3 sm:p-4 cursor-pointer select-none group"
       >
-        <div className="flex items-center gap-3 sm:gap-4 flex-1 overflow-hidden">
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 overflow-hidden">
           {/* Badge Lớp & Điểm */}
           <div className="flex flex-col items-center justify-center gap-1 min-w-[2.5rem]">
             <span className="font-bold text-slate-700 text-xs sm:text-sm">{violation.violatingClass}</span>
@@ -310,8 +409,8 @@ const ViolationRow = ({
         </div>
 
         {/* Nút Toggle Icon */}
-        <div className={`text-slate-400 pl-2 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-           <ChevronDown className="w-5 h-5" />
+        <div className="text-slate-400 pl-2 flex-shrink-0">
+           <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
@@ -319,7 +418,7 @@ const ViolationRow = ({
       <div className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${
         isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
       }`}>
-        <div className="bg-slate-50/80 p-3 sm:p-4 text-sm space-y-3 border-t border-slate-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
+        <div className="glass-details p-3 sm:p-4 text-sm space-y-3 border-t border-slate-100/60 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
           {/* Ngày vi phạm */}
           {violationTimestamp && (
             <div className="flex gap-3">
@@ -710,11 +809,22 @@ const PublicViolationReport = () => {
   };
 
   return (
-    <div className={`public-report-shell ${isDarkMode ? "theme-dark" : "theme-light"} min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-10 relative`}>
+    <div className={`public-report-shell ${isDarkMode ? "theme-dark" : "theme-light"} min-h-screen pb-10 relative`}>
       <style>{premiumStyles}</style>
-      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="aurora-blob absolute -top-24 -left-16 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl" />
-        <div className="aurora-blob absolute top-40 right-0 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl [animation-delay:4s]" />
+      {/* Fixed animated background — does NOT scroll with content */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden aurora-bg-layer">
+        {/* Base gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-slate-50 to-cyan-50" />
+        {/* Blob 1 — top-left, blue */}
+        <div className="aurora-blob-1 absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-blue-400/25 blur-[80px]" />
+        {/* Blob 2 — top-right, indigo */}
+        <div className="aurora-blob-2 absolute -top-20 right-0 h-[420px] w-[420px] rounded-full bg-indigo-400/20 blur-[70px]" />
+        {/* Blob 3 — center-left, cyan */}
+        <div className="aurora-blob-3 absolute top-1/3 -left-24 h-[380px] w-[380px] rounded-full bg-cyan-400/22 blur-[90px]" />
+        {/* Blob 4 — bottom-right, violet */}
+        <div className="aurora-blob-4 absolute bottom-0 right-0 h-[480px] w-[480px] rounded-full bg-violet-400/18 blur-[80px]" />
+        {/* Blob 5 — bottom-center, teal */}
+        <div className="aurora-blob-5 absolute bottom-1/4 left-1/3 h-[360px] w-[360px] rounded-full bg-teal-400/20 blur-[100px]" />
       </div>
       {/* Welcome Modal */}
       {showWelcomeModal && (
@@ -967,7 +1077,7 @@ const PublicViolationReport = () => {
       )}
 
       {/* Sticky Header (title row + tab row only) */}
-      <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
+      <div className="glass-header border-b border-slate-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto">
           {/* Header Row: Title + Week/Class Selector */}
           <div className="px-3 sm:px-4 py-2 border-b border-slate-100">
@@ -1103,7 +1213,7 @@ const PublicViolationReport = () => {
       </div>
 
       {/* Disclaimer & Actions — NOT sticky */}
-      <div className="bg-white border-b border-slate-100">
+      <div className="glass-header border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[10px] sm:text-xs text-slate-500 leading-relaxed flex-1 min-w-[200px]">
               {activeTab === 'violations' ? (
@@ -1161,7 +1271,7 @@ const PublicViolationReport = () => {
               </div>
             )}
             {violations && violations.length === 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-8 text-center mt-8">
+              <div className="glass-card rounded-lg shadow-sm !p-8 text-center mt-8">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
                   <FileText className="w-8 h-8 text-slate-400" />
                 </div>
@@ -1185,7 +1295,7 @@ const PublicViolationReport = () => {
                   if (excusedAbsenceCount === 0) return null;
                   
                   return (
-                    <div key={dayTimestamp} className="w-full bg-slate-100 text-slate-500 px-4 py-3 rounded-xl flex items-center justify-between border border-slate-200">
+                    <div key={dayTimestamp} className="w-full glass-card text-slate-500 !px-4 !py-3 rounded-xl flex items-center justify-between border border-slate-200">
                       <span className="font-semibold text-sm">{format(new Date(dayTimestamp), "iiii, dd/MM", { locale: vi })}</span>
                       <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200">Chỉ có {excusedAbsenceCount} nghỉ CP</span>
                     </div>
@@ -1196,14 +1306,14 @@ const PublicViolationReport = () => {
                 if (dayViolations.length === 0) return null;
                 
                 return (
-                  <div key={dayTimestamp} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div key={dayTimestamp} className="glass-card !p-0 rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
                     {/* Header Ngày */}
                     <button 
                       onClick={() => toggleDay(dayTimestamp)} 
                       className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${
                         isExpanded 
-                          ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white' 
-                          : 'bg-white hover:bg-slate-50 text-slate-800'
+                          ? 'glass-day-expanded text-white' 
+                          : 'glass-row text-slate-800'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -1225,8 +1335,8 @@ const PublicViolationReport = () => {
 
                     {/* Body Ngày */}
                     {isExpanded && (
-                      <div className="border-t border-slate-200">
-                        <div className="divide-y divide-slate-100">
+                      <div className="border-t border-slate-200/50">
+                        <div className="divide-y divide-slate-200/50">
                           {dayViolations.map((v: any) => (
                             <ViolationRow 
                               key={v._id} 
@@ -1259,7 +1369,7 @@ const PublicViolationReport = () => {
             )}
 
             {emulationScores && emulationScores.length === 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="glass-card rounded-lg shadow-sm !p-8 text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
                   <Award className="w-8 h-8 text-slate-400" />
                 </div>
@@ -1269,7 +1379,7 @@ const PublicViolationReport = () => {
             )}
 
             {emulationScores && emulationScores.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200">
+              <div className="glass-card !p-0 rounded-lg shadow-sm overflow-hidden border border-slate-200">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs sm:text-sm">
                     <thead>
@@ -1283,7 +1393,7 @@ const PublicViolationReport = () => {
                     <tbody className={`${isDarkMode ? "divide-y divide-slate-700/60" : "divide-y divide-slate-100"}`}>
                       {emulationScores.map((score, index) => {
                         return (
-                          <tr key={score.className} className={`transition-colors ${isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-slate-50"}`}>
+                          <tr key={score.className} className="glass-row transition-colors">
                             <td className="px-2 py-3 text-center align-top">
                               <span className={`font-semibold ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}>{score.className}</span>
                             </td>
@@ -1370,7 +1480,7 @@ const PublicViolationReport = () => {
                 </div>
               </div>
             ) : classViolations && classViolationsByWeek.length === 0 ? (
-               <div className="bg-white rounded-lg shadow-sm p-8 text-center mt-8">
+               <div className="glass-card rounded-lg shadow-sm !p-8 text-center mt-8">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
                   <FileText className="w-8 h-8 text-slate-400" />
                 </div>
@@ -1380,10 +1490,10 @@ const PublicViolationReport = () => {
             ) : (
               <div className="space-y-4 mt-2">
                 {classViolationsByWeek.map(({ week, violations }) => (
-                  <div key={week} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div key={week} className="glass-card !p-0 rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
                     <div className={`w-full px-4 py-3 flex items-center justify-between border-b ${
-                      isDarkMode ? "bg-slate-800/60 border-slate-600/70" : "bg-slate-50 border-slate-200"
-                    }`}>
+                      isDarkMode ? "border-slate-600/70" : "border-slate-200/50"
+                    } glass-row`}>
                       <div className="flex items-center gap-3">
                          <span className={`font-bold text-sm sm:text-base ${isDarkMode ? "text-slate-100" : "text-slate-800"}`}>Tuần {week}</span>
                       </div>
@@ -1397,7 +1507,7 @@ const PublicViolationReport = () => {
                     </div>
 
                     {violations.length > 0 ? (
-                        <div className={`${isDarkMode ? "divide-y divide-slate-700/60" : "divide-y divide-slate-100"}`}>
+                        <div className={`${isDarkMode ? "divide-y divide-slate-700/60" : "divide-y divide-slate-200/50"}`}>
                           {violations.map((v: any) => (
                             <ViolationRow 
                               key={v._id} 
@@ -1408,7 +1518,7 @@ const PublicViolationReport = () => {
                         </div>
                     ) : (
                         <div className={`p-4 text-center text-sm italic ${
-                          isDarkMode ? "text-slate-300 bg-slate-800/40" : "text-slate-500 bg-slate-50/50"
+                          isDarkMode ? "text-slate-300 glass-row" : "text-slate-500 glass-row"
                         }`}>
                             Tuần này lớp ngoan, không có vi phạm nào! 🎉
                         </div>
