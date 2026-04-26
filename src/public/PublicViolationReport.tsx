@@ -710,7 +710,7 @@ const PublicViolationReport = () => {
   };
 
   return (
-    <div className={`public-report-shell ${isDarkMode ? "theme-dark" : "theme-light"} min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-10 relative overflow-x-hidden`}>
+    <div className={`public-report-shell ${isDarkMode ? "theme-dark" : "theme-light"} min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-10 relative`}>
       <style>{premiumStyles}</style>
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
         <div className="aurora-blob absolute -top-24 -left-16 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl" />
@@ -966,7 +966,7 @@ const PublicViolationReport = () => {
         </div>
       )}
 
-      {/* Sticky Header */}
+      {/* Sticky Header (title row + tab row only) */}
       <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto">
           {/* Header Row: Title + Week/Class Selector */}
@@ -1054,62 +1054,57 @@ const PublicViolationReport = () => {
           </div>
 
           {/* Tab Selector Row */}
-          <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 sm:gap-3">
-            {/* Tab Selector */}
-            <div className="flex items-center gap-0.5 border-b-2 border-slate-200 flex-1 overflow-x-auto no-scrollbar scroll-smooth">
+          <div className="px-3 sm:px-4 py-0">
+            {/* Tab buttons: centered on mobile, left-aligned on desktop */}
+            <div className="flex items-end justify-center sm:justify-start border-b-2 border-slate-200">
               <button
                 onClick={() => handleTabChange('violations')}
-                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
+                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${
                   activeTab === 'violations'
-                    ? (isDarkMode ? 'text-indigo-300' : 'text-indigo-600')
-                    : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')
+                    ? (isDarkMode ? 'text-indigo-300 border-indigo-300' : 'text-indigo-600 border-indigo-600')
+                    : 'border-transparent ' + (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')
                 }`}
               >
                 <span className="flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Vi phạm</span>
                 </span>
-                {activeTab === 'violations' && (
-                  <div className={`absolute bottom-0 left-0 right-0 h-0.5 -mb-[2px] ${isDarkMode ? 'bg-indigo-300' : 'bg-indigo-600'}`}></div>
-                )}
               </button>
               <button
                 onClick={() => handleTabChange('scores')}
-                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
+                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${
                   activeTab === 'scores'
-                    ? (isDarkMode ? 'text-amber-300' : 'text-amber-600')
-                    : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')
+                    ? (isDarkMode ? 'text-amber-300 border-amber-300' : 'text-amber-600 border-amber-600')
+                    : 'border-transparent ' + (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')
                 }`}
               >
                 <span className="flex items-center gap-1.5">
                   <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Bảng điểm</span>
                 </span>
-                {activeTab === 'scores' && (
-                  <div className={`absolute bottom-0 left-0 right-0 h-0.5 -mb-[2px] ${isDarkMode ? 'bg-amber-300' : 'bg-amber-600'}`}></div>
-                )}
               </button>
               <button
                 onClick={() => handleTabChange('classSummary')}
-                className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
+                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${
                   activeTab === 'classSummary'
-                    ? (isDarkMode ? 'text-emerald-300' : 'text-emerald-600')
-                    : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')
+                    ? (isDarkMode ? 'text-emerald-300 border-emerald-300' : 'text-emerald-600 border-emerald-600')
+                    : 'border-transparent ' + (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700')
                 }`}
               >
                 <span className="flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Tổng hợp theo lớp</span>
                 </span>
-                {activeTab === 'classSummary' && (
-                  <div className={`absolute bottom-0 left-0 right-0 h-0.5 -mb-[2px] ${isDarkMode ? 'bg-emerald-300' : 'bg-emerald-600'}`}></div>
-                )}
               </button>
             </div>
           </div>
 
-          {/* Disclaimer & Actions */}
-          <div className="px-3 sm:px-4 py-1.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+        </div>
+      </div>
+
+      {/* Disclaimer & Actions — NOT sticky */}
+      <div className="bg-white border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[10px] sm:text-xs text-slate-500 leading-relaxed flex-1 min-w-[200px]">
               {activeTab === 'violations' ? (
                 <>
@@ -1145,7 +1140,6 @@ const PublicViolationReport = () => {
                 <span>{hideExcusedAbsence ? 'Ẩn nghỉ CP' : 'Hiện tất cả'}</span>
               </button>
             )}
-          </div>
         </div>
       </div>
 
