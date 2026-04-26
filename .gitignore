@@ -10,6 +10,8 @@ lerna-debug.log*
 # Dependencies
 node_modules
 convex/_generated/
+convex/betterAuth/_generated/
+
 
 # Build outputs
 dist

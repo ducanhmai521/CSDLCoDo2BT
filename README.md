@@ -139,125 +139,146 @@
 - **Upload file đính kèm**: Giấy khám bệnh, etc.
 - **Gửi yêu cầu**
 
-## 🛠️ Cài Đặt Và Triển Khai
+## 🛠️ Hướng Dẫn Cài Đặt Và Triển Khai Chi Tiết
 
-### Yêu Cầu Hệ Thống
-- **Node.js**: Phiên bản 19 trở lên
-- **Git**: Để clone repository
-- **Tài khoản**: Convex, Vercel, Cloudflare R2
+Dưới đây là hướng dẫn chi tiết từng bước để cài đặt project này chạy thực tế, đặc biệt là cách thiết lập **Better Auth**, AI và lưu trữ file.
 
-### Cài Đặt Local (Development)
+### 1. Yêu Cầu Hệ Thống
+- **Node.js**: Phiên bản 18+ (khuyên dùng 20.x)
+- **Git**: Để clone source code
+- Các tài khoản dịch vụ cần thiết:
+  - Tài khoản [Convex](https://convex.dev) (Miễn phí)
+  - Tài khoản [OpenRouter](https://openrouter.ai) (để gọi API AI)
+  - Tài khoản [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) (để lưu ảnh/video)
+
+### 2. Khởi Tạo Dự Án Local
+
+Mở Terminal và chạy các lệnh sau:
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/ducanhmai521/CSDLCoDo2BT
 cd CSDLCoDo2BT
 
-# 2. Cài dependencies
+# 2. Cài đặt các thư viện (dependencies)
 npm install
+```
 
-# 3. Khởi tạo Convex
+### 3. Cấu hình Convex Backend
+
+Khởi tạo project trên Convex:
+```bash
 npx convex dev
+```
+- Lệnh này sẽ yêu cầu bạn đăng nhập Convex (bằng GitHub).
+- Nó sẽ tự tạo một project Convex mới và liên kết với code local của bạn.
+- Bạn có thể ấn `Ctrl + C` để dừng tạm thời nếu cần thiết lập biến môi trường ở bước sau.
 
-# 4. Chạy project (mở 2 terminal)
-npm run dev:frontend  # Terminal 1 - Frontend
-npm run dev:backend # Terminal 2 - Backend
+### 4. Cấu Hình Biến Môi Trường (Environment Variables)
+
+Hệ thống cần các biến môi trường được lưu trữ bảo mật trên server của Convex (không nằm trong `.env` của thư mục code). Để cài đặt, bạn mở dashboard của Convex (vào [dashboard.convex.dev](https://dashboard.convex.dev)), chọn project của mình, rồi vào tab **Settings > Environment Variables**, hoặc chạy các lệnh dưới đây trong Terminal.
+
+#### A. Thiết Lập Better Auth (Bắt Buộc)
+
+Better Auth là hệ thống quản lý đăng nhập và phiên làm việc (session). Nó cần 2 biến chính:
+
+1. **`BETTER_AUTH_SECRET`**: Khóa bí mật dùng để mã hóa token. Phải là một chuỗi ngẫu nhiên dài và bảo mật (ít nhất 32 ký tự).
+   - **Cách tạo custom key nhanh nhất**: 
+     - Mở Terminal (PowerShell/Bash) và gõ: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+     - Hoặc dùng công cụ [Generate Secret](https://generate-secret.vercel.app/32)
+   - Lệnh lưu vào Convex:
+     ```bash
+     npx convex env set BETTER_AUTH_SECRET "CHUỖI_BẠN_VỪA_TẠO_VÀO_ĐÂY"
+     ```
+
+2. **`BETTER_AUTH_URL`**: Đường dẫn gốc trang web của bạn (không có dấu `/` ở cuối).
+   - Khi chạy ở môi trường **Local/Dev**:
+     ```bash
+     npx convex env set BETTER_AUTH_URL "http://localhost:5173"
+     ```
+   - Khi chạy trên **Production** (ví dụ trang web là `https://codo.thpts2bt.edu.vn`):
+     ```bash
+     npx convex env set BETTER_AUTH_URL "https://codo.thpts2bt.edu.vn"
+     ```
+
+#### B. Thiết Lập Cloudflare R2 (Bắt Buộc Để Lưu Ảnh)
+
+Dự án dùng Cloudflare R2 (miễn phí 10GB) để lưu trữ bằng chứng vi phạm. Bạn vào Dashboard Cloudflare > R2, tạo Bucket mới và xin thông tin API Token. Sau đó nhập:
+
+```bash
+npx convex env set R2_ACCOUNT_ID "id_tài_khoản_cloudflare_của_bạn"
+npx convex env set R2_ACCESS_KEY_ID "r2_access_key_bạn_vừa_tạo"
+npx convex env set R2_SECRET_ACCESS_KEY "r2_secret_key_bạn_vừa_tạo"
+npx convex env set R2_BUCKET_NAME "tên_bucket_của_bạn"
+npx convex env set R2_PUBLIC_URL "url_public_r2_của_bạn"
+```
+*(Ghi chú: `R2_PUBLIC_URL` thường có định dạng `https://pub-xxxxxx.r2.dev`)*
+
+#### C. Thiết Lập OpenRouter AI (Tùy Chọn nhưng khuyên dùng)
+
+Để tính năng AI (tự động điền vi phạm) hoạt động, bạn lấy API Key từ OpenRouter.
+
+```bash
+npx convex env set OPENROUTER_API_KEY "sk-or-v1-..."
+npx convex env set OPENROUTER_MODEL "openai/gpt-4o-mini"
 ```
 
-### Triển Khai Production
+### 5. Chạy Dự Án
 
-#### 1. Chuẩn Bị
-- **Convex**: Tạo project production, lấy deployment key
-- **Vercel**: Import từ GitHub, cấu hình environment variables
-- **Cloudflare R2**: Tạo bucket, API token
+Sau khi cài đặt xong biến môi trường, hãy mở 2 tab Terminal:
 
-#### 2. Environment Variables
-Cần cấu hình đầy đủ các biến:
+**Terminal 1 (Backend - Convex):**
+```bash
+npx convex dev
 ```
-# JWT & Auth
-JWT_PRIVATE_KEY=your_jwt_private_key
-JWKS=your_jwks_json
+Lệnh này sẽ tự động chạy server database và sync liên tục mọi thay đổi bạn viết trong thư mục `convex/`.
 
-# OpenRouter AI
-OPENROUTER_API_KEY=your_openrouter_api_key
-# Optional (fallback if Admin setting `aiModel` is empty)
-OPENROUTER_MODEL=openai/gpt-4o-mini
-# Optional (recommended by OpenRouter)
-OPENROUTER_HTTP_REFERER=http://localhost
-OPENROUTER_APP_NAME=CSDLCoDo2BT
-
-# Cloudflare R2
-R2_ACCOUNT_ID=your_r2_account_id
-R2_ACCESS_KEY_ID=your_r2_access_key
-R2_SECRET_ACCESS_KEY=your_r2_secret_key
-R2_BUCKET_NAME=your_bucket_name
-R2_PUBLIC_URL=your_r2_public_url
-
-# Deployment
-VITE_CONVEX_URL=your_convex_deployment_url
-CONVEX_DEPLOYMENT_KEY=your_convex_deploy_key
+**Terminal 2 (Frontend - Vite):**
+```bash
+npm run dev
 ```
+Trình duyệt sẽ tự động mở lên tại `http://localhost:5173`. Bạn đã có thể bắt đầu sử dụng!
 
-#### 3. GitHub Actions (Tùy Chọn)
-- **Tự động deploy**: Khi push code lên GitHub
-- **Cấu hình**: Thêm `CONVEX_DEPLOY_KEY` vào GitHub Secrets
+---
+
+### 🚀 Hướng Dẫn Triển Khai Lên Môi Trường Thật (Production Deploy)
+
+Khi bạn muốn chạy thực tế, Frontend thường được host trên Vercel hoặc Cloudflare Pages. 
+
+1. Push code của bạn lên một GitHub Repository.
+2. Đăng nhập vào [Vercel](https://vercel.com) > Add New Project > Import repo của bạn.
+3. Trong phần **Environment Variables** trên Vercel, bạn cần điền các biến Frontend:
+   - `VITE_CONVEX_URL="đường_dẫn_convex_production_của_bạn"` (Lấy từ Convex Dashboard)
+4. Trên hệ thống của **Convex** (chuyển sang môi trường Production):
+   - Vào Settings > Environment Variables.
+   - Thêm đầy đủ lại các biến `BETTER_AUTH_SECRET`, `R2_...`, `OPENROUTER_...` như bước 4.
+   - ⚠️ **QUAN TRỌNG:** Phải đổi biến `BETTER_AUTH_URL` thành tên miền chính thức của bạn (ví dụ `https://codo.truongcua_ban.edu.vn`).
+
+### Mật Khẩu Admin Mặc Định Là Gì?
+Khi cài mới hoàn toàn, database sẽ trống. Hãy vào bảng `users` trên Convex Dashboard để tự thêm bản ghi Admin đầu tiên, hoặc bạn có thể tạo qua form public rồi vào Dashboard Convex phân quyền Role thành `"admin"`.
 
 ## 📁 Cấu Trúc Dự Án
 
 ```
 CSDLCoDo2BT/
-├── convex/                 # Backend logic
-│   ├── violations.ts       # Logic vi phạm
-│   ├── users.ts           # Quản lý người dùng
-│   ├── ai.ts              # AI integration
-│   ├── r2.ts              # Cloudflare R2
-│   └── excelExport.ts     # Xuất Excel
+├── convex/                 # Backend logic & Database Schema
+│   ├── betterAuth/         # Module quản lý Authentication (BetterAuth)
+│   ├── violations.ts       # Logic ghi nhận vi phạm
+│   ├── users.ts            # Quản lý người dùng, học sinh
+│   ├── ai.ts               # Logic gọi AI xử lý thô
+│   ├── r2.ts               # Tương tác với Cloudflare R2
+│   └── excelExport.ts      # Tạo báo cáo Excel
 ├── src/
-│   ├── components/        # UI components
-│   ├── public/            # Trang công khai
-│   ├── AdminDashboard.tsx # Dashboard Admin
-│   ├── ViolationReportForm.tsx # Form báo cáo
-│   └── AIViolationInputModal.tsx # AI helper
+│   ├── components/         # Các mảnh UI nhỏ (Buttons, Modals...)
+│   ├── public/             # Trang công khai (Bảng điểm thi đua, Form xin phép)
+│   ├── AdminDashboard.tsx  # Giao diện chính quyền Admin
+│   └── ViolationReportForm.tsx # Form thao tác báo cáo
 └── README.md
 ```
 
-## 🔧 Tùy Chỉnh Cho Trường Của Bạn
-
-### 1. Đổi Tên Trường
-- **File**: `index.html` - thay đổi `<title>`
-- **File**: `src/App.tsx` - thay đổi tên trong header và footer
-- **File**: `src/public/*.tsx` - thay đổi tiêu đề các bảng công khai
-
-### 2. Đổi Logo
-- **Icon**: Thay thế `icon.ico` và `favicon.ico`
-- **Logo header**: Đổi URL trong `src/App.tsx`
-- **Logo public**: Đổi trong các file `src/public/*.tsx`
-
-### 3. Điều Chỉnh Danh Mục Vi Phạm
-- **File**: `convex/violationPoints.ts`
-- **Cấu trúc**: Categories → Violations → Điểm trừ
-- **Tùy chỉnh**: Thêm, sửa, xóa theo quy định trường bạn
-
-### 4. Số Lượng Lớp
-- **Mặc định**: 24 lớp (10A1 → 12A8)
-- **Thay đổi**: Cần sửa nhiều file, xem lưu ý bên dưới
-
 ## ⚠️ Lưu Ý Quan Trọng
-
-### 1. Giới Hạn Thiết Kế
-- **Số lớp**: Code được thiết kế cho 24 lớp cố định
-- **Tên lớp**: Theo format 10A1, 11A2, 12A8...
-- **Nếu khác**: Cần chỉnh sửa nhiều file, không khuyến khích cho người không chuyên
-
-### 2. Bảo Mật
-- **JWT Keys**: Tự tạo cặp khóa RSA, đảm bảo an toàn
-- **API Keys**: Không commit lên GitHub
-- **File upload**: Có giới hạn kích thước, tự động nén
-
-### 3. Performance
-- **Real-time**: Dữ liệu cập nhật ngay lập tức
-- **Caching**: Tự động cache để tối ưu
-- **Lazy loading**: Chỉ load data khi cần
+- **Bảo mật:** Không bao giờ lưu trực tiếp API keys vào code. Chỉ sử dụng lệnh `npx convex env set` hoặc nhập trên giao diện web của Convex.
+- **Tên lớp:** Hệ thống mặc định cấu hình tĩnh 24 lớp (`10A1` đến `12A8`). Nếu sửa đổi, cần cập nhật file `src/lib/utils.ts` và các bộ lọc tìm kiếm.
 
 ## 🤝 Đóng Góp
 

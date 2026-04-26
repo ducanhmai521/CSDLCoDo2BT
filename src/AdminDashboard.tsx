@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { startOfWeek, startOfDay, endOfDay, toDate, differenceInCalendarWeeks, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
-import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2 } from 'lucide-react';
+import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2, Upload, X } from 'lucide-react';
 import { AIViolationInputModal } from "./AIViolationInputModal";
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -66,7 +66,28 @@ export default function AdminDashboard() {
   const [holidayBreakEndDate, setHolidayBreakEndDate] = useState<string>("");
   const [weekNumber, setWeekNumber] = useState<number>(1);
   const [weekInput, setWeekInput] = useState<number>(1);
-  const [activeSection, setActiveSection] = useState<'actions' | 'overview' | 'violations' | 'emulation' | 'roster' | 'users' | 'systemUsers' | 'settings' >('actions');
+  const [activeSection, setActiveSection] = useState<'actions' | 'overview' | 'violations' | 'emulation' | 'roster' | 'systemUsers' | 'settings' >('actions');
+  // Better Auth users state for systemUsers tab
+  const [betterAuthUsers, setBetterAuthUsers] = useState<Array<any> | null>(null);
+  const [betterAuthUsersLoading, setBetterAuthUsersLoading] = useState(false);
+  // Password reset state
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  // Bulk create state
+  const [showBulkCreateModal, setShowBulkCreateModal] = useState(false);
+  const [bulkRows, setBulkRows] = useState<Array<{ username: string; password: string }>>([
+    { username: "", password: "" },
+  ]);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkSummary, setBulkSummary] = useState<{
+    created: number;
+    failed: number;
+    results: Array<{ username: string; status: "created" | "duplicate" | "failed"; reason?: string }>;
+  } | null>(null);
+  const [showAutoMigrateModal, setShowAutoMigrateModal] = useState(false);
+  const [autoMigrateStep, setAutoMigrateStep] = useState<'preview' | 'processing' | 'result'>('preview');
+  const [autoMigrateData, setAutoMigrateData] = useState<any | null>(null);
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
   const savedBreakStart = useQuery(api.users.getSetting, { key: 'holidayBreakStartDate' });
   const savedBreakEnd = useQuery(api.users.getSetting, { key: 'holidayBreakEndDate' });
@@ -78,10 +99,15 @@ export default function AdminDashboard() {
   const exportRosterTemplate = useAction(api.adminTools.exportRosterTemplate);
   const importRoster = useAction(api.adminTools.importRoster);
   const setupPublicAbsenceSystemUser = useAction(api.adminTools.setupPublicAbsenceSystemUser);
-  const migrateExistingViolations = useMutation(api.reportingPoints.migrateExistingViolations);
+  const getBetterAuthUsersAction = useAction(api.adminTools.getBetterAuthUsers);
+  const setUserPasswordAction = useAction(api.adminTools.setUserPassword);
+  const bulkCreateUsersAction = useAction(api.adminTools.bulkCreateUsers);
+  const migrateProfilesToBetterAuthAction = useAction(api.adminTools.migrateProfilesToBetterAuth);
+
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const deleteUserProfile = useMutation(api.users.deleteUserProfile);
   const migrateUserDataAndDeleteProfile = useMutation(api.users.migrateUserDataAndDeleteProfile);
+  const reassignAuthAccountMutation = useMutation(api.users.reassignAuthAccount);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const roster = useQuery(api.users.listRoster);
   const [showRosterModal, setShowRosterModal] = useState(false);
@@ -94,6 +120,14 @@ export default function AdminDashboard() {
   const [aiModelsSavedAt, setAiModelsSavedAt] = useState<number | null>(null);
   const [migrateFromProfileId, setMigrateFromProfileId] = useState<string>("");
   const [migrateToProfileId, setMigrateToProfileId] = useState<string>("");
+  // Reassign auth account state
+  const [reassignSourceBaId, setReassignSourceBaId] = useState<string>("");
+  const [reassignTargetProfileId, setReassignTargetProfileId] = useState<string>("");
+  const [reassignLoading, setReassignLoading] = useState(false);
+  const [reassignConflict, setReassignConflict] = useState<{
+    existingProfileName: string;
+    existingProfileId: string;
+  } | null>(null);
   const navButtonClass = (active: boolean) =>
     `shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition-all whitespace-nowrap ${
       active
@@ -130,6 +164,15 @@ export default function AdminDashboard() {
 
   const pendingUsers = useQuery(api.users.getPendingUsers);
   const allUserProfiles = useQuery(api.users.getAllUserProfiles);
+  // Fetch Convex users bridging Better Auth IDs to Convex user IDs
+  // betterAuthUsers is the raw array of BA user objects (already extracted from result.users)
+  const betterAuthUserIds = betterAuthUsers
+    ? (betterAuthUsers as Array<any>).map((u: any) => u.id ?? u._id).filter(Boolean) as string[]
+    : [];
+  const convexUsersByBetterAuthId = useQuery(
+    api.users.getUsersByBetterAuthIds,
+    betterAuthUsers !== null && betterAuthUserIds.length > 0 ? { betterAuthIds: betterAuthUserIds } : "skip"
+  );
   const allViolations = useQuery(api.violations.getAllViolationsForAdmin, filters);
   const allViolationsForActions = useQuery(api.violations.getAllViolationsForAdmin, {} as any);
   const appealedViolations = useMemo(
@@ -283,6 +326,27 @@ export default function AdminDashboard() {
     setOpenRouterModelsDraft('');
   }, [savedOpenRouterModels, savedAiModels, savedAiModel]);
 
+  // Fetch Better Auth users when systemUsers tab is activated
+  useEffect(() => {
+    if (activeSection !== 'systemUsers') return;
+    if (betterAuthUsers !== null || betterAuthUsersLoading) return;
+    setBetterAuthUsersLoading(true);
+    getBetterAuthUsersAction({})
+      .then((result: any) => {
+        // Better Auth admin listUsers returns { users: [...], total, ... }
+        const users = Array.isArray(result) ? result : (result?.users ?? result?.data ?? []);
+        setBetterAuthUsers(users);
+      })
+      .catch(() => {
+        toast.error("Không thể tải danh sách tài khoản. Hiển thị dữ liệu hồ sơ.");
+        setBetterAuthUsers([]);
+      })
+      .finally(() => {
+        setBetterAuthUsersLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
+
   return (
     <div className="w-full">
       <div className="mx-auto max-w-[1400px] md:flex gap-6">
@@ -296,8 +360,7 @@ export default function AdminDashboard() {
             <button className={navButtonClass(activeSection==='violations')} onClick={() => setActiveSection('violations')}>Vi phạm</button>
             <button className={navButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}>Thi đua</button>
             <button className={navButtonClass(activeSection==='roster')} onClick={() => setActiveSection('roster')}>Học sinh</button>
-            <button className={navButtonClass(activeSection==='users')} onClick={() => setActiveSection('users')}>Xét duyệt</button>
-            <button className={navButtonClass(activeSection==='systemUsers')} onClick={() => setActiveSection('systemUsers')}>Users</button>
+            <button className={navButtonClass(activeSection==='systemUsers')} onClick={() => setActiveSection('systemUsers')}>Tài khoản HT</button>
             <button className={navButtonClass(activeSection==='settings')} onClick={() => setActiveSection('settings')}>Cài đặt</button>
           </div>
         </div>
@@ -311,12 +374,11 @@ export default function AdminDashboard() {
             <button className={sideNavButtonClass(activeSection==='violations')} onClick={() => setActiveSection('violations')}><AlertTriangle className="w-4 h-4 inline-block mr-2" /> Quản lý Vi phạm</button>
             <button className={sideNavButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}><Trophy className="w-4 h-4 inline-block mr-2" /> Điểm thi đua</button>
             <button className={sideNavButtonClass(activeSection==='roster')} onClick={() => setActiveSection('roster')}><Users className="w-4 h-4 inline-block mr-2" /> Danh sách học sinh</button>
-            <button className={sideNavButtonClass(activeSection==='users')} onClick={() => setActiveSection('users')}><CheckCircle className="w-4 h-4 inline-block mr-2" /> Xét duyệt</button>
             <button className={sideNavButtonClass(activeSection==='systemUsers')} onClick={() => setActiveSection('systemUsers')}><UserCheck className="w-4 h-4 inline-block mr-2" /> User hệ thống</button>
             <button className={sideNavButtonClass(activeSection==='settings')} onClick={() => setActiveSection('settings')}><Settings className="w-4 h-4 inline-block mr-2" /> Cài đặt</button>
           </nav>
         </aside>
-        <div className="flex-1 space-y-8">
+        <div className="flex-1 min-w-0 space-y-8">
       {activeSection === 'emulation' && (
         <EmulationScoreTable />
       )}
@@ -374,38 +436,718 @@ export default function AdminDashboard() {
         </div>
       </div>
       )}
-      {activeSection === 'users' && (
-      <div className="w-full">
-        <div className="bg-white/80 rounded-lg border border-slate-200/80 p-4">
-          <h3 className="text-lg font-semibold mb-3">Người dùng chờ duyệt</h3>
-          {pendingUsers === undefined ? (
-            <p className="text-slate-500 text-sm">Đang tải...</p>
-          ) : pendingUsers.length === 0 ? (
-            <p className="text-slate-500 text-sm">Không có người dùng chờ duyệt.</p>
+
+      {activeSection === 'systemUsers' && (
+      <div className="w-full space-y-6">
+        {/* Unified Better Auth + Convex user table */}
+        <div className={panelClass}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <h3 className="text-lg font-semibold text-slate-800">Tài khoản hệ thống</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setBulkRows([{ username: "", password: "" }]);
+                  setBulkSummary(null);
+                  setShowBulkCreateModal(true);
+                }}
+                className={primaryButtonClass}
+              >
+                Tạo nhiều tài khoản
+              </button>
+              <button
+                onClick={async () => {
+                  setShowAutoMigrateModal(true);
+                  setAutoMigrateStep('preview');
+                  setAutoMigrateData(null);
+                  try {
+                    const result = await migrateProfilesToBetterAuthAction({ dryRun: true });
+                    setAutoMigrateData(result);
+                  } catch (e) {
+                    toast.error(`Lỗi tải dữ liệu: ${(e as Error).message}`);
+                    setShowAutoMigrateModal(false);
+                  }
+                }}
+                className={secondaryButtonClass}
+              >
+                Tự động tạo Better Auth
+              </button>
+              <button
+                onClick={() => {
+                  setBetterAuthUsers(null);
+                  setBetterAuthUsersLoading(false);
+                }}
+                className={secondaryButtonClass}
+                title="Tải lại danh sách"
+              >
+                Tải lại
+              </button>
+            </div>
+          </div>
+          <p className="text-sm text-slate-600 mb-3">
+            Danh sách tài khoản Better Auth kết hợp với hồ sơ Convex. Sắp xếp theo ngày tạo mới nhất.
+          </p>
+          {(() => {
+            // Build merged list
+            const baUsers: Array<any> = betterAuthUsers ?? [];
+            const profiles: Array<any> = allUserProfiles ?? [];
+            const convexUsers: Array<any> = convexUsersByBetterAuthId ?? [];
+
+            // Map betterAuthId -> convex user record
+            const baIdToConvexUser = new Map<string, any>();
+            for (const cu of convexUsers) {
+              baIdToConvexUser.set(cu.betterAuthId, cu);
+            }
+
+            // Map convex userId -> profile
+            const userIdToProfile = new Map<string, any>();
+            for (const p of profiles) {
+              userIdToProfile.set(p.userId, p);
+            }
+
+            // Track which profiles have been matched to a BA user
+            const matchedProfileUserIds = new Set<string>();
+
+            // Build rows from Better Auth users
+            const rows: Array<{
+              key: string;
+              baUser: any | null;
+              convexUser: any | null;
+              profile: any | null;
+            }> = baUsers.map((baUser: any) => {
+              const baId = baUser.id ?? baUser._id ?? "";
+              const convexUser = baIdToConvexUser.get(baId) ?? null;
+              const profile = convexUser ? (userIdToProfile.get(convexUser._id) ?? null) : null;
+              if (convexUser) matchedProfileUserIds.add(convexUser._id);
+              return { key: baId || String(Math.random()), baUser, convexUser, profile };
+            });
+
+            // Add profiles with no linked BA account
+            for (const p of profiles) {
+              if (!matchedProfileUserIds.has(p.userId)) {
+                rows.push({ key: `profile-${p.profileId}`, baUser: null, convexUser: null, profile: p });
+              }
+            }
+
+            // Sort by BA account creation date descending; profiles-only rows go to the end
+            rows.sort((a, b) => {
+              const aTime = a.baUser ? new Date(a.baUser.createdAt).getTime() : 0;
+              const bTime = b.baUser ? new Date(b.baUser.createdAt).getTime() : 0;
+              return bTime - aTime;
+            });
+
+            const isLoading = betterAuthUsersLoading || allUserProfiles === undefined;
+
+            if (isLoading) {
+              return <p className="text-sm text-slate-500">Đang tải...</p>;
+            }
+
+            if (rows.length === 0) {
+              return <p className="text-sm text-slate-500">Không có tài khoản nào.</p>;
+            }
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b border-slate-200/80">
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Tên đăng nhập</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Email</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Ngày tạo</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Đăng nhập cuối</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Họ tên</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Lớp</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Vai trò</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">SuperUser</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Báo cáo</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Hoạt động cuối</th>
+                      <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(({ key, baUser, profile }) => (
+                      <tr key={key} className="border-b border-slate-200/60 hover:bg-white/60">
+                        <td className="py-2 px-3 text-slate-700 font-mono text-xs">
+                          {baUser
+                            ? (baUser.username ?? baUser.name ?? baUser.email?.split("@")[0] ?? "—")
+                            : (profile?.fullName ? (
+                                <span className="text-slate-500 italic">—</span>
+                              ) : "—")}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600 text-xs">
+                          {baUser ? baUser.email : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600 whitespace-nowrap text-xs">
+                          {baUser
+                            ? format(toZonedTime(new Date(baUser.createdAt), TIME_ZONE), "dd/MM/yyyy HH:mm")
+                            : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600 whitespace-nowrap text-xs">
+                          {baUser?.updatedAt
+                            ? format(toZonedTime(new Date(baUser.updatedAt), TIME_ZONE), "dd/MM/yyyy HH:mm")
+                            : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          {profile ? profile.fullName : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          {profile ? profile.className : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          {profile ? profile.role : (
+                            !baUser ? (
+                              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
+                                Không có tài khoản auth
+                              </span>
+                            ) : "—"
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          {profile ? (profile.isSuperUser ? "Có" : "Không") : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-slate-700 font-semibold">
+                          {profile ? profile.reportCount : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600 whitespace-nowrap text-xs">
+                          {profile?.lastActiveAt
+                            ? format(toZonedTime(new Date(profile.lastActiveAt), TIME_ZONE), "dd/MM/yyyy HH:mm")
+                            : "—"}
+                        </td>
+                        <td className="py-2 px-3">
+                          {baUser && (
+                            <button
+                              onClick={() => {
+                                setResetPasswordUserId(baUser.id ?? baUser._id);
+                                setResetPasswordValue("");
+                              }}
+                              className="px-3 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors whitespace-nowrap"
+                            >
+                              Đặt lại mật khẩu
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Password reset modal */}
+        {resetPasswordUserId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-white/70 bg-white/95 shadow-2xl p-6 space-y-4">
+              <h3 className="text-base font-semibold text-slate-800">Đặt lại mật khẩu</h3>
+              <p className="text-sm text-slate-600">
+                Nhập mật khẩu mới cho tài khoản này. Mật khẩu phải có ít nhất 8 ký tự.
+              </p>
+              <input
+                type="password"
+                placeholder="Mật khẩu mới (tối thiểu 8 ký tự)"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                className="auth-input-field w-full"
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    setResetPasswordUserId(null);
+                    setResetPasswordValue("");
+                  }}
+                  disabled={resetPasswordLoading}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-60"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!resetPasswordUserId) return;
+                    setResetPasswordLoading(true);
+                    try {
+                      await setUserPasswordAction({
+                        betterAuthUserId: resetPasswordUserId,
+                        newPassword: resetPasswordValue,
+                      });
+                      toast.success("Đặt lại mật khẩu thành công.");
+                      setResetPasswordUserId(null);
+                      setResetPasswordValue("");
+                    } catch (err) {
+                      toast.error(`Đặt lại mật khẩu thất bại: ${(err as Error).message}`);
+                    } finally {
+                      setResetPasswordLoading(false);
+                    }
+                  }}
+                  disabled={resetPasswordValue.length < 8 || resetPasswordLoading}
+                  className="inline-flex items-center justify-center rounded-lg bg-indigo-900/90 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-900 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {resetPasswordLoading ? "Đang xử lý..." : "Xác nhận"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk create users modal */}
+        {showBulkCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="w-full max-w-2xl rounded-2xl border border-white/70 bg-white/95 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-slate-800">Tạo nhiều tài khoản</h3>
+                <button
+                  onClick={() => {
+                    setShowBulkCreateModal(false);
+                    setBulkSummary(null);
+                  }}
+                  disabled={bulkSubmitting}
+                  className="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* CSV upload */}
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white cursor-pointer">
+                  Tải lên CSV
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const text = ev.target?.result as string;
+                        const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+                        if (lines.length === 0) return;
+                        // Detect header row
+                        const firstLine = lines[0].toLowerCase();
+                        const hasHeader =
+                          firstLine.includes("username") || firstLine.includes("password");
+                        const dataLines = hasHeader ? lines.slice(1) : lines;
+                        const parsed = dataLines.map((line) => {
+                          const parts = line.split(",").map((p) => p.trim());
+                          return { username: parts[0] ?? "", password: parts[1] ?? "" };
+                        });
+                        setBulkRows(parsed.length > 0 ? parsed : [{ username: "", password: "" }]);
+                        setBulkSummary(null);
+                      };
+                      reader.readAsText(file);
+                      // Reset input so same file can be re-uploaded
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <span className="text-xs text-slate-500">
+                  Định dạng CSV: cột 1 = username, cột 2 = password
+                </span>
+              </div>
+
+              {/* Multi-row form */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs font-semibold text-slate-600 px-1">
+                  <span>Tên đăng nhập</span>
+                  <span>Mật khẩu</span>
+                  <span />
+                </div>
+                {bulkRows.map((row, idx) => {
+                  const usernameError = row.username.trim() === "";
+                  const passwordError = row.password.trim() === "";
+                  return (
+                    <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="username"
+                          value={row.username}
+                          onChange={(e) => {
+                            const next = [...bulkRows];
+                            next[idx] = { ...next[idx], username: e.target.value };
+                            setBulkRows(next);
+                            setBulkSummary(null);
+                          }}
+                          className={`auth-input-field w-full ${usernameError && row.username !== "" ? "" : ""} ${
+                            bulkSummary ? "" : ""
+                          }`}
+                          style={
+                            usernameError && (bulkSummary !== null || row.username !== "")
+                              ? { borderColor: "#f87171" }
+                              : {}
+                          }
+                        />
+                        {usernameError && row.username === "" && bulkSummary !== null && (
+                          <p className="text-xs text-red-500 mt-0.5">Bắt buộc</p>
+                        )}
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="password"
+                          value={row.password}
+                          onChange={(e) => {
+                            const next = [...bulkRows];
+                            next[idx] = { ...next[idx], password: e.target.value };
+                            setBulkRows(next);
+                            setBulkSummary(null);
+                          }}
+                          className="auth-input-field w-full"
+                          style={
+                            passwordError && (bulkSummary !== null || row.password !== "")
+                              ? { borderColor: "#f87171" }
+                              : {}
+                          }
+                        />
+                        {passwordError && row.password === "" && bulkSummary !== null && (
+                          <p className="text-xs text-red-500 mt-0.5">Bắt buộc</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setBulkRows(bulkRows.filter((_, i) => i !== idx));
+                          setBulkSummary(null);
+                        }}
+                        disabled={bulkRows.length === 1}
+                        className="mt-1 px-2 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  );
+                })}
+                <button
+                  onClick={() => {
+                    setBulkRows([...bulkRows, { username: "", password: "" }]);
+                    setBulkSummary(null);
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-white"
+                >
+                  + Thêm dòng
+                </button>
+              </div>
+
+              {/* Summary after submission */}
+              {bulkSummary && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <p className="text-sm font-semibold text-slate-800">
+                    Tạo thành công {bulkSummary.created} tài khoản, thất bại {bulkSummary.failed} tài khoản.
+                  </p>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {bulkSummary.results.map((r, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-start gap-2 text-xs rounded-lg px-2 py-1 ${
+                          r.status === "created"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : r.status === "duplicate"
+                            ? "bg-amber-50 text-amber-800"
+                            : "bg-red-50 text-red-800"
+                        }`}
+                      >
+                        <span className="font-semibold shrink-0">
+                          {r.status === "created"
+                            ? "✓"
+                            : r.status === "duplicate"
+                            ? "⚠ Trùng"
+                            : "✗"}
+                        </span>
+                        <span className="font-mono">{r.username}</span>
+                        {r.reason && (
+                          <span className="text-xs opacity-75 ml-1">— {r.reason}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  onClick={() => {
+                    setShowBulkCreateModal(false);
+                    setBulkSummary(null);
+                    // Refresh the Better Auth user list
+                    setBetterAuthUsers(null);
+                    setBetterAuthUsersLoading(false);
+                  }}
+                  disabled={bulkSubmitting}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-60"
+                >
+                  {bulkSummary ? "Đóng" : "Hủy"}
+                </button>
+                {!bulkSummary && (
+                  <button
+                    onClick={async () => {
+                      // Validate: all rows must have username and password
+                      const hasEmpty = bulkRows.some(
+                        (r) => r.username.trim() === "" || r.password.trim() === ""
+                      );
+                      if (hasEmpty) {
+                        setBulkSummary({
+                          created: 0,
+                          failed: 0,
+                          results: [],
+                        });
+                        toast.error("Vui lòng điền đầy đủ tên đăng nhập và mật khẩu cho tất cả các dòng.");
+                        return;
+                      }
+                      setBulkSubmitting(true);
+                      try {
+                        const summary = await bulkCreateUsersAction({
+                          users: bulkRows.map((r) => ({
+                            username: r.username.trim(),
+                            password: r.password.trim(),
+                          })),
+                        });
+                        setBulkSummary(summary);
+                        if (summary.created > 0) {
+                          toast.success(
+                            `Tạo thành công ${summary.created} tài khoản${summary.failed > 0 ? `, thất bại ${summary.failed}` : ""}.`
+                          );
+                        } else {
+                          toast.error(`Tất cả ${summary.failed} tài khoản đều thất bại.`);
+                        }
+                      } catch (err) {
+                        toast.error((err as Error).message);
+                      } finally {
+                        setBulkSubmitting(false);
+                      }
+                    }}
+                    disabled={
+                      bulkSubmitting ||
+                      bulkRows.length === 0 ||
+                      bulkRows.every((r) => r.username.trim() === "" && r.password.trim() === "")
+                    }
+                    className="inline-flex items-center justify-center rounded-lg bg-indigo-900/90 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {bulkSubmitting ? (
+                      <>
+                        <div className="form-loading-spinner mr-2" />
+                        Đang tạo...
+                      </>
+                    ) : (
+                      `Tạo ${bulkRows.filter((r) => r.username.trim() !== "").length} tài khoản`
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Auth account reassignment tool */}
+        <div className={panelClass}>
+          <h3 className="text-lg font-semibold text-slate-800 mb-1">Gán lại tài khoản auth</h3>
+          <p className="text-sm text-slate-600 mb-3">
+            Liên kết một tài khoản Better Auth với một hồ sơ Convex khác. Dùng khi tài khoản auth bị lệch với hồ sơ.
+          </p>
+          {betterAuthUsers === null || allUserProfiles === undefined ? (
+            <p className="text-sm text-slate-500">Đang tải dữ liệu...</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b border-slate-200/80">
-                    <th className="py-2 px-4">Họ tên</th>
-                    <th className="py-2 px-4">Email</th>
-                    <th className="py-2 px-4">Lớp</th>
-                    <th className="py-2 px-4">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingUsers.map((u: any) => (
-                    <PendingUserRow key={u._id} user={u} />
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Source: Better Auth user */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Tài khoản Better Auth (nguồn)
+                  </label>
+                  <select
+                    value={reassignSourceBaId}
+                    onChange={(e) => {
+                      setReassignSourceBaId(e.target.value);
+                      setReassignConflict(null);
+                    }}
+                    className="auth-input-field w-full"
+                  >
+                    <option value="">Chọn tài khoản auth...</option>
+                    {(betterAuthUsers as Array<any>).map((u: any) => {
+                      const uid = u.id ?? u._id ?? "";
+                      const label = u.username ?? u.name ?? u.email?.split("@")[0] ?? uid.slice(-8);
+                      return (
+                        <option key={uid} value={uid}>
+                          {label} — {uid.slice(-8)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Target: Convex userProfile */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Hồ sơ Convex (đích)
+                  </label>
+                  <select
+                    value={reassignTargetProfileId}
+                    onChange={(e) => {
+                      setReassignTargetProfileId(e.target.value);
+                      setReassignConflict(null);
+                    }}
+                    className="auth-input-field w-full"
+                  >
+                    <option value="">Chọn hồ sơ...</option>
+                    {(allUserProfiles as Array<any>).map((p: any) => (
+                      <option key={p.profileId} value={p.profileId}>
+                        {p.fullName} — {p.className} ({p.role}) · #{p.profileId.slice(-6)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Preview of selected items */}
+              {(reassignSourceBaId || reassignTargetProfileId) && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+                  {reassignSourceBaId && (() => {
+                    const u = (betterAuthUsers as Array<any>).find((x: any) => x.id === reassignSourceBaId);
+                    if (!u) return null;
+                    // Check if this BA user is already linked to a profile
+                    const convexUser = (convexUsersByBetterAuthId ?? []).find((cu: any) => cu.betterAuthId === reassignSourceBaId);
+                    const linkedProfile = convexUser
+                      ? (allUserProfiles as Array<any>).find((p: any) => p.userId === convexUser._id)
+                      : null;
+                    return (
+                      <div>
+                        <span className="font-semibold">Auth:</span>{" "}
+                        {u.username ?? u.name ?? u.email?.split("@")[0]} ({u.email})
+                        {linkedProfile && (
+                          <span className="ml-2 text-amber-700 font-medium">
+                            → hiện liên kết với: {linkedProfile.fullName} ({linkedProfile.className})
+                          </span>
+                        )}
+                        {!linkedProfile && (
+                          <span className="ml-2 text-slate-500">→ chưa liên kết hồ sơ nào</span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {reassignTargetProfileId && (() => {
+                    const p = (allUserProfiles as Array<any>).find((x: any) => x.profileId === reassignTargetProfileId);
+                    if (!p) return null;
+                    return (
+                      <div>
+                        <span className="font-semibold">Hồ sơ đích:</span>{" "}
+                        {p.fullName} — {p.className} ({p.role})
+                        {p.isSuperUser && <span className="ml-1 text-indigo-700 font-medium">[SuperUser]</span>}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <button
+                onClick={async () => {
+                  if (!reassignSourceBaId || !reassignTargetProfileId) {
+                    toast.error("Vui lòng chọn đủ tài khoản auth và hồ sơ đích.");
+                    return;
+                  }
+
+                  // Check if the selected BA user is already linked to a different profile
+                  const convexUser = (convexUsersByBetterAuthId ?? []).find(
+                    (cu: any) => cu.betterAuthId === reassignSourceBaId
+                  );
+                  const linkedProfile = convexUser
+                    ? (allUserProfiles as Array<any>).find(
+                        (p: any) => p.userId === convexUser._id && p.profileId !== reassignTargetProfileId
+                      )
+                    : null;
+
+                  if (linkedProfile) {
+                    // Show conflict warning — require confirmation
+                    setReassignConflict({
+                      existingProfileName: `${linkedProfile.fullName} (${linkedProfile.className})`,
+                      existingProfileId: linkedProfile.profileId,
+                    });
+                    return;
+                  }
+
+                  // No conflict — proceed directly
+                  setReassignLoading(true);
+                  try {
+                    await reassignAuthAccountMutation({
+                      targetProfileId: reassignTargetProfileId as any,
+                      newBetterAuthId: reassignSourceBaId,
+                    });
+                    toast.success("Gán lại tài khoản thành công.");
+                    setReassignSourceBaId("");
+                    setReassignTargetProfileId("");
+                    setReassignConflict(null);
+                    // Refresh the Better Auth user list
+                    setBetterAuthUsers(null);
+                    setBetterAuthUsersLoading(false);
+                  } catch (err) {
+                    toast.error(`Gán lại tài khoản thất bại: ${(err as Error).message}`);
+                  } finally {
+                    setReassignLoading(false);
+                  }
+                }}
+                disabled={reassignLoading || !reassignSourceBaId || !reassignTargetProfileId}
+                className={`${primaryButtonClass}`}
+              >
+                {reassignLoading ? "Đang xử lý..." : "Gán lại tài khoản"}
+              </button>
             </div>
           )}
         </div>
-      </div>
-      )}
-      {activeSection === 'systemUsers' && (
-      <div className="w-full">
+
+        {/* Conflict confirmation dialog for reassignment */}
+        {reassignConflict !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-white/70 bg-white/95 shadow-2xl p-6 space-y-4">
+              <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                <span className="text-amber-500">⚠</span> Xác nhận gán lại
+              </h3>
+              <p className="text-sm text-slate-700">
+                Tài khoản auth này hiện đang liên kết với hồ sơ:{" "}
+                <span className="font-semibold text-amber-700">{reassignConflict.existingProfileName}</span>.
+              </p>
+              <p className="text-sm text-slate-600">
+                Nếu tiếp tục, hồ sơ đó sẽ mất liên kết với tài khoản auth này. Bạn có chắc chắn muốn tiếp tục?
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setReassignConflict(null)}
+                  disabled={reassignLoading}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-60"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={async () => {
+                    setReassignLoading(true);
+                    try {
+                      await reassignAuthAccountMutation({
+                        targetProfileId: reassignTargetProfileId as any,
+                        newBetterAuthId: reassignSourceBaId,
+                      });
+                      toast.success("Gán lại tài khoản thành công.");
+                      setReassignSourceBaId("");
+                      setReassignTargetProfileId("");
+                      setReassignConflict(null);
+                      // Refresh the Better Auth user list
+                      setBetterAuthUsers(null);
+                      setBetterAuthUsersLoading(false);
+                    } catch (err) {
+                      toast.error(`Gán lại tài khoản thất bại: ${(err as Error).message}`);
+                      setReassignConflict(null);
+                    } finally {
+                      setReassignLoading(false);
+                    }
+                  }}
+                  disabled={reassignLoading}
+                  className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {reassignLoading ? "Đang xử lý..." : "Xác nhận gán lại"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Profile merge tool — unchanged */}
         <div className={panelClass}>
           <p className="text-sm text-slate-600 mb-3">
             Danh sách hồ sơ user trong hệ thống. Có thể xóa hồ sơ nếu user chưa có dữ liệu báo cáo.
@@ -833,25 +1575,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className={panelClass}>
-          <h3 className="text-lg font-semibold mb-3 text-slate-800">Điểm báo cáo</h3>
-          <p className="text-sm text-slate-600 mb-3">
-            Chạy migration để cộng điểm cho các vi phạm hiện có trong database (10 điểm/vi phạm).
-          </p>
-          <button
-            onClick={async () => {
-              try {
-                const result = await migrateExistingViolations();
-                toast.success(result.message);
-              } catch (err) {
-                toast.error((err as Error).message);
-              }
-            }}
-            className={primaryButtonClass}
-          >
-            <Settings className="w-5 h-5 inline-block mr-1" /> Migrate điểm báo cáo
-          </button>
-        </div>
+
 
         <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800">Form xin phép công khai</h3>
@@ -875,81 +1599,106 @@ export default function AdminDashboard() {
       </div>
       )}
       {activeSection === 'roster' && (
-      <div className="w-full">
-        <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:items-center">
-            <button
-                onClick={async () => {
-                    try {
-                        const url = await exportRosterTemplate({} as any);
-                        if (url) window.open(url, '_blank');
-                    } catch (e) { toast.error((e as Error).message); }
-                }}
-                className={`${primaryButtonClass} w-full sm:w-auto`}
-            >
-                Tải mẫu danh sách HS
-            </button>
-            <label className="w-full sm:w-auto">
-                <span className="sr-only">Upload và nhập danh sách HS</span>
-                <input
-                    type="file"
-                    className="hidden"
-                    onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        try {
-                            const postUrl = await generateUploadUrl();
-                            const res = await fetch(postUrl, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
-                            const { storageId } = await res.json();
-                            await importRoster({ storageId } as any);
-                            toast.success('Đã nhập danh sách học sinh.');
-                        } catch (err) {
-                            toast.error((err as Error).message);
-                        } finally {
-                            e.currentTarget.value = '';
-                        }
-                    }}
-                />
-                <span className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors">Tải lên & nhập danh sách HS</span>
-            </label>
-        </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 rounded-2xl border border-white/70 bg-white/75 backdrop-blur-sm shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-4 md:grid-cols-4">
-            <div className="md:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-sm font-medium mb-2 text-slate-800">Chọn lớp</p>
-                <div className="max-h-64 overflow-auto space-y-1">
-                    {roster === undefined ? (
-                        <p className="text-sm text-slate-600">Đang tải...</p>
-                    ) : roster.length === 0 ? (
-                        <p className="text-sm text-slate-600">Chưa có dữ liệu.</p>
-                    ) : (
-                        roster.map((c: any) => (
-                            <button
-                                key={c.className}
-                                onClick={() => setSelectedRosterClass(c.className)}
-                                className={`w-full text-left px-2 py-1 rounded-lg transition-all ${selectedRosterClass === c.className ? 'bg-white/30 text-slate-800' : 'hover:bg-white/10 text-slate-700 hover:text-slate-800'}`}
-                            >
-                                {c.className} <span className="text-xs text-slate-600">({c.students.length})</span>
-                            </button>
-                        ))
-                    )}
+      <div className="w-full space-y-6">
+        <div className={panelClass}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                        <Users className="w-5 h-5 text-indigo-600" /> Danh sách học sinh
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1">Quản lý và cập nhật danh sách học sinh theo lớp.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                        onClick={async () => {
+                            try {
+                                const url = await exportRosterTemplate({} as any);
+                                if (url) window.open(url, '_blank');
+                            } catch (e) { toast.error((e as Error).message); }
+                        }}
+                        className={`${secondaryButtonClass} w-full sm:w-auto`}
+                    >
+                        <Download className="w-4 h-4 mr-2 text-slate-500" /> Tải file mẫu
+                    </button>
+                    <label className="w-full sm:w-auto cursor-pointer">
+                        <input
+                            type="file"
+                            className="hidden"
+                            onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                    const postUrl = await generateUploadUrl();
+                                    const res = await fetch(postUrl, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+                                    const { storageId } = await res.json();
+                                    await importRoster({ storageId } as any);
+                                    toast.success('Đã nhập danh sách học sinh.');
+                                } catch (err) {
+                                    toast.error((err as Error).message);
+                                } finally {
+                                    e.currentTarget.value = '';
+                                }
+                            }}
+                        />
+                        <div className={`${primaryButtonClass} w-full sm:w-auto`}>
+                            <Upload className="w-4 h-4 mr-2" /> Tải lên & Nhập
+                        </div>
+                    </label>
                 </div>
             </div>
-            <div className="md:col-span-3">
-                <p className="text-sm font-medium mb-2 text-slate-800">Học sinh</p>
-                <div className="max-h-96 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    {selectedRosterClass && roster && (
-                        (() => {
-                            const cls = roster.find((c: any) => c.className === selectedRosterClass);
-                            if (!cls) return <p className="text-sm text-slate-600">Chưa chọn lớp.</p>;
-                            return (
-                                <ul className="list-disc list-inside text-sm space-y-1 text-slate-700">
-                                    {cls.students.map((s: string, idx: number) => (
-                                        <li key={idx}>{s}</li>
-                                    ))}
-                                </ul>
-                            );
-                        })()
-                    )}
-                    {!selectedRosterClass && <p className="text-sm text-slate-600">Chọn một lớp để xem danh sách học sinh.</p>}
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="md:col-span-1 flex flex-col h-[60vh] md:h-[500px]">
+                    <div className="font-semibold text-sm text-slate-700 mb-3 px-1 uppercase tracking-wider">Danh sách lớp</div>
+                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
+                        {roster === undefined ? (
+                            <p className="text-sm text-slate-500 italic p-2">Đang tải...</p>
+                        ) : roster.length === 0 ? (
+                            <p className="text-sm text-slate-500 italic p-2">Chưa có dữ liệu.</p>
+                        ) : (
+                            roster.map((c: any) => (
+                                <button
+                                    key={c.className}
+                                    onClick={() => setSelectedRosterClass(c.className)}
+                                    className={`w-full text-left px-3 py-2.5 rounded-xl transition-all border ${selectedRosterClass === c.className ? 'bg-indigo-50 border-indigo-200 text-indigo-900 shadow-sm' : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200 text-slate-700'}`}
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold">{c.className}</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${selectedRosterClass === c.className ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-500'}`}>{c.students.length} HS</span>
+                                    </div>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+                <div className="md:col-span-3 flex flex-col h-[60vh] md:h-[500px]">
+                    <div className="font-semibold text-sm text-slate-700 mb-3 px-1 uppercase tracking-wider">
+                        Học sinh {selectedRosterClass ? `lớp ${selectedRosterClass}` : ''}
+                    </div>
+                    <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-200/60 bg-white shadow-sm p-4 custom-scrollbar">
+                        {selectedRosterClass && roster ? (
+                            (() => {
+                                const cls = roster.find((c: any) => c.className === selectedRosterClass);
+                                if (!cls) return <div className="h-full flex items-center justify-center text-sm text-slate-400 italic">Chưa chọn lớp.</div>;
+                                return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                                        {cls.students.map((s: string, idx: number) => (
+                                            <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                                                <div className="w-6 h-6 shrink-0 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-medium">
+                                                    {idx + 1}
+                                                </div>
+                                                <span className="text-sm text-slate-700 font-medium">{s}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-sm text-slate-400 italic">
+                                Chọn một lớp ở danh sách bên trái để xem học sinh.
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -1028,6 +1777,159 @@ export default function AdminDashboard() {
       )}
         </div>
       </div>
+
+      {/* Auto Migrate Better Auth Modal */}
+      {showAutoMigrateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-lg font-semibold text-slate-800">
+                {autoMigrateStep === 'preview' ? 'Xác nhận tạo tài khoản tự động' : autoMigrateStep === 'processing' ? 'Đang xử lý...' : 'Kết quả tạo tài khoản'}
+              </h3>
+              {autoMigrateStep !== 'processing' && (
+                <button onClick={() => setShowAutoMigrateModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              {autoMigrateStep === 'preview' && !autoMigrateData && (
+                <div className="flex flex-col justify-center items-center py-12 space-y-4">
+                  <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                  <span className="text-slate-600 font-medium">Đang phân tích danh sách hồ sơ...</span>
+                </div>
+              )}
+              
+              {autoMigrateStep === 'preview' && autoMigrateData && (
+                <div className="space-y-4">
+                  <div className="bg-indigo-50 text-indigo-800 p-4 rounded-xl text-sm border border-indigo-100">
+                    Hệ thống tìm thấy <strong>{autoMigrateData.total}</strong> hồ sơ. Trong đó có <strong>{autoMigrateData.results.filter((r:any) => r.status==='dry_run').length}</strong> hồ sơ chưa có tài khoản Better Auth và sẽ được tạo mới tự động.
+                  </div>
+                  
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="min-w-full text-sm text-left">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+                        <tr>
+                          <th className="px-4 py-3">Học sinh</th>
+                          <th className="px-4 py-3">Username dự kiến</th>
+                          <th className="px-4 py-3">Password dự kiến</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {autoMigrateData.results.filter((r:any) => r.status === 'dry_run').length === 0 ? (
+                          <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500">Tất cả hồ sơ đều đã có tài khoản.</td></tr>
+                        ) : (
+                          autoMigrateData.results.filter((r:any) => r.status === 'dry_run').map((r:any, i:number) => (
+                            <tr key={i} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-3 font-medium text-slate-800">{r.fullName}</td>
+                              <td className="px-4 py-3 text-slate-600 font-mono">{r.username}</td>
+                              <td className="px-4 py-3 text-slate-600 font-mono">{r.tempPassword}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {autoMigrateStep === 'processing' && (
+                <div className="flex flex-col justify-center items-center py-16 space-y-4">
+                  <div className="w-12 h-12 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div>
+                  <span className="text-slate-600 font-medium">Hệ thống đang tạo tài khoản, vui lòng không đóng cửa sổ này...</span>
+                </div>
+              )}
+              
+              {autoMigrateStep === 'result' && autoMigrateData && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl text-center">
+                      <div className="text-2xl font-bold text-emerald-600">{autoMigrateData.created}</div>
+                      <div className="text-xs font-medium text-emerald-800 uppercase tracking-wider mt-1">Tạo mới</div>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-center">
+                      <div className="text-2xl font-bold text-slate-600">{autoMigrateData.skipped}</div>
+                      <div className="text-xs font-medium text-slate-700 uppercase tracking-wider mt-1">Bỏ qua</div>
+                    </div>
+                    <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl text-center">
+                      <div className="text-2xl font-bold text-rose-600">{autoMigrateData.failed}</div>
+                      <div className="text-xs font-medium text-rose-800 uppercase tracking-wider mt-1">Thất bại</div>
+                    </div>
+                  </div>
+                  
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="min-w-full text-sm text-left">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+                        <tr>
+                          <th className="px-4 py-3">Học sinh</th>
+                          <th className="px-4 py-3">Username</th>
+                          <th className="px-4 py-3">Password</th>
+                          <th className="px-4 py-3">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {autoMigrateData.results.filter((r:any) => r.status === 'created' || r.status === 'failed').map((r:any, i:number) => (
+                          <tr key={i} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3 font-medium text-slate-800">{r.fullName}</td>
+                            <td className="px-4 py-3 text-slate-600 font-mono">{r.username || '-'}</td>
+                            <td className="px-4 py-3 text-slate-600 font-mono">{r.tempPassword || '-'}</td>
+                            <td className="px-4 py-3">
+                              {r.status === 'created' ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Thành công</span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800" title={r.reason}>Thất bại</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {autoMigrateData.results.filter((r:any) => r.status === 'created' || r.status === 'failed').length === 0 && (
+                          <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Không có tài khoản nào được tạo.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+              {autoMigrateStep === 'preview' && (
+                <>
+                  <button onClick={() => setShowAutoMigrateModal(false)} className={secondaryButtonClass}>
+                    Hủy
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setAutoMigrateStep('processing');
+                      try {
+                        const result = await migrateProfilesToBetterAuthAction({ dryRun: false });
+                        setAutoMigrateData(result);
+                        setAutoMigrateStep('result');
+                        setBetterAuthUsers(null);
+                        setBetterAuthUsersLoading(false);
+                      } catch (e) {
+                        toast.error(`Lỗi: ${(e as Error).message}`);
+                        setShowAutoMigrateModal(false);
+                      }
+                    }}
+                    className={primaryButtonClass}
+                    disabled={!autoMigrateData || autoMigrateData.results.filter((r:any) => r.status==='dry_run').length === 0}
+                  >
+                    Tiến hành tạo tài khoản
+                  </button>
+                </>
+              )}
+              {autoMigrateStep === 'result' && (
+                <button onClick={() => setShowAutoMigrateModal(false)} className={primaryButtonClass}>
+                  Đóng
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

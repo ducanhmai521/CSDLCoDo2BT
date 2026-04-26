@@ -64,6 +64,10 @@ Kiểm tra kết quả phân tích lần 1 và sửa các lỗi sau (nếu có):
    - MỖI HỌC SINH/MỖI LỖI = 1 VI PHẠM RIÊNG
    - VI PHẠM CẤP LỚP (không có tên học sinh): studentName = null
    - Tên lớp viết HOA (10a1 → 10A1)
+   - Một số học sinh có tên đặc biệt nên phải nhận diện được: "trường 12a1" là học sinh tên "trường" ở lớp 12A1.
+ NHẬN DIỆN TÊN HỌC SINH: Tên học sinh thường đứng ngay trước tên lớp.
+   - Ví dụ: "Trường 12A1 sai đồng phục" -> studentName: "Trường", violatingClass: "12A1", lỗi: Sai đồng phục.
+   - Tuyệt đối không nhầm tên học sinh "Trường" thành tên "trường học".
 
 TRẢ VỀ JSON THEO CHẾ ĐỘ DIFF ĐỂ TIẾT KIỆM TOKEN:
 {
@@ -100,7 +104,7 @@ QUY TẮC OUTPUT:
     });
 
     let validationText = validationCompletion.choices[0]?.message?.content || "";
-    
+
     if (validationText.includes("```json")) {
       validationText = validationText.substring(
         validationText.indexOf("```json") + 7,
@@ -396,6 +400,9 @@ NHIỆM VỤ:
 - ⚠️ Nếu 1 học sinh mắc nhiều lỗi (ví dụ "Khải 10A4 dép lê, học muộn") → TẠO 2 MỤC VI PHẠM RIÊNG (cùng Khải, cùng 10A4, nhưng khác violationId)
 - VI PHẠM CẤP LỚP: nếu dòng chỉ có TÊN LỚP + NỘI DUNG VI PHẠM (không có tên học sinh) → studentName PHẢI là null
   Ví dụ: "10A5 trực muộn", "10A5 vệ sinh muộn" → { studentName: null, violatingClass: "10A5", ... }
+- ⚠️ NHẬN DIỆN TÊN HỌC SINH: Tên học sinh thường đứng ngay trước tên lớp.
+  Ví dụ: "Trường 12A1 sai đồng phục" -> studentName: "Trường", violatingClass: "12A1", lỗi: Sai đồng phục.
+  Tuyệt đối không nhầm tên học sinh "Trường" thành tên "trường học".
 
 QUY TẮC PHÂN TÍCH:
 1. Tên lớp: Chuẩn hóa thành IN HOA (10a1 → 10A1)
@@ -457,7 +464,7 @@ LƯU Ý:
       });
 
       const parsedData = JSON.parse(firstPass.text);
-      
+
       // Double-check with validation pass
       const validationResult = await validateAndCorrectAI(
         firstPass.client,
@@ -467,13 +474,13 @@ LƯU Ý:
         "attendance",
         Boolean(debug)
       );
-      
+
       const finalData = validationResult.data ?? parsedData;
       const mappedViolations = (finalData.violations || []).map((v: any) => {
-        const type = typeof v.violationId === 'number' && ALL_VIOLATIONS[v.violationId] 
-          ? ALL_VIOLATIONS[v.violationId] 
+        const type = typeof v.violationId === 'number' && ALL_VIOLATIONS[v.violationId]
+          ? ALL_VIOLATIONS[v.violationId]
           : v.violationType || ALL_VIOLATIONS[0];
-        
+
         return {
           studentName: v.studentName,
           violatingClass: v.violatingClass,
@@ -482,7 +489,7 @@ LƯU Ý:
           originalText: v.originalText || "",
         };
       });
-      
+
       return {
         violations: mappedViolations,
         checkedClasses: finalData.checkedClasses || [],
@@ -640,7 +647,7 @@ LƯU Ý CUỐI CÙNG:
 
       const parsedData = JSON.parse(firstPass.text);
 
-      const normalizedData = Array.isArray(parsedData) 
+      const normalizedData = Array.isArray(parsedData)
         ? { violations: parsedData, checkedClasses: [] }
         : { violations: parsedData.violations || [], checkedClasses: parsedData.checkedClasses || [] };
 
@@ -656,10 +663,10 @@ LƯU Ý CUỐI CÙNG:
 
       const finalData = validationResult.data ?? normalizedData;
       const mappedViolations = (finalData.violations || []).map((v: any) => {
-        const type = typeof v.violationId === 'number' && ALL_VIOLATIONS[v.violationId] 
-          ? ALL_VIOLATIONS[v.violationId] 
+        const type = typeof v.violationId === 'number' && ALL_VIOLATIONS[v.violationId]
+          ? ALL_VIOLATIONS[v.violationId]
           : v.violationType || ALL_VIOLATIONS[0];
-        
+
         return {
           studentName: v.studentName,
           violatingClass: v.violatingClass,

@@ -1,7 +1,7 @@
 import { VIOLATION_CATEGORIES } from "./violationPoints";
 import { v } from "convex/values";
 import { mutation, query, QueryCtx, internalMutation, internalQuery, action } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/auth";
 import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 
@@ -85,7 +85,7 @@ export const reportViolation = mutation({
     evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) {
       throw new Error("Bạn phải đăng nhập để báo cáo vi phạm.");
     }
@@ -691,7 +691,7 @@ export const editViolation = mutation({
         details: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
+        const userId = await getUserId(ctx);
         if (!userId) {
             throw new Error("Bạn phải đăng nhập để chỉnh sửa.");
         }
@@ -784,7 +784,7 @@ export const bulkReportViolations = mutation({
     customReporterName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated.");
     }

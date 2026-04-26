@@ -1,8 +1,8 @@
-import { auth } from "./auth";
+import { authComponent, createAuth } from "./betterAuth/auth";
 import router from "./router";
 
 const http = router;
 
-auth.addHttpRoutes(http);
+authComponent.registerRoutes(http, createAuth);
 
 export default http;

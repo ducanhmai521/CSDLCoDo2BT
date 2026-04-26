@@ -1,13 +1,93 @@
 "use client";
-import { useAuthActions } from "@convex-dev/auth/react";
+import { authClient } from "./lib/authClient";
+import { useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
 import { useState } from "react";
 import { toast } from "sonner";
-import { FiMail, FiLock, FiLogIn, FiUserPlus } from "react-icons/fi";
+import { FiUser, FiLock, FiLogIn, FiUserPlus } from "react-icons/fi";
 
 export function SignInForm() {
-  const { signIn } = useAuthActions();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [submitting, setSubmitting] = useState(false);
+  const syncBetterAuthUser = useMutation(api.users.syncBetterAuthUser);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
+    const username = (formData.get("username") as string).trim();
+    const password = formData.get("password") as string;
+    
+    if (flow === "signUp") {
+      const confirmPassword = formData.get("confirmPassword") as string;
+      if (password.length < 8) {
+        toast.error("Mật khẩu phải có ít nhất 8 ký tự.");
+        setSubmitting(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        toast.error("Mật khẩu không khớp.");
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    try {
+      if (flow === "signIn") {
+        const result = await authClient.signIn.username({ username, password });
+        if (result.error) {
+          const msg = result.error.message ?? "";
+          if (msg.toLowerCase().includes("invalid") || msg.toLowerCase().includes("password") || msg.toLowerCase().includes("credentials")) {
+            toast.error("Sai tên đăng nhập hoặc mật khẩu.");
+          } else {
+            toast.error("Không thể đăng nhập, vui lòng thử lại.");
+          }
+          return;
+        }
+        // Sync user to Convex users table
+        if (result.data?.user) {
+          const u = result.data.user as any;
+          await syncBetterAuthUser({
+            betterAuthId: u.id,
+            username: u.username ?? username,
+            email: u.email ?? `${username}@internal.local`,
+          });
+        }
+      } else {
+        const email = `${username}@internal.local`;
+        const result = await authClient.signUp.email({
+          email,
+          password,
+          name: username,
+          username,
+        } as any);
+        if (result.error) {
+          const msg = result.error.message ?? "";
+          if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("exist") || msg.toLowerCase().includes("taken")) {
+            toast.error("Tên đăng nhập đã tồn tại.");
+          } else {
+            toast.error("Không thể đăng ký, vui lòng thử lại.");
+          }
+          return;
+        }
+        // Sync user to Convex users table
+        if (result.data?.user) {
+          const u = result.data.user as any;
+          await syncBetterAuthUser({
+            betterAuthId: u.id,
+            username: u.username ?? username,
+            email: u.email ?? email,
+          });
+        }
+      }
+    } catch (error: unknown) {
+      toast.error("Không thể kết nối. Vui lòng thử lại.");
+      console.error(error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="w-full glass-card-strong">
@@ -55,38 +135,20 @@ export function SignInForm() {
       
       <form
         className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setSubmitting(true);
-          const formData = new FormData(e.target as HTMLFormElement);
-          formData.set("flow", flow);
-          void signIn("password", formData).catch((error) => {
-            let toastTitle = "";
-            if (error.message.includes("Invalid password")) {
-              toastTitle = "Sai mật khẩu, vui lòng thử lại.";
-            } else {
-              toastTitle =
-                flow === "signIn"
-                  ? "Không thể đăng nhập, bạn có muốn đăng ký?"
-                  : "Không thể đăng ký, bạn có muốn đăng nhập?";
-            }
-            toast.error(toastTitle);
-            setSubmitting(false);
-          });
-        }}
+        onSubmit={handleSubmit}
       >
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-            <FiMail className="text-primary" /> Email
+          <label htmlFor="username" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+            <FiUser className="text-primary" /> Tên đăng nhập
           </label>
           <div className="relative">
             <input
-              id="email"
+              id="username"
               className="auth-input-field w-full"
-              type="email"
-              name="email"
-              autoComplete="email"
-              placeholder="you@example.com"
+              type="text"
+              name="username"
+              autoComplete="username"
+              placeholder="Nhập tên đăng nhập"
               required
             />
           </div>
@@ -108,6 +170,24 @@ export function SignInForm() {
             />
           </div>
         </div>
+        
+        {flow === "signUp" && (
+          <div className="space-y-2">
+            <label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              <FiLock className="text-primary" /> Nhập lại mật khẩu
+            </label>
+            <div className="relative">
+              <input
+                id="confirmPassword"
+                className="auth-input-field w-full"
+                type="password"
+                name="confirmPassword"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+          </div>
+        )}
         
         <button 
           className="auth-button mt-4 flex items-center justify-center gap-2 relative" 

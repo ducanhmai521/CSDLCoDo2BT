@@ -1,8 +1,17 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "@convex-dev/auth/server";
 
 const applicationTables = {
+  users: defineTable({
+    betterAuthId: v.optional(v.string()),
+    username: v.optional(v.string()),
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+    tokenIdentifier: v.optional(v.string()), // Keep for backward compatibility with Convex Auth
+  }).index("by_betterAuthId", ["betterAuthId"])
+    .index("by_username", ["username"])
+    .index("by_token", ["tokenIdentifier"]),
+
   userProfiles: defineTable({
     userId: v.id("users"),
     fullName: v.string(),
@@ -105,6 +114,5 @@ const applicationTables = {
 };
 
 export default defineSchema({
-  ...authTables,
   ...applicationTables,
 });

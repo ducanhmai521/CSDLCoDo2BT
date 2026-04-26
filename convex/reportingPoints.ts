@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/auth";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
@@ -11,7 +11,7 @@ export const addReportingPoints = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -137,7 +137,7 @@ export const getMyReportingPoints = query({
     v.null()
   ),
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return null;
 
     const myPoints = await ctx.db
@@ -164,81 +164,6 @@ export const getMyReportingPoints = query({
       points: myPoints.points,
       totalReports: myPoints.totalReports,
       rank: higherPointsCount.length + 1,
-    };
-  },
-});
-
-// Migration script to add points for existing violations (public mutation for admin)
-export const migrateExistingViolations = mutation({
-  args: {},
-  returns: v.object({
-    processed: v.number(),
-    message: v.string(),
-  }),
-  handler: async (ctx): Promise<{ processed: number; message: string }> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const userProfile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .unique();
-
-    if (!userProfile || userProfile.role !== "admin") {
-      throw new Error("Only admins can run migration");
-    }
-
-    return await ctx.runMutation(internal.reportingPoints.migrateExistingViolationsInternal);
-  },
-});
-
-// Migration script to add points for existing violations (internal)
-export const migrateExistingViolationsInternal = internalMutation({
-  args: {},
-  returns: v.object({
-    processed: v.number(),
-    message: v.string(),
-  }),
-  handler: async (ctx) => {
-    // Get all violations
-    const violations = await ctx.db.query("violations").collect();
-    
-    // Group by reporter
-    const reporterCounts = new Map<Id<"users">, number>();
-    
-    for (const violation of violations) {
-      const currentCount = reporterCounts.get(violation.reporterId) || 0;
-      reporterCounts.set(violation.reporterId, currentCount + 1);
-    }
-
-    // Update reporting points for each reporter
-    for (const [userId, count] of reporterCounts) {
-      const points = count * 10; // 10 points per violation
-      
-      const existing = await ctx.db
-        .query("reportingPoints")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .unique();
-
-      if (existing) {
-        await ctx.db.patch(existing._id, {
-          points: points,
-          totalReports: count,
-        });
-      } else {
-        await ctx.db.insert("reportingPoints", {
-          userId,
-          points,
-          totalReports: count,
-        });
-      }
-    }
-
-    return {
-      processed: reporterCounts.size,
-      message: `Đã cập nhật điểm cho ${reporterCounts.size} người báo cáo từ ${violations.length} vi phạm hiện có.`,
     };
   },
 });

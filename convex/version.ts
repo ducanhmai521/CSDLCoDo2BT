@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/auth";
 
 export const getWebVer = query({
   args: {},
@@ -16,7 +16,7 @@ export const getWebVer = query({
 export const updateMyWebVer = mutation({
   args: { webVer: v.number() },
   handler: async (ctx, { webVer }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -34,7 +34,7 @@ export const updateMyWebVer = mutation({
 export const setWebVer = mutation({
   args: { version: v.number() },
   handler: async (ctx, { version }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) {
         throw new Error("Not authenticated");
     }

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./lib/auth";
 
 export const getShopItems = query({
   args: {},
@@ -39,7 +39,7 @@ export const getUserPurchases = query({
     })),
   })),
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const purchases = await ctx.db
@@ -75,7 +75,7 @@ export const purchaseItem = mutation({
     purchaseId: v.optional(v.id("userPurchases")),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     // Get user points
@@ -143,7 +143,7 @@ export const updateCustomization = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const purchase = await ctx.db.get(args.purchaseId);

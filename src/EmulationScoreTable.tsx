@@ -83,7 +83,7 @@ export default function EmulationScoreTable() {
   return (
     <div className="space-y-6">
       <div className="bg-white/70 backdrop-blur-md rounded-xl shadow-md border border-white/50 p-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-slate-800">Bảng Điểm Thi Đua</h2>
             {date?.from && (
@@ -95,14 +95,14 @@ export default function EmulationScoreTable() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <div className={cn("grid gap-2")}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+            <div className={cn("grid gap-2 w-full sm:w-auto")}>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     id="date"
                     className={cn(
-                      "w-[300px] justify-start text-left font-normal border",
+                      "w-full sm:w-[300px] justify-start text-left font-normal border",
                       !date && "text-muted-foreground"
                     )}
                   >
@@ -135,7 +135,7 @@ export default function EmulationScoreTable() {
               </Popover>
             </div>
             <Button
-              className="border"
+              className="border w-full sm:w-auto"
               onClick={handleExport}
               disabled={isExporting || !emulationScores || emulationScores.length === 0}
             >

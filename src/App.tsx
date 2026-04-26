@@ -1,14 +1,17 @@
 import { Authenticated, Unauthenticated, useMutation, useQuery } from "convex/react";
+import { useState } from "react";
 import { api } from "../convex/_generated/api";
+import { authClient } from "./lib/authClient";
 import { SignInForm } from "./SignInForm";
-import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
 import ProfileCreationForm from "./ProfileCreationForm";
 import { Doc } from "../convex/_generated/dataModel";
 import AdminDashboard from "./AdminDashboard";
 import GradeManagerDashboard from "./GradeManagerDashboard";
 import { ForceRefresh } from "./ForceRefresh";
-import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw, FiZap, FiTrendingUp } from "react-icons/fi";
+import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw, FiZap, FiTrendingUp, FiLock, FiUser, FiChevronDown, FiLogOut } from "react-icons/fi";
+import { ChangePasswordModal } from "./ChangePasswordModal";
+import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import PublicViolationReport from "./public/PublicViolationReport";
 import EviView from "./public/EviView";
@@ -33,6 +36,7 @@ export default function AppWrapper() {
 function App() {
   const myProfile = useQuery(api.users.getMyProfile);
   const switchRole = useMutation(api.users.switchRole);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const handleSwitchRole = async () => {
     try {
@@ -60,16 +64,47 @@ function App() {
         </div>
         <div className="flex items-center gap-4">
           <Authenticated>
-            {myProfile?.isSuperUser && (
-              <button
-                onClick={handleSwitchRole}
-                className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition-colors p-2 rounded-xl hover:bg-white/20"
-                title="Switch Role"
-              >
-                <FiRefreshCw />
-              </button>
-            )}
-            <SignOutButton />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="p-2 rounded-full text-slate-700 hover:bg-slate-200/50 transition-all outline-none" title="Tài khoản">
+                  <FiUser size={24} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2 bg-white/90 backdrop-blur-xl border-white/50 shadow-2xl rounded-2xl" align="end">
+                <div className="flex flex-col gap-1">
+                  <div className="px-3 py-2 mb-1 border-b border-slate-100">
+                    <p className="text-xs font-bold text-slate-800 truncate">{myProfile?.fullName}</p>
+                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{myProfile?.className} • {translateRole(myProfile?.role || '')}</p>
+                  </div>
+                  {myProfile && (myProfile.role === 'gradeManager' || myProfile.role === 'admin') && (
+                    <button
+                      onClick={() => setShowChangePassword(true)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all"
+                    >
+                      <FiLock className="text-lg opacity-70" />
+                      <span>Đổi mật khẩu</span>
+                    </button>
+                  )}
+                  {myProfile?.isSuperUser && (
+                    <button
+                      onClick={handleSwitchRole}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-all"
+                    >
+                      <FiRefreshCw className="text-lg opacity-70" />
+                      <span>Chuyển đổi vai trò</span>
+                    </button>
+                  )}
+                  <div className="h-px bg-slate-200/50 my-1 mx-2" />
+                  <button
+                    onClick={() => void authClient.signOut()}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                  >
+                    <FiLogOut className="text-lg opacity-70" />
+                    <span>Đăng xuất</span>
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </Authenticated>
         </div>
       </header>
@@ -94,15 +129,18 @@ function App() {
         </div>
       </footer>
       <ForceRefresh />
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </div>
   );
     }
 
 function Content() {
   const myProfile = useQuery(api.users.getMyProfile);
-  const user = useQuery(api.auth.loggedInUser);
+  const { data: session, isPending: sessionPending } = authClient.useSession();
 
-  const isLoading = myProfile === undefined || user === undefined;
+  const isLoading = myProfile === undefined || sessionPending;
 
   if (isLoading) {
     return (
@@ -118,7 +156,7 @@ function Content() {
   return (
     <div>
       <Authenticated>
-        {user && !myProfile ? (
+        {session && !myProfile ? (
           <div className="glass-card">
             <ProfileCreationForm />
           </div>

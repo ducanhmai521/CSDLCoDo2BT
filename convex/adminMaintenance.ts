@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
@@ -78,6 +78,34 @@ export const recordStoredFile = internalMutation({
       kind: args.kind,
       timestamp: Date.now(),
     });
+  },
+});
+
+export const getBetterAuthId = internalQuery({
+  args: { userId: v.id("users") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    return user?.betterAuthId ?? null;
+  },
+});
+
+export const patchUserBetterAuthId = internalMutation({
+  args: {
+    userId: v.id("users"),
+    betterAuthId: v.string(),
+    username: v.string(),
+    email: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // If the betterAuthId is already set to something else, we patch it
+    await ctx.db.patch(args.userId, {
+      betterAuthId: args.betterAuthId,
+      username: args.username,
+      email: args.email,
+    });
+    return null;
   },
 });
 
