@@ -176,20 +176,24 @@ const premiumStyles = `
     border-color: rgba(148, 163, 184, 0.26) !important;
   }
   .public-report-shell.theme-dark .reporter-badge {
+    background-color: rgba(30, 41, 59, 0.72) !important;
     border-color: rgba(148, 163, 184, 0.35) !important;
     box-shadow: none !important;
   }
   .public-report-shell.theme-dark .reporter-badge-inner {
     background-color: rgba(15, 23, 42, 0.72) !important;
   }
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) {
-    background: rgba(245, 158, 11, 0.12) !important;
+  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500),
+  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-600) {
+    background-color: rgba(245, 158, 11, 0.15) !important;
     border-color: rgba(251, 191, 36, 0.42) !important;
   }
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) .text-slate-700 {
+  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) .text-slate-700,
+  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-600) .text-slate-700 {
     color: #f8fafc !important;
   }
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) .text-amber-600 {
+  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) .text-amber-600,
+  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-600) .text-amber-600 {
     color: #fcd34d !important;
     border-color: rgba(251, 191, 36, 0.55) !important;
   }
@@ -470,7 +474,7 @@ const ViolationRow = ({
                           e.stopPropagation(); // Ngăn click lan ra ngoài làm đóng accordion
                           onOpenEvidence(violation, url);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:shadow-sm transition-all text-xs font-medium"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:border-indigo-300 dark:hover:border-indigo-800 hover:shadow-sm transition-all text-xs font-medium"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Xem bằng chứng {i + 1}</span>
