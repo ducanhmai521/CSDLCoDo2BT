@@ -6,7 +6,7 @@ import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../convex/_generated/dataModel";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
-import { AIViolationInputModal } from "./AIViolationInputModal"; // Import the new modal
+import { AIViolationInputModal } from "./AIViolationInputModal";
 import imageCompression from 'browser-image-compression';
 
 const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(category => category.violations);
@@ -23,7 +23,7 @@ const PERSONAL_VIOLATIONS = [
   "Có học sinh đánh nhau."
 ];
 
-export default function ViolationReportForm() {
+export default function ViolationReportForm({ showAIModal = true }: { showAIModal?: boolean }) {
   const [targetType, setTargetType] = useState<"student" | "class">("class");
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<{name: string, className: string} | null>(null);
@@ -157,7 +157,7 @@ export default function ViolationReportForm() {
 
   return (
     <div className="space-y-6">
-      <AIViolationInputModal onBulkSubmitSuccess={resetForm} />
+      {showAIModal && <AIViolationInputModal onBulkSubmitSuccess={resetForm} />}
       <div className="relative">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex justify-between items-center">

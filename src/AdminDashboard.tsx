@@ -10,6 +10,7 @@ import { toZonedTime } from 'date-fns-tz';
 import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
 import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2, Upload, X } from 'lucide-react';
 import { AIViolationInputModal } from "./AIViolationInputModal";
+import ViolationReportForm from "./ViolationReportForm";
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -112,7 +113,8 @@ export default function AdminDashboard() {
   const roster = useQuery(api.users.listRoster);
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [selectedRosterClass, setSelectedRosterClass] = useState<string>("");
-  const [overviewDate, setOverviewDate] = useState<string>(format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy'));
+  const [showSingleReportForm, setShowSingleReportForm] = useState(false);
+  const [overviewDate, setOverviewDate] = useState(() => format(toZonedTime(new Date(), TIME_ZONE), 'dd/MM/yyyy'));
   const [aiModelsDraft, setAiModelsDraft] = useState<string>("");
   const [geminiModelsDraft, setGeminiModelsDraft] = useState<string>("");
   const [openRouterModelsDraft, setOpenRouterModelsDraft] = useState<string>("");
@@ -381,8 +383,30 @@ export default function AdminDashboard() {
       {activeSection === 'actions' && (
       <div className="w-full space-y-6">
         <div className={panelClass}>
-          <h3 className="text-lg font-semibold mb-3 text-slate-800">Nhập liệu nhanh</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-slate-800">Nhập liệu nhanh (AI)</h3>
+          </div>
           <AIViolationInputModal onBulkSubmitSuccess={() => {}} />
+        </div>
+        <div className={panelClass}>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-800">Nhập vi phạm đơn lẻ</h3>
+            <button
+              onClick={() => setShowSingleReportForm(v => !v)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                showSingleReportForm
+                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  : 'bg-indigo-900/90 text-white hover:bg-indigo-900'
+              }`}
+            >
+              {showSingleReportForm ? 'Ẩn form' : '+ Mở form nhập'}
+            </button>
+          </div>
+          {showSingleReportForm && (
+            <div className="mt-4 border-t border-slate-200/60 pt-4">
+              <ViolationReportForm showAIModal={false} />
+            </div>
+          )}
         </div>
         {pendingUsers && pendingUsers.length > 0 && (
           <div className={panelClass}>

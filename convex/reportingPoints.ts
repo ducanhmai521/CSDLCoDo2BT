@@ -101,13 +101,25 @@ export const getReportingLeaderboard = query({
       .order("desc")
       .take(limit);
 
+    if (reportingPoints.length === 0) return [];
+
+    // Optimization: Batch fetch all profiles in one go
+    const userIds = reportingPoints.map(rp => rp.userId);
+    const profiles = await Promise.all(
+      userIds.map(userId => 
+        ctx.db.query("userProfiles").withIndex("by_userId", q => q.eq("userId", userId)).unique()
+      )
+    );
+
+    const profileMap = new Map();
+    profiles.forEach(p => {
+      if (p) profileMap.set(p.userId, p);
+    });
+
     const results = [];
     for (let i = 0; i < reportingPoints.length; i++) {
       const rp = reportingPoints[i];
-      const userProfile = await ctx.db
-        .query("userProfiles")
-        .withIndex("by_userId", (q) => q.eq("userId", rp.userId))
-        .unique();
+      const userProfile = profileMap.get(rp.userId);
 
       if (userProfile) {
         results.push({
