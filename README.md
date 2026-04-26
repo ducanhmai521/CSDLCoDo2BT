@@ -7,12 +7,12 @@
 - **Backend**: Convex - nền tảng database thời gian thực
 - **Frontend**: Vite + React với giao diện hiện đại, responsive
 - **Lưu trữ file**: Cloudflare R2 cho ảnh bằng chứng vi phạm
-- **AI Integration**: OpenRouter (OpenAI-compatible) để hỗ trợ xử lý dữ liệu thô
+- **AI Integration**: Gemini và OpenRouter (OpenAI-compatible) để hỗ trợ xử lý dữ liệu thô
 
 ## ✨ Tính Năng Nổi Bật
 
 ### 🔐 1. Hệ Thống Xác Thực Đa Cấp
-- **Đăng nhập an toàn** với Convex Auth
+- **Đăng nhập an toàn, dễ dàng quản lý** với Better Auth
 - **Phân quyền chi tiết**: Admin, Quản lý khối, Người dùng chờ duyệt
 - **Chuyển đổi vai trò linh hoạt** cho Admin
 
@@ -196,9 +196,9 @@ Better Auth là hệ thống quản lý đăng nhập và phiên làm việc (se
      ```bash
      npx convex env set BETTER_AUTH_URL "http://localhost:5173"
      ```
-   - Khi chạy trên **Production** (ví dụ trang web là `https://codo.thpts2bt.edu.vn`):
+   - Khi chạy trên **Production** (ví dụ trang web là `https://codo2bt.vercel.app`):
      ```bash
-     npx convex env set BETTER_AUTH_URL "https://codo.thpts2bt.edu.vn"
+     npx convex env set BETTER_AUTH_URL "https://codo2bt.vercel.app"
      ```
 
 #### B. Thiết Lập Cloudflare R2 (Bắt Buộc Để Lưu Ảnh)
@@ -252,7 +252,7 @@ Khi bạn muốn chạy thực tế, Frontend thường được host trên Verc
 4. Trên hệ thống của **Convex** (chuyển sang môi trường Production):
    - Vào Settings > Environment Variables.
    - Thêm đầy đủ lại các biến `BETTER_AUTH_SECRET`, `R2_...`, `OPENROUTER_...` như bước 4.
-   - ⚠️ **QUAN TRỌNG:** Phải đổi biến `BETTER_AUTH_URL` thành tên miền chính thức của bạn (ví dụ `https://codo.truongcua_ban.edu.vn`).
+   - ⚠️ **QUAN TRỌNG:** Phải đổi biến `BETTER_AUTH_URL` thành tên miền chính thức của bạn (ví dụ `https://codo2bt.vercel.app`).
 
 ### Mật Khẩu Admin Mặc Định Là Gì?
 Khi cài mới hoàn toàn, database sẽ trống. Hãy vào bảng `users` trên Convex Dashboard để tự thêm bản ghi Admin đầu tiên, hoặc bạn có thể tạo qua form public rồi vào Dashboard Convex phân quyền Role thành `"admin"`.

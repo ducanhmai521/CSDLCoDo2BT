@@ -399,16 +399,16 @@ export const getPublicEmulationScores = query({
             ))
             .collect();
         
+        // --- OPTIMIZATION: Deduplicate reporter lookups ---
         const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
         const reporterProfiles = await Promise.all(
             reporterUserIds.map(userId => 
                 ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', userId)).unique()
             )
         );
-
-        const reporterProfileMap = new Map();
+        const reporterProfileMap = new Map<string, string>(); // userId -> fullName
         reporterProfiles.forEach(profile => {
-            if (profile) { reporterProfileMap.set(profile.userId, profile); }
+            if (profile) { reporterProfileMap.set(profile.userId, profile.fullName); }
         });
         
         const violationPointsMap = new Map<string, number>();
@@ -421,8 +421,20 @@ export const getPublicEmulationScores = query({
         const scoresByClass: Record<string, { totalPoints: number; violations: any[] }> = {};
         for (const v of violations) {
             const points = violationPointsMap.get(v.violationType) ?? 0;
-            const reporterProfile = reporterProfileMap.get(v.reporterId);
-            const detailedViolation = { ...v, reporterName: v.customReporterName || reporterProfile?.fullName || 'Không rõ', points: points };
+            const reporterName = v.customReporterName || reporterProfileMap.get(v.reporterId) || 'Không rõ';
+            // Only include display fields (NOT full DB document) to minimize payload
+            const detailedViolation = {
+                _id: v._id,
+                violatingClass: v.violatingClass,
+                violationDate: v.violationDate,
+                violationType: v.violationType,
+                targetType: v.targetType,
+                studentName: v.studentName,
+                details: v.details,
+                customReporterName: v.customReporterName,
+                reporterName,
+                points,
+            };
             if (!scoresByClass[v.violatingClass]) {
                 scoresByClass[v.violatingClass] = { totalPoints: 0, violations: [] };
             }
@@ -434,23 +446,11 @@ export const getPublicEmulationScores = query({
         const allClassNames = allClasses.map(c => c.name);
         allClassNames.sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
 
-        const emulationScores = allClassNames.map(className => {
-            if (scoresByClass[className]) {
-                return {
-                    className,
-                    totalPoints: scoresByClass[className].totalPoints,
-                    violations: scoresByClass[className].violations,
-                };
-            } else {
-                return {
-                    className,
-                    totalPoints: 0,
-                    violations: [],
-                };
-            }
-        });
-
-        return emulationScores;
+        return allClassNames.map(className => ({
+            className,
+            totalPoints: scoresByClass[className]?.totalPoints ?? 0,
+            violations: scoresByClass[className]?.violations ?? [],
+        }));
     }
 });
 
@@ -588,23 +588,23 @@ export const getPublicViolations = query({
             .order("desc")
             .collect();
 
+        // --- OPTIMIZATION: Deduplicate reporter lookups ---
         const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
+
         const reporterProfiles = await Promise.all(
-            reporterUserIds.map(userId => 
+            reporterUserIds.map(userId =>
                 ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', userId)).unique()
             )
         );
-
-        const reporterProfileMap = new Map();
-        const reporterSuperUserMap = new Map();
+        const reporterProfileMap = new Map<string, string>(); // userId -> fullName
+        const reporterSuperUserMap = new Map<string, boolean>(); // userId -> isSuperUser
         reporterProfiles.forEach(profile => {
-            if (profile) { 
+            if (profile) {
                 reporterProfileMap.set(profile.userId, profile.fullName);
                 reporterSuperUserMap.set(profile.userId, profile.isSuperUser || false);
             }
         });
 
-        // Get reporter customizations
         const reporterCustomizations = await Promise.all(
             reporterUserIds.map(async userId => {
                 const purchase = await ctx.db
@@ -612,7 +612,6 @@ export const getPublicViolations = query({
                     .withIndex('by_userId', q => q.eq('userId', userId))
                     .filter(q => q.eq(q.field('isActive'), true))
                     .first();
-                
                 if (purchase && purchase.customization) {
                     const item = await ctx.db.get(purchase.itemId);
                     if (item && item.category === 'customization') {
@@ -622,8 +621,7 @@ export const getPublicViolations = query({
                 return { userId, customization: null };
             })
         );
-
-        const reporterCustomizationMap = new Map();
+        const reporterCustomizationMap = new Map<string, any>(); // userId -> customization
         reporterCustomizations.forEach(({ userId, customization }) => {
             reporterCustomizationMap.set(userId, customization);
         });
@@ -635,44 +633,39 @@ export const getPublicViolations = query({
             });
         });
 
-        const detailedViolations = await Promise.all(violations.map(async v => {
-            // Get evidence URLs from both Convex storage (legacy) and R2
-            const evidenceUrls: (string | null)[] = [];
-            
-            // Legacy Convex storage URLs
-            if (v.evidenceFileIds && v.evidenceFileIds.length > 0) {
-                const convexUrls = await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId)));
-                evidenceUrls.push(...convexUrls);
-            }
-            
-            // R2 URLs
+        // Build result — only send necessary fields to reduce payload size
+        const result = violations.map(v => {
+            const evidenceUrls: string[] = [];
             if (v.evidenceR2Keys && v.evidenceR2Keys.length > 0) {
-                const r2Urls = await Promise.all(v.evidenceR2Keys.map(async (key) => {
-                    try {
-                        return await ctx.runQuery(api.r2.getR2PublicUrl, { key });
-                    } catch (error) {
-                        console.error("Error getting R2 URL for key:", key, error);
-                        return null;
-                    }
-                }));
-                evidenceUrls.push(...r2Urls);
+                const r2PublicUrl = process.env.R2_PUBLIC_URL || '';
+                for (const key of v.evidenceR2Keys) {
+                    evidenceUrls.push(`${r2PublicUrl}/${key}`);
+                }
             }
-            
+
             return {
-                ...v,
+                _id: v._id,
+                _creationTime: v._creationTime,
+                violatingClass: v.violatingClass,
+                violationDate: v.violationDate,
+                violationType: v.violationType,
+                targetType: v.targetType,
+                studentName: v.studentName,
+                details: v.details,
+                status: v.status,
+                requesterName: v.requesterName,
+                customReporterName: v.customReporterName,
                 reporterName: v.customReporterName || reporterProfileMap.get(v.reporterId) || 'Không rõ',
                 reporterIsSuperUser: reporterSuperUserMap.get(v.reporterId) ?? false,
                 reporterCustomization: reporterCustomizationMap.get(v.reporterId) ?? null,
                 evidenceUrls,
                 points: violationPointsMap.get(v.violationType) ?? 0,
             };
-        }));
+        });
 
-        return detailedViolations.sort((a, b) => {
+        return result.sort((a, b) => {
             const classCompare = a.violatingClass.localeCompare(b.violatingClass, 'vi', { numeric: true });
-            if (classCompare !== 0) {
-                return classCompare;
-            }
+            if (classCompare !== 0) return classCompare;
             return b.violationDate - a.violationDate;
         });
     }
