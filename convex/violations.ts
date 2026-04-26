@@ -223,6 +223,74 @@ export const appealViolation = mutation({
     }
 });
 
+/**
+ * Lightweight query: only returns violations with status="appealed".
+ * Replaces the old pattern of fetching ALL violations and filtering on the client.
+ * Only returns the fields needed by the "Hành động" tab.
+ */
+export const getAppealedViolations = query({
+    args: {},
+    handler: async (ctx): Promise<ViolationWithDetails[]> => {
+        const myProfile = await ctx.runQuery(api.users.getMyProfile);
+        if (myProfile?.role !== 'admin') return [];
+
+        const violations = await ctx.db
+            .query("violations")
+            .filter(q => q.eq(q.field("status"), "appealed"))
+            .order("desc")
+            .collect();
+
+        return Promise.all(violations.map(v => resolveViolationDetails(ctx, v)));
+    }
+});
+
+/**
+ * Lightweight query for the Overview tab.
+ * Returns minimal fields (no evidence URLs, no customizations) for aggregation display.
+ * Much cheaper than running full resolveViolationDetails on every matching record.
+ */
+export const getAdminOverviewViolations = query({
+    args: {
+        dateRange: v.object({ start: v.number(), end: v.number() }),
+    },
+    handler: async (ctx, args) => {
+        const myProfile = await ctx.runQuery(api.users.getMyProfile);
+        if (myProfile?.role !== 'admin') return [];
+
+        const violations = await ctx.db
+            .query("violations")
+            .filter(q => q.and(
+                q.gte(q.field("violationDate"), args.dateRange.start),
+                q.lte(q.field("violationDate"), args.dateRange.end)
+            ))
+            .order("desc")
+            .collect();
+
+        // Deduplicate reporter lookups
+        const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
+        const reporterProfiles = await Promise.all(
+            reporterUserIds.map(uid =>
+                ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', uid)).unique()
+            )
+        );
+        const reporterNameMap = new Map<string, string>();
+        reporterProfiles.forEach(p => {
+            if (p) reporterNameMap.set(p.userId, p.fullName);
+        });
+
+        // Return only the fields the overview tab actually uses
+        return violations.map(v => ({
+            _id: v._id,
+            violatingClass: v.violatingClass,
+            violationDate: v.violationDate,
+            violationType: v.violationType,
+            targetType: v.targetType,
+            studentName: v.studentName,
+            reporterName: v.customReporterName || reporterNameMap.get(v.reporterId) || 'Không rõ',
+        }));
+    }
+});
+
 export const getAllViolationsForAdmin = query({
     args: {
         grade: v.optional(v.number()),

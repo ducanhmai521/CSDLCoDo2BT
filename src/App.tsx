@@ -368,12 +368,12 @@ function HomepageHero() {
 }
 
 function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
-      const adminViolations = useQuery(
-        api.violations.getAllViolationsForAdmin,
-        profile.role === "admin" ? ({} as any) : "skip"
+      const appealedViolations = useQuery(
+        api.violations.getAppealedViolations,
+        profile.role === "admin" ? {} : "skip"
       );
       const appealedCount = profile.role === "admin"
-        ? (adminViolations || []).filter((v: any) => v.status === "appealed").length
+        ? (appealedViolations ?? []).length
         : 0;
       return (
         <div>

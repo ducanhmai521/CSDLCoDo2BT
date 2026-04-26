@@ -174,16 +174,12 @@ export default function AdminDashboard() {
     betterAuthUsers !== null && betterAuthUserIds.length > 0 ? { betterAuthIds: betterAuthUserIds } : "skip"
   );
   const allViolations = useQuery(api.violations.getAllViolationsForAdmin, filters);
-  const allViolationsForActions = useQuery(api.violations.getAllViolationsForAdmin, {} as any);
-  const appealedViolations = useMemo(
-    () => (allViolationsForActions || []).filter((v: any) => v.status === "appealed"),
-    [allViolationsForActions]
-  );
+  const appealedViolations = useQuery(api.violations.getAppealedViolations, {}) ?? [];
   // Overview: selected date range
   const _parsedOverview = parseDDMMYYYY(overviewDate);
   const _overviewStart = _parsedOverview ? startOfDay(toZonedTime(_parsedOverview, TIME_ZONE)).getTime() : startOfDay(toZonedTime(new Date(), TIME_ZONE)).getTime();
   const _overviewEnd = _parsedOverview ? endOfDay(toZonedTime(_parsedOverview, TIME_ZONE)).getTime() : endOfDay(toZonedTime(new Date(), TIME_ZONE)).getTime();
-  const overviewViolations = useQuery(api.violations.getAllViolationsForAdmin, { dateRange: { start: _overviewStart, end: _overviewEnd } } as any);
+  const overviewViolations = useQuery(api.violations.getAdminOverviewViolations, { dateRange: { start: _overviewStart, end: _overviewEnd } });
   // TODO: if needed, implement pagination UI here while keeping export using full filtered set on server
   const exportViolations = useAction(api.excelExport.exportViolations);
 
@@ -417,7 +413,7 @@ export default function AdminDashboard() {
           <h3 className="text-lg font-semibold mb-3 text-slate-800">
             Báo cáo đang kháng cáo ({appealedViolations.length})
           </h3>
-          {allViolationsForActions === undefined ? (
+          {appealedViolations === undefined ? (
             <p className="text-sm text-slate-600">Đang tải...</p>
           ) : appealedViolations.length === 0 ? (
             <p className="text-sm text-emerald-700">Ổn rồi, hiện không có báo cáo nào ở trạng thái kháng cáo.</p>
