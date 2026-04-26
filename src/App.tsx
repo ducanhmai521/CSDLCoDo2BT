@@ -1,4 +1,4 @@
-import { Authenticated, Unauthenticated, useMutation, useQuery } from "convex/react";
+import { Authenticated, Unauthenticated, useMutation, useQuery, useConvexAuth } from "convex/react";
 import { useEffect, useState } from "react";
 import { api } from "../convex/_generated/api";
 import { authClient } from "./lib/authClient";
@@ -138,6 +138,7 @@ function App() {
 
 function Content() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { isAuthenticated: convexIsAuth } = useConvexAuth();
   const myProfile = useQuery(api.users.getMyProfile);
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
@@ -148,7 +149,8 @@ function Content() {
   }, [sessionPending]);
 
   // Loading if initial check isn't done, or if we have a session but profile is loading
-  const isLoading = !hasCheckedAuth || (!!session && myProfile === undefined);
+  // Also wait if we have a session but Convex hasn't authenticated yet (prevents Profile flash)
+  const isLoading = !hasCheckedAuth || (!!session && !convexIsAuth) || (!!session && myProfile === undefined);
 
   if (isLoading) {
     return (
