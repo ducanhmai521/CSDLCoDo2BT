@@ -10,7 +10,9 @@ export default async function handler(req: any, res: any) {
   const url = new URL(req.url!, CONVEX_SITE_URL);
 
   const newHeaders = { ...req.headers };
-  delete newHeaders.host; // Let fetch set the correct host header
+  newHeaders['x-forwarded-host'] = req.headers.host;
+  newHeaders['x-forwarded-proto'] = 'https';
+  delete newHeaders.host; // Let fetch set the correct host header for TLS
   delete newHeaders.connection;
 
   const response = await fetch(url.toString(), {
@@ -23,6 +25,10 @@ export default async function handler(req: any, res: any) {
   });
 
   res.status(response.status);
+  
+  // DEBUG HEADER
+  res.setHeader('X-Debug-Convex-Url', url.toString());
+
   response.headers.forEach((value: string, key: string) => {
     // Avoid sending transfer-encoding or content-encoding as the serverless wrapper handles it
     if (key.toLowerCase() !== 'transfer-encoding' && key.toLowerCase() !== 'content-encoding') {
