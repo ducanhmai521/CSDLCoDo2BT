@@ -30,11 +30,23 @@ export default async function handler(req: any, res: any) {
   res.setHeader('X-Debug-Convex-Url', url.toString());
 
   response.headers.forEach((value: string, key: string) => {
-    // Avoid sending transfer-encoding or content-encoding as the serverless wrapper handles it
-    if (key.toLowerCase() !== 'transfer-encoding' && key.toLowerCase() !== 'content-encoding') {
+    // Skip set-cookie here as we handle it below, and skip encodings
+    if (key.toLowerCase() !== 'transfer-encoding' && key.toLowerCase() !== 'content-encoding' && key.toLowerCase() !== 'set-cookie') {
       res.setHeader(key, value);
     }
   });
+  
+  // Handle set-cookie properly
+  const cookies = response.headers.getSetCookie ? response.headers.getSetCookie() : [];
+  if (cookies && cookies.length > 0) {
+    res.setHeader('Set-Cookie', cookies);
+  } else {
+    // Fallback if getSetCookie is not available
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) {
+      res.setHeader('Set-Cookie', setCookie);
+    }
+  }
   const body = await response.text();
   res.send(body);
 }
