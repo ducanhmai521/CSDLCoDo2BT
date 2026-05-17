@@ -14,25 +14,55 @@ export const clearStoredFiles = action({
   }
 });
 
+// Cache key used to avoid re-generating the roster template on every request.
+const ROSTER_TEMPLATE_CACHE_KEY = "rosterTemplateStorageId";
+
 export const exportRosterTemplate = action({
   args: {},
-  handler: async (ctx) => {
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx): Promise<string | null> => {
+    // Auth check — only admins may download the template
+    const myProfile = await ctx.runQuery(api.users.getMyProfile);
+    if (myProfile?.role !== "admin") {
+      throw new Error("Bạn không có quyền thực hiện hành động này.");
+    }
+
+    // Return cached URL if the file already exists in storage
+    const cached: string | null = await ctx.runQuery(api.users.getSetting, {
+      key: ROSTER_TEMPLATE_CACHE_KEY,
+    }) as string | null;
+
+    if (cached) {
+      const url = await ctx.storage.getUrl(cached as any);
+      if (url) return url;
+      // File was deleted from storage — fall through to regenerate
+    }
+
+    // Generate the template workbook
     const classes: Array<string> = [];
     for (const grade of [10, 11, 12]) {
       for (let i = 1; i <= 8; i++) {
         classes.push(`${grade}A${i}`);
       }
     }
-    const columns = classes;
-    const sheetData = [columns];
+    const sheetData = [classes];
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Mau_Danh_Sach");
     const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const storageId = await ctx.storage.store(blob);
+
+    // Persist the storageId so future calls reuse the same file
+    await ctx.runMutation(api.users.setSetting, {
+      key: ROSTER_TEMPLATE_CACHE_KEY,
+      value: storageId,
+    });
+
     return await ctx.storage.getUrl(storageId);
-  }
+  },
 });
 
 export const importRoster = action({
@@ -66,47 +96,7 @@ export const importRoster = action({
   }
 });
 
-export const setupPublicAbsenceSystemUser = action({
-  args: {},
-  handler: async (ctx): Promise<{ success: boolean; message: string; systemUserId: string }> => {
-    const myProfile = await ctx.runQuery(api.users.getMyProfile);
-    if (myProfile?.role !== "admin") {
-      throw new Error("Bạn không có quyền thực hiện hành động này.");
-    }
-    
-    // Check if system user already exists
-    const existingSetting: string | null = await ctx.runQuery(api.users.getSetting, { 
-      key: "publicAbsenceSystemUserId" 
-    });
-    
-    if (existingSetting) {
-      return {
-        success: true,
-        message: "System user đã được cấu hình trước đó",
-        systemUserId: existingSetting,
-      };
-    }
-    
-    // Use the first admin user as the system user
-    // This is the simplest approach and maintains referential integrity
-    const adminProfile = await ctx.runQuery(api.users.getMyProfile);
-    if (!adminProfile || !adminProfile.userId) {
-      throw new Error("Không tìm thấy admin user");
-    }
-    
-    // Store the system user ID in settings
-    await ctx.runMutation(api.users.setSetting, {
-      key: "publicAbsenceSystemUserId",
-      value: adminProfile.userId,
-    });
-    
-    return {
-      success: true,
-      message: "Đã cấu hình system user thành công",
-      systemUserId: adminProfile.userId,
-    };
-  }
-});
+
 
 
 export const listBetterAuthUsers = internalAction({

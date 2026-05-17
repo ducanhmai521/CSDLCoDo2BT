@@ -99,7 +99,6 @@ export default function AdminDashboard() {
   const saveSetting = useMutation(api.users.setSetting);
   const exportRosterTemplate = useAction(api.adminTools.exportRosterTemplate);
   const importRoster = useAction(api.adminTools.importRoster);
-  const setupPublicAbsenceSystemUser = useAction(api.adminTools.setupPublicAbsenceSystemUser);
   const getBetterAuthUsersAction = useAction(api.adminTools.getBetterAuthUsers);
   const setUserPasswordAction = useAction(api.adminTools.setUserPassword);
   const bulkCreateUsersAction = useAction(api.adminTools.bulkCreateUsers);
@@ -1594,25 +1593,8 @@ export default function AdminDashboard() {
 
 
 
-        <div className={panelClass}>
-          <h3 className="text-lg font-semibold mb-3 text-slate-800">Form xin phép công khai</h3>
-          <p className="text-sm text-slate-600 mb-3">
-            Cấu hình system user để form xin phép công khai có thể hoạt động. Chỉ cần chạy một lần.
-          </p>
-          <button
-            onClick={async () => {
-              try {
-                const result = await setupPublicAbsenceSystemUser({} as any);
-                toast.success(result.message);
-              } catch (err) {
-                toast.error((err as Error).message);
-              }
-            }}
-            className={primaryButtonClass}
-          >
-            <Settings className="w-5 h-5 inline-block mr-1" /> Cấu hình System User
-          </button>
-        </div>
+
+
       </div>
       )}
       {activeSection === 'roster' && (

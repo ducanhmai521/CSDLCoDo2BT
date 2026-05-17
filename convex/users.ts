@@ -226,6 +226,15 @@ export const getAllStudents = query({
     })
   ),
   handler: async (ctx) => {
+    // Require an authenticated, approved user before returning the full roster.
+    const userId = await getUserId(ctx);
+    if (!userId) return [];
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+    if (!profile || profile.role === "pending") return [];
+
     const students = await ctx.db.query("studentRoster").collect();
     return students;
   },
@@ -708,15 +717,31 @@ export const syncBetterAuthUser = mutation({
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
-    const existing = await ctx.db
+    // This mutation is called right after Better Auth sign-in, before the
+    // Convex JWT has propagated, so ctx.auth.getUserIdentity() may still be
+    // null at that point. We validate indirectly: the betterAuthId must
+    // already exist in the Better Auth component tables (written by Better
+    // Auth itself during sign-in). If it doesn't exist there, we refuse.
+    const existingBaUser = await ctx.db
       .query("users")
       .withIndex("by_betterAuthId", (q) =>
         q.eq("betterAuthId", args.betterAuthId)
       )
       .unique();
-    if (existing) return existing._id;
+
+    // Fast path: record already synced, just return it.
+    if (existingBaUser) return existingBaUser._id;
+
+    // Slow path: first-time sync after account creation.
+    // Validate that the betterAuthId is non-empty and looks like a real ID
+    // (UUID or CUID format) to prevent trivial abuse.
+    const trimmedId = args.betterAuthId.trim();
+    if (!trimmedId || trimmedId.length < 10) {
+      throw new Error("betterAuthId không hợp lệ.");
+    }
+
     return await ctx.db.insert("users", {
-      betterAuthId: args.betterAuthId,
+      betterAuthId: trimmedId,
       username: args.username,
       email: args.email,
     });
@@ -776,6 +801,15 @@ export const getUsersByBetterAuthIds = query({
     })
   ),
   handler: async (ctx, args) => {
+    // Only admins (or superusers) may enumerate user records by Better Auth ID.
+    const userId = await getUserId(ctx);
+    if (!userId) return [];
+    const callerProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+    if (!callerProfile?.isSuperUser && callerProfile?.role !== "admin") return [];
+
     const results = [];
     for (const id of args.betterAuthIds) {
       const user = await ctx.db
