@@ -1,4 +1,4 @@
-import { Authenticated, Unauthenticated, useMutation, useQuery, useConvexAuth } from "convex/react";
+import { Authenticated, useMutation, useQuery, useConvexAuth } from "convex/react";
 import { useEffect, useState } from "react";
 import { api } from "../convex/_generated/api";
 import { authClient } from "./lib/authClient";
@@ -9,7 +9,7 @@ import { Doc } from "../convex/_generated/dataModel";
 import AdminDashboard from "./AdminDashboard";
 import GradeManagerDashboard from "./GradeManagerDashboard";
 import { ForceRefresh } from "./ForceRefresh";
-import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw, FiZap, FiTrendingUp, FiLock, FiUser, FiChevronDown, FiLogOut, FiAlertTriangle } from "react-icons/fi";
+import { FiBarChart2, FiCheckCircle, FiShield, FiDatabase, FiUsers, FiRefreshCw, FiZap, FiTrendingUp, FiLock, FiUser, FiLogOut, FiMoon, FiSun } from "react-icons/fi";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
@@ -37,6 +37,8 @@ function App() {
   const myProfile = useQuery(api.users.getMyProfile);
   const switchRole = useMutation(api.users.switchRole);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false); // Mặc định light mode
+  const [showDarkModeWarning, setShowDarkModeWarning] = useState(false);
 
   const handleSwitchRole = async () => {
     try {
@@ -46,11 +48,26 @@ function App() {
     }
   };
 
+  const handleDarkModeToggle = () => {
+    if (!isDarkMode) {
+      // Đang ở light mode, muốn chuyển sang dark mode -> hiện cảnh báo
+      setShowDarkModeWarning(true);
+    } else {
+      // Đang ở dark mode, chuyển về light mode -> không cần cảnh báo
+      setIsDarkMode(false);
+    }
+  };
+
+  const confirmDarkMode = () => {
+    setIsDarkMode(true);
+    setShowDarkModeWarning(false);
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-cyan-300/25 via-blue-200/20 to-teal-300/25 animated-gradient-bg bg-size-200 animate-gradient-slow">
-      <header className="sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl bg-white/50 backdrop-blur-md shadow-lg">
+    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-cyan-300/25 via-blue-200/20 to-teal-300/25 animated-gradient-bg bg-size-200 animate-gradient-slow'}`}>
+      <header className={`sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl shadow-lg ${isDarkMode ? 'bg-slate-800/90 backdrop-blur-md border border-slate-700' : 'bg-white/50 backdrop-blur-md'}`}>
         <div className="flex items-center gap-3">
-          <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm">
+          <div className={`p-2 rounded-2xl backdrop-blur-sm ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/20'}`}>
             <img
               src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
               alt="logo"
@@ -58,28 +75,35 @@ function App() {
             />
           </div>
           <div>
-            <h2 className="text-sm font-extrabold text-slate-800 font-display">CSDL Cờ đỏ THPTS2BT</h2>
-            <p className="hidden md:block text-xs text-slate-600">Nền tảng quản lý vi phạm và nền nếp của trường THPT Số 2 Bảo Thắng</p>
+            <h2 className={`text-sm font-extrabold font-display ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>CSDL Cờ đỏ THPTS2BT</h2>
+            <p className={`hidden md:block text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nền tảng quản lý vi phạm và nền nếp của trường THPT Số 2 Bảo Thắng</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDarkModeToggle}
+            className={`p-2 rounded-full transition-all outline-none ${isDarkMode ? 'text-amber-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-200/50'}`}
+            title={isDarkMode ? "Chuyển sang nền sáng" : "Chuyển sang nền tối"}
+          >
+            {isDarkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+          </button>
           <Authenticated>
             <Popover>
               <PopoverTrigger asChild>
-                <button className="p-2 rounded-full text-slate-700 hover:bg-slate-200/50 transition-all outline-none" title="Tài khoản">
-                  <FiUser size={24} />
+                <button className={`p-2 rounded-full transition-all outline-none ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-200/50'}`} title="Tài khoản">
+                  <FiUser size={20} />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-56 p-2 bg-white/90 backdrop-blur-xl border-white/50 shadow-2xl rounded-2xl" align="end">
+              <PopoverContent className={`w-56 p-2 backdrop-blur-xl shadow-2xl rounded-2xl ${isDarkMode ? 'bg-slate-800/95 border-slate-700' : 'bg-white/90 border-white/50'}`} align="end">
                 <div className="flex flex-col gap-1">
-                  <div className="px-3 py-2 mb-1 border-b border-slate-100">
-                    <p className="text-xs font-bold text-slate-800 truncate">{myProfile?.fullName}</p>
-                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{myProfile?.className} • {translateRole(myProfile?.role || '')}</p>
+                  <div className={`px-3 py-2 mb-1 border-b ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                    <p className={`text-xs font-bold truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{myProfile?.fullName}</p>
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{myProfile?.className} • {translateRole(myProfile?.role || '')}</p>
                   </div>
                   {myProfile && (myProfile.role === 'gradeManager' || myProfile.role === 'admin') && (
                     <button
                       onClick={() => setShowChangePassword(true)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all"
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all ${isDarkMode ? 'text-slate-300 hover:bg-blue-500/20 hover:text-blue-300' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'}`}
                     >
                       <FiLock className="text-lg opacity-70" />
                       <span>Đổi mật khẩu</span>
@@ -88,16 +112,16 @@ function App() {
                   {myProfile?.isSuperUser && (
                     <button
                       onClick={handleSwitchRole}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-all"
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all ${isDarkMode ? 'text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-300' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'}`}
                     >
                       <FiRefreshCw className="text-lg opacity-70" />
                       <span>Chuyển đổi vai trò</span>
                     </button>
                   )}
-                  <div className="h-px bg-slate-200/50 my-1 mx-2" />
+                  <div className={`h-px my-1 mx-2 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-200/50'}`} />
                   <button
                     onClick={() => void authClient.signOut()}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all ${isDarkMode ? 'text-rose-400 hover:bg-rose-500/20' : 'text-rose-600 hover:bg-rose-50'}`}
                   >
                     <FiLogOut className="text-lg opacity-70" />
                     <span>Đăng xuất</span>
@@ -110,19 +134,19 @@ function App() {
       </header>
 
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
-        <Content />
+        <Content isDarkMode={isDarkMode} />
       </main>
 
       <Toaster position="bottom-center" richColors />
 
-      <footer className="py-6 text-center text-sm text-slate-700 border-t border-white/40 mt-8 nav-glass">
+      <footer className={`py-6 text-center text-sm border-t mt-8 nav-glass ${isDarkMode ? 'text-slate-400 border-slate-700' : 'text-slate-700 border-white/40'}`}>
         <div className="max-w-7xl mx-auto px-4">
-          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-2">CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
-          <div className="flex justify-center gap-4 text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-            <a href="https://github.com/ducanhmai521/CSDLCoDo2BT" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
+          <p className={`text-[10px] uppercase tracking-widest font-semibold mb-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
+          <div className={`flex justify-center gap-4 text-[10px] uppercase tracking-widest font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+            <a href="https://github.com/ducanhmai521/CSDLCoDo2BT" target="_blank" rel="noopener noreferrer" className={`px-2 py-1 rounded-md transition-colors duration-200 ${isDarkMode ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-500 hover:text-blue-700 hover:bg-blue-100'}`}>
               GitHub Repository
             </a>
-            <a href="https://17022008.xyz" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors duration-200">
+            <a href="https://17022008.xyz" target="_blank" rel="noopener noreferrer" className={`px-2 py-1 rounded-md transition-colors duration-200 ${isDarkMode ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-500 hover:text-blue-700 hover:bg-blue-100'}`}>
               Liên hệ Dev
             </a>
           </div>
@@ -132,11 +156,49 @@ function App() {
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
+      
+      {/* Dark Mode Warning Modal */}
+      {showDarkModeWarning && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <FiMoon className="w-6 h-6 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">Chế độ tối (thử nghiệm)</h2>
+            </div>
+            <div className="space-y-3 text-sm text-slate-700">
+              <p className="font-medium text-amber-800">
+                Tính năng Dark Mode hiện đang trong giai đoạn thử nghiệm.
+              </p>
+              <ul className="space-y-2 text-xs text-slate-600 list-disc list-inside">
+                <li>Một số màu sắc có thể chưa được tối ưu hoàn toàn</li>
+                <li>Có thể gặp vấn đề về độ tương phản ở một số thành phần</li>
+                <li>Tui không có thời gian để tối ưu hết được</li>
+              </ul>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={confirmDarkMode}
+                className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
+              >
+                Tiếp tục
+              </button>
+              <button
+                onClick={() => setShowDarkModeWarning(false)}
+                className="px-4 py-2.5 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function Content() {
+function Content({ isDarkMode }: { isDarkMode: boolean }) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const { isAuthenticated: convexIsAuth } = useConvexAuth();
   const myProfile = useQuery(api.users.getMyProfile);
@@ -154,31 +216,31 @@ function Content() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64 glass-card">
+      <div className={`flex justify-center items-center h-64 glass-card ${isDarkMode ? 'bg-slate-800/50' : ''}`}>
         <div className="flex flex-col items-center gap-4">
-          <div className="form-loading-spinner w-12 h-12 border-t-blue-600"></div>
-          <p className="text-slate-700 font-medium">Đang tải dữ liệu...</p>
+          <div className={`form-loading-spinner w-12 h-12 ${isDarkMode ? 'border-t-blue-400' : 'border-t-blue-600'}`}></div>
+          <p className={`font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Đang tải dữ liệu...</p>
         </div>
       </div>
     );
   }
 
   if (!session) {
-    return <HomepageHero />;
+    return <HomepageHero isDarkMode={isDarkMode} />;
   }
 
   if (!myProfile) {
     return (
-      <div className="glass-card">
+      <div className={`glass-card ${isDarkMode ? 'bg-slate-800/50' : ''}`}>
         <ProfileCreationForm />
       </div>
     );
   }
 
-  return <Dashboard profile={myProfile} />;
+  return <Dashboard profile={myProfile} isDarkMode={isDarkMode} />;
 }
 
-function HomepageHero() {
+function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
   return (
     <div>
       {/* ── Hero Section ── */}
@@ -188,16 +250,16 @@ function HomepageHero() {
           <div className="flex flex-col text-center lg:text-left gap-8 w-full max-w-2xl mx-auto lg:mx-0">
             {/* Title Area */}
             <div className="space-y-5 flex flex-col items-center lg:items-start">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-sm font-semibold">
-                <FiZap className="text-blue-600" />
+              <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+                <FiZap className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} />
                 Phiên bản 2025-2026
               </div>
-              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold text-slate-900 font-display leading-[1.15] tracking-tight">
+              <h1 className={`text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold font-display leading-[1.15] tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                 Quản lý nền nếp
                 <br className="hidden sm:block" />
-                <span className="text-blue-600"> thông minh & hiệu quả</span>
+                <span className={isDarkMode ? 'text-blue-400' : 'text-blue-600'}> thông minh & hiệu quả</span>
               </h1>
-              <p className="text-slate-600 text-lg md:text-xl leading-relaxed max-w-lg">
+              <p className={`text-lg md:text-xl leading-relaxed max-w-lg ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 Nền tảng chính thức của Đoàn trường THPT Số 2 Bảo Thắng. Giúp số hóa toàn bộ quy trình ghi nhận và xử lý vi phạm.
               </p>
             </div>
@@ -206,16 +268,16 @@ function HomepageHero() {
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mt-2 w-full sm:w-auto px-4 sm:px-0">
               <Link
                 to="/bang-bao-cao-vi-pham"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-blue-600 text-white font-bold shadow-md hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
               >
                 <FiBarChart2 className="text-xl" />
                 Bảng điểm thi đua
               </Link>
               <Link
                 to="/xin-phep"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white text-slate-700 font-bold shadow-md border border-slate-200 hover:bg-slate-50 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold shadow-md border transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
               >
-                <FiCheckCircle className="text-teal-600 text-xl" />
+                <FiCheckCircle className={`text-xl ${isDarkMode ? 'text-teal-400' : 'text-teal-600'}`} />
                 Xin phép nghỉ học
               </Link>
             </div>
@@ -223,95 +285,95 @@ function HomepageHero() {
 
           {/* Right — sign-in form */}
           <div className="w-full max-w-sm mx-auto lg:mr-0">
-            <SignInForm />
+            <SignInForm isDarkMode={isDarkMode} />
           </div>
         </div>
       </section>
 
       {/* ── Features Section ── */}
-      <section className="py-16 border-t border-white/20">
+      <section className={`py-16 border-t ${isDarkMode ? 'border-slate-700/50' : 'border-white/20'}`}>
         <div className="text-center mb-12">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Tính năng nổi bật</p>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 font-display">
+          <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Tính năng nổi bật</p>
+          <h2 className={`text-2xl md:text-3xl font-extrabold font-display ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
             Mọi thứ bạn cần, trong một nơi
           </h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* Feature 1 */}
-          <div className="feature-card group">
+          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400/30 to-blue-500/30 border border-white/30 flex items-center justify-center text-cyan-600 text-lg group-hover:scale-110 transition-transform duration-300">
+              <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400/30 to-blue-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-cyan-500/30 text-cyan-400' : 'border-white/30 text-cyan-600'}`}>
                 <FiShield />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 mb-1">Ghi nhận vi phạm</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">Nhanh chóng, chuẩn hóa theo quy định nhà trường. Phân loại theo khối, lớp, loại lỗi.</p>
+                <h3 className={`font-bold mb-1 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Ghi nhận vi phạm</h3>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Nhanh chóng, chuẩn hóa theo quy định nhà trường. Phân loại theo khối, lớp, loại lỗi.</p>
               </div>
             </div>
           </div>
 
           {/* Feature 2 */}
-          <div className="feature-card group">
+          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-400/30 to-indigo-500/30 border border-white/30 flex items-center justify-center text-blue-600 text-lg group-hover:scale-110 transition-transform duration-300">
+              <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-400/30 to-indigo-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-blue-500/30 text-blue-400' : 'border-white/30 text-blue-600'}`}>
                 <FiBarChart2 />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 mb-1">Báo cáo thống kê</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">Tổng hợp theo tuần, tháng. Trang xem công khai cho phụ huynh và ban giám hiệu.</p>
+                <h3 className={`font-bold mb-1 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Báo cáo thống kê</h3>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Tổng hợp theo tuần, tháng. Trang xem công khai cho phụ huynh và ban giám hiệu.</p>
               </div>
             </div>
           </div>
 
           {/* Feature 3 */}
-          <div className="feature-card group">
+          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-400/30 to-purple-500/30 border border-white/30 flex items-center justify-center text-violet-600 text-lg group-hover:scale-110 transition-transform duration-300">
+              <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-400/30 to-purple-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-violet-500/30 text-violet-400' : 'border-white/30 text-violet-600'}`}>
                 <FiZap />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 mb-1">Nhập liệu bằng AI</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">Dán danh sách vi phạm thô, AI tự động chuẩn hóa và phân loại chính xác.</p>
+                <h3 className={`font-bold mb-1 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Nhập liệu bằng AI</h3>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Dán danh sách vi phạm thô, AI tự động chuẩn hóa và phân loại chính xác.</p>
               </div>
             </div>
           </div>
 
           {/* Feature 4 */}
-          <div className="feature-card group">
+          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-400/30 to-cyan-500/30 border border-white/30 flex items-center justify-center text-teal-600 text-lg group-hover:scale-110 transition-transform duration-300">
+              <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-400/30 to-cyan-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-teal-500/30 text-teal-400' : 'border-white/30 text-teal-600'}`}>
                 <FiTrendingUp />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 mb-1">Bảng xếp hạng</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">Hệ thống điểm thưởng cho cờ đỏ báo cáo. Bảng xếp hạng minh bạch, cạnh tranh lành mạnh.</p>
+                <h3 className={`font-bold mb-1 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Bảng xếp hạng</h3>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Hệ thống điểm thưởng cho cờ đỏ báo cáo. Bảng xếp hạng minh bạch, cạnh tranh lành mạnh.</p>
               </div>
             </div>
           </div>
 
           {/* Feature 5 */}
-          <div className="feature-card group">
+          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400/30 to-blue-500/30 border border-white/30 flex items-center justify-center text-sky-600 text-lg group-hover:scale-110 transition-transform duration-300">
+              <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400/30 to-blue-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-sky-500/30 text-sky-400' : 'border-white/30 text-sky-600'}`}>
                 <FiUsers />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 mb-1">Phân quyền rõ ràng</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">Quản trị viên, quản lý khối với quyền hạn riêng biệt. Dữ liệu được bảo vệ chặt chẽ.</p>
+                <h3 className={`font-bold mb-1 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Phân quyền rõ ràng</h3>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Quản trị viên, quản lý khối với quyền hạn riêng biệt. Dữ liệu được bảo vệ chặt chẽ.</p>
               </div>
             </div>
           </div>
 
           {/* Feature 6 */}
-          <div className="feature-card group">
+          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400/30 to-teal-500/30 border border-white/30 flex items-center justify-center text-emerald-600 text-lg group-hover:scale-110 transition-transform duration-300">
+              <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400/30 to-teal-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-emerald-500/30 text-emerald-400' : 'border-white/30 text-emerald-600'}`}>
                 <FiDatabase />
               </div>
               <div>
-                <h3 className="font-bold text-slate-800 mb-1">Dữ liệu tập trung</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">Đồng bộ real-time, xuất Excel, lưu trữ lâu dài. Không mất dữ liệu, không trùng lặp.</p>
+                <h3 className={`font-bold mb-1 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Dữ liệu tập trung</h3>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Đồng bộ real-time, xuất Excel, lưu trữ lâu dài. Không mất dữ liệu, không trùng lặp.</p>
               </div>
             </div>
           </div>
@@ -321,7 +383,7 @@ function HomepageHero() {
   );
 }
 
-function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
+function Dashboard({ profile, isDarkMode }: { profile: Doc<"userProfiles">, isDarkMode: boolean }) {
   const appealedViolations = useQuery(
     api.violations.getAppealedViolations,
     profile.role === "admin" ? {} : "skip"
@@ -331,24 +393,24 @@ function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
     : 0;
   return (
     <div>
-      <div className="glass-card mb-6">
-        <h1 className="text-3xl font-bold mb-2 text-slate-900">Xin chào, {profile.fullName}!</h1>
-        <p className="text-slate-700 mb-4">
-          Vai trò của bạn: <span className="font-semibold text-slate-800">{translateRole(profile.role)}</span>
+      <div className={`glass-card mb-6 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+        <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>Xin chào, {profile.fullName}!</h1>
+        <p className={`mb-4 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+          Vai trò của bạn: <span className={`font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{translateRole(profile.role)}</span>
           {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
         </p>
         {profile.role === "admin" && (
           <div className="mt-2">
             {appealedViolations === undefined ? (
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-500/10 border border-slate-500/20 text-slate-600 text-sm font-semibold shadow-sm animate-pulse">
+              <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold shadow-sm animate-pulse ${isDarkMode ? 'bg-slate-700/50 border-slate-600 text-slate-300' : 'bg-slate-500/10 border-slate-500/20 text-slate-600'}`}>
                 Đang kiểm tra báo cáo kháng cáo...
               </div>
             ) : appealedCount > 0 ? (
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm font-semibold shadow-sm">
+              <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold shadow-sm ${isDarkMode ? 'bg-amber-500/20 border-amber-400/30 text-amber-300' : 'bg-amber-500/10 border-amber-500/20 text-amber-700'}`}>
                 Có {appealedCount} báo cáo đang chờ xử lý kháng cáo
               </div>
             ) : (
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-sm font-semibold shadow-sm">
+              <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold shadow-sm ${isDarkMode ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700'}`}>
                 Hiện không có báo cáo nào bị kháng cáo.
               </div>
             )}
@@ -356,12 +418,12 @@ function Dashboard({ profile }: { profile: Doc<"userProfiles"> }) {
         )}
       </div>
 
-      {profile.role === 'admin' && <AdminDashboard />}
-      {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} />}
+      {profile.role === 'admin' && <AdminDashboard isDarkMode={isDarkMode} />}
+      {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} isDarkMode={isDarkMode} />}
       {profile.role === 'pending' &&
-        <div className="glass-card-subtle p-6 border-l-4 border-blue-600">
-          <p className="font-bold text-slate-800">Tài khoản của bạn đang được xem xét</p>
-          <p className="text-slate-700">Vui lòng chờ Quản trị viên xác minh và cấp quyền truy cập.</p>
+        <div className={`glass-card-subtle p-6 border-l-4 ${isDarkMode ? 'bg-slate-800/50 border-blue-500' : 'border-blue-600'}`}>
+          <p className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Tài khoản của bạn đang được xem xét</p>
+          <p className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>Vui lòng chờ Quản trị viên xác minh và cấp quyền truy cập.</p>
         </div>
       }
     </div>

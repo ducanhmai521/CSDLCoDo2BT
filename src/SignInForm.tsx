@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { FiUser, FiLock, FiLogIn, FiHelpCircle } from "react-icons/fi";
 
-export function SignInForm() {
+export function SignInForm({ isDarkMode }: { isDarkMode?: boolean }) {
   const [submitting, setSubmitting] = useState(false);
   const syncBetterAuthUser = useMutation(api.users.syncBetterAuthUser);
 
@@ -51,12 +51,12 @@ export function SignInForm() {
   };
 
   return (
-    <div className="w-full glass-card-strong">
+    <div className={`w-full glass-card-strong ${isDarkMode ? 'bg-slate-800/90 border-slate-700' : ''}`}>
       <div className="mb-6 text-center">
-        <h2 className="text-2xl font-extrabold text-slate-800 flex items-center justify-center gap-2">
-          <FiLogIn className="text-cyan-600" /> Đăng nhập
+        <h2 className={`text-2xl font-extrabold flex items-center justify-center gap-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+          <FiLogIn className={isDarkMode ? 'text-cyan-400' : 'text-cyan-600'} /> Đăng nhập
         </h2>
-        <p className="mt-2 text-sm text-slate-700">
+        <p className={`mt-2 text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
           Truy cập hệ thống quản lý CSDL Cờ đỏ
         </p>
       </div>
@@ -66,13 +66,13 @@ export function SignInForm() {
         onSubmit={handleSubmit}
       >
         <div className="space-y-2">
-          <label htmlFor="username" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-            <FiUser className="text-cyan-600" /> Tên đăng nhập
+          <label htmlFor="username" className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+            <FiUser className={isDarkMode ? 'text-cyan-400' : 'text-cyan-600'} /> Tên đăng nhập
           </label>
           <div className="relative">
             <input
               id="username"
-              className="auth-input-field w-full"
+              className={`auth-input-field w-full ${isDarkMode ? 'bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400' : ''}`}
               type="text"
               name="username"
               autoComplete="username"
@@ -83,13 +83,13 @@ export function SignInForm() {
         </div>
         
         <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-            <FiLock className="text-cyan-600" /> Mật khẩu
+          <label htmlFor="password" className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+            <FiLock className={isDarkMode ? 'text-cyan-400' : 'text-cyan-600'} /> Mật khẩu
           </label>
           <div className="relative">
             <input
               id="password"
-              className="auth-input-field w-full"
+              className={`auth-input-field w-full ${isDarkMode ? 'bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400' : ''}`}
               type="password"
               name="password"
               autoComplete="current-password"
@@ -100,7 +100,7 @@ export function SignInForm() {
         </div>
         
         <button 
-          className="auth-button mt-4 flex items-center justify-center gap-2 relative" 
+          className={`auth-button mt-4 flex items-center justify-center gap-2 relative ${isDarkMode ? 'bg-cyan-600 hover:bg-cyan-700' : ''}`}
           type="submit" 
           disabled={submitting}
         >
@@ -114,18 +114,18 @@ export function SignInForm() {
         {submitting && (
           <div className="form-loading-overlay">
             <div className="text-center">
-              <div className="form-loading-spinner mx-auto mb-4 border-t-cyan-500 border-white/50 w-10 h-10 border-[3px]"></div>
-              <p className="text-slate-800 font-semibold">
+              <div className={`form-loading-spinner mx-auto mb-4 w-10 h-10 border-[3px] ${isDarkMode ? 'border-t-cyan-400 border-slate-700' : 'border-t-cyan-500 border-white/50'}`}></div>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
                 Đang đăng nhập...
               </p>
             </div>
           </div>
         )}
         
-        <div className="text-center text-sm text-slate-700 mt-4 pt-4 border-t border-white/40">
+        <div className={`text-center text-sm mt-4 pt-4 border-t ${isDarkMode ? 'text-slate-300 border-slate-700' : 'text-slate-700 border-white/40'}`}>
           <button
             type="button"
-            className="text-cyan-700 hover:text-cyan-800 hover:underline font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 mx-auto"
+            className={`hover:underline font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 mx-auto ${isDarkMode ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800'}`}
             onClick={handleForgotPassword}
           >
             <FiHelpCircle /> Quên mật khẩu?

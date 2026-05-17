@@ -23,7 +23,7 @@ const PERSONAL_VIOLATIONS = [
   "Có học sinh đánh nhau."
 ];
 
-export default function ViolationReportForm({ showAIModal = true }: { showAIModal?: boolean }) {
+export default function ViolationReportForm({ showAIModal = true, isDarkMode }: { showAIModal?: boolean, isDarkMode?: boolean }) {
   const [targetType, setTargetType] = useState<"student" | "class">("class");
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<{name: string, className: string} | null>(null);
@@ -157,17 +157,17 @@ export default function ViolationReportForm({ showAIModal = true }: { showAIModa
 
   return (
     <div className="space-y-6">
-      {showAIModal && <AIViolationInputModal onBulkSubmitSuccess={resetForm} />}
+      {showAIModal && <AIViolationInputModal onBulkSubmitSuccess={resetForm} isDarkMode={isDarkMode} />}
       <div className="relative">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-800">Báo cáo vi phạm riêng lẻ</h2>
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Báo cáo vi phạm riêng lẻ</h2>
           </div>
     
-          <div className="glass-card-subtle">
-            <label className="font-semibold block mb-3 text-slate-700">Đối tượng vi phạm</label>
+          <div className={`glass-card-subtle ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+            <label className={`font-semibold block mb-3 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Đối tượng vi phạm</label>
             <div className="flex space-x-6">
-              <label className="flex items-center cursor-pointer hover:text-slate-800 transition-colors">
+              <label className={`flex items-center cursor-pointer transition-colors ${isDarkMode ? 'hover:text-slate-200' : 'hover:text-slate-800'}`}>
                 <input
                   type="radio"
                   name="targetType"
@@ -177,9 +177,9 @@ export default function ViolationReportForm({ showAIModal = true }: { showAIModa
                   disabled={isSubmitting}
                   className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
                 />
-                <span className="text-slate-700">Lớp</span>
+                <span className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>Lớp</span>
               </label>
-              <label className="flex items-center cursor-pointer hover:text-slate-800 transition-colors">
+              <label className={`flex items-center cursor-pointer transition-colors ${isDarkMode ? 'hover:text-slate-200' : 'hover:text-slate-800'}`}>
                 <input
                   type="radio"
                   name="targetType"
@@ -189,7 +189,7 @@ export default function ViolationReportForm({ showAIModal = true }: { showAIModa
                   disabled={isSubmitting}
                   className="mr-2 h-4 w-4 text-primary focus:ring-primary-light"
                 />
-                <span className="text-slate-700">Học sinh</span>
+                <span className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>Học sinh</span>
               </label>
             </div>
           </div>
@@ -208,20 +208,20 @@ export default function ViolationReportForm({ showAIModal = true }: { showAIModa
               required
             />
             {studentSearch.trim() && studentSuggestions === undefined && !selectedStudent && (
-              <div className="absolute z-10 w-full mt-1 glass-card-subtle">
-                <div className="px-3 py-3 text-center text-slate-600">
+              <div className={`absolute z-10 w-full mt-1 glass-card-subtle ${isDarkMode ? 'bg-slate-800/90 border-slate-700' : ''}`}>
+                <div className={`px-3 py-3 text-center ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   <div className="form-loading-spinner mx-auto mb-2"></div>
                   <p className="text-xs">Đang tìm kiếm...</p>
                 </div>
               </div>
             )}
             {studentSuggestions && studentSuggestions.length > 0 && !selectedStudent && (
-              <div className="absolute z-10 w-full mt-1 glass-card-subtle">
+              <div className={`absolute z-10 w-full mt-1 glass-card-subtle ${isDarkMode ? 'bg-slate-800/90 border-slate-700' : ''}`}>
                 <ul className="py-1">
                   {(studentSuggestions as any[]).map((s, idx) => (
                     <li
                       key={idx}
-                      className="px-3 py-2 cursor-pointer hover:bg-white/20 text-slate-700 transition-colors"
+                      className={`px-3 py-2 cursor-pointer transition-colors ${isDarkMode ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-700 hover:bg-white/20'}`}
                       onClick={() => handleSelectStudent(s)}
                     >
                       {s.fullName} ({s.className})
@@ -231,8 +231,8 @@ export default function ViolationReportForm({ showAIModal = true }: { showAIModa
               </div>
             )}
             {studentSuggestions && studentSuggestions.length === 0 && studentSearch.trim() && !selectedStudent && (
-              <div className="absolute z-10 w-full mt-1 glass-card-subtle">
-                <div className="px-3 py-2 text-center text-slate-600 text-sm">
+              <div className={`absolute z-10 w-full mt-1 glass-card-subtle ${isDarkMode ? 'bg-slate-800/90 border-slate-700' : ''}`}>
+                <div className={`px-3 py-2 text-center text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   Không tìm thấy học sinh
                 </div>
               </div>
@@ -278,18 +278,18 @@ export default function ViolationReportForm({ showAIModal = true }: { showAIModa
             disabled={isSubmitting}
             rows={3}
           />
-          <p className="text-xs text-slate-600 mt-1">Có thể bỏ trống với các lỗi "Đi muộn" hoặc "Vệ sinh muộn".</p>
+          <p className={`text-xs mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Có thể bỏ trống với các lỗi "Đi muộn" hoặc "Vệ sinh muộn".</p>
         </div>
   
-        <div className="glass-card-subtle">
-          <label className="font-semibold block mb-2 text-slate-700">Bằng chứng (tối đa 15MB mỗi tệp)</label>
+        <div className={`glass-card-subtle ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+          <label className={`font-semibold block mb-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Bằng chứng (tối đa 15MB mỗi tệp)</label>
           <input
             type="file"
             ref={fileInputRef}
             multiple
             onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))}
             disabled={isSubmitting}
-            className="block w-full text-sm text-slate-700 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-white/20 file:text-primary hover:file:bg-white/30 transition-all"
+            className={`block w-full text-sm file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold transition-all ${isDarkMode ? 'text-slate-300 file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600' : 'text-slate-700 file:bg-white/20 file:text-primary hover:file:bg-white/30'}`}
           />
         </div>
   
@@ -309,7 +309,7 @@ export default function ViolationReportForm({ showAIModal = true }: { showAIModa
           <div className="form-loading-overlay">
             <div className="text-center">
               <div className="form-loading-spinner mx-auto mb-4"></div>
-              <p className="text-slate-800 font-semibold">Đang xử lý báo cáo...</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Đang xử lý báo cáo...</p>
             </div>
           </div>
         )}

@@ -18,14 +18,14 @@ const PERSONAL_VIOLATIONS = [
   "Có học sinh đánh nhau."
 ];
 
-export default function ViolationList({ violations, isLoading, isAdminView = false }: { violations: ViolationWithDetails[] | undefined, isLoading: boolean, isAdminView?: boolean }) {
+export default function ViolationList({ violations, isLoading, isAdminView = false, isDarkMode }: { violations: ViolationWithDetails[] | undefined, isLoading: boolean, isAdminView?: boolean, isDarkMode?: boolean }) {
     const currentUser = useQuery(api.users.getLoggedInUser);
     if (isLoading) {
-        return <div className="text-center p-4">Đang tải danh sách...</div>;
+        return <div className={`text-center p-4 ${isDarkMode ? 'text-slate-300' : ''}`}>Đang tải danh sách...</div>;
     }
 
     if (!violations || violations.length === 0) {
-        return <div className="text-center p-4 text-slate-500">Chưa có vi phạm nào được báo cáo.</div>;
+        return <div className={`text-center p-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Chưa có vi phạm nào được báo cáo.</div>;
     }
 
     const role = (currentUser as any)?.role ?? (currentUser as any)?.profile?.role;
@@ -33,12 +33,12 @@ export default function ViolationList({ violations, isLoading, isAdminView = fal
     const myUserId = currentUser?._id;
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-            {violations.map(v => <ViolationCard key={v._id} violation={v} isAdminView={isAdminView} isAdmin={!!isAdmin} myUserId={myUserId} />)}
+            {violations.map(v => <ViolationCard key={v._id} violation={v} isAdminView={isAdminView} isAdmin={!!isAdmin} myUserId={myUserId} isDarkMode={isDarkMode} />)}
         </div>
     );
 }
 
-function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violation: ViolationWithDetails, isAdminView: boolean, isAdmin: boolean, myUserId: string | undefined }) {
+function ViolationCard({ violation, isAdminView, isAdmin, myUserId, isDarkMode }: { violation: ViolationWithDetails, isAdminView: boolean, isAdmin: boolean, myUserId: string | undefined, isDarkMode?: boolean }) {
     const [showAppealForm, setShowAppealForm] = useState(false);
     const [appealReason, setAppealReason] = useState("");
     const appealViolation = useMutation(api.violations.appealViolation);
@@ -139,26 +139,26 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
     };
 
     return (
-        <div className="bg-white/80 p-4 rounded-lg shadow-sm border border-slate-200/80">
+        <div className={`p-4 rounded-lg shadow-sm border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white/80 border-slate-200/80'}`}>
             <div className="flex justify-between items-start">
                 <div>
-                    <p className="font-bold text-lg">{violation.violatingClass} - <span className="font-normal">{violation.violationType}</span></p>
-                    <p className="text-sm text-slate-600">
+                    <p className={`font-bold text-lg ${isDarkMode ? 'text-slate-100' : ''}`}>{violation.violatingClass} - <span className="font-normal">{violation.violationType}</span></p>
+                    <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         {new Date(violation.violationDate).toLocaleString('vi-VN')} bởi {(violation as any).requesterName || violation.reporterName}
                     </p>
                 </div>
-                <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-1 text-xs font-semibold rounded-md border ${statusColor(violation.status)}`}>
+                <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-1 text-xs font-semibold rounded-md border ${statusColor(violation.status, isDarkMode)}`}>
                     {translateStatus(violation.status)}
                 </span>
             </div>
-            {violation.targetType === 'student' && <p className="mt-2"><strong>Học sinh:</strong> {violation.studentName}</p>}
+            {violation.targetType === 'student' && <p className={`mt-2 ${isDarkMode ? 'text-slate-300' : ''}`}><strong>Học sinh:</strong> {violation.studentName}</p>}
             {!isEditing ? (
-                <p className="mt-2"><strong>Chi tiết:</strong> {violation.details}</p>
+                <p className={`mt-2 ${isDarkMode ? 'text-slate-300' : ''}`}><strong>Chi tiết:</strong> {violation.details}</p>
             ) : (
                 <div className="mt-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Đối tượng</label>
+                            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Đối tượng</label>
                             <select className="auth-input-field w-full" value={editTargetType} onChange={(e) => setEditTargetType(e.target.value as any)}>
                                 <option value="class">Lớp</option>
                                 <option value="student">Học sinh</option>
@@ -166,16 +166,16 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                         </div>
                         {editTargetType === 'student' && (
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Tên học sinh</label>
+                                <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Tên học sinh</label>
                                 <input className="auth-input-field w-full" value={editStudentName} onChange={(e) => setEditStudentName(e.target.value)} />
                             </div>
                         )}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Lớp vi phạm</label>
+                            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Lớp vi phạm</label>
                             <input className="auth-input-field w-full" value={editClass} onChange={(e) => setEditClass(e.target.value)} />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Loại vi phạm</label>
+                            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Loại vi phạm</label>
                             <select className="auth-input-field w-full" value={editType} onChange={(e) => setEditType(e.target.value)}>
                                 {VIOLATION_CATEGORIES.map(category => {
                                     const filteredViolations = category.violations.filter(v => editTargetType === "student" || !PERSONAL_VIOLATIONS.includes(v));
@@ -191,7 +191,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                             </select>
                         </div>
                     </div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1 mt-3">Chi tiết</label>
+                    <label className={`block text-sm font-medium mb-1 mt-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Chi tiết</label>
                     <textarea
                         className="auth-input-field w-full"
                         value={editDetails}
@@ -200,7 +200,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                     />
                     <div className="flex gap-2 mt-2">
                         <button onClick={handleSaveEdit} disabled={saving} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:bg-slate-400">Lưu</button>
-                        <button onClick={() => { setIsEditing(false); setEditDetails(violation.details || ""); setEditType(violation.violationType); setEditClass(violation.violatingClass); setEditStudentName(violation.studentName || ""); setEditTargetType(violation.targetType); }} className="bg-slate-200 text-slate-700 px-3 py-1 rounded text-sm hover:bg-slate-300">Hủy</button>
+                        <button onClick={() => { setIsEditing(false); setEditDetails(violation.details || ""); setEditType(violation.violationType); setEditClass(violation.violatingClass); setEditStudentName(violation.studentName || ""); setEditTargetType(violation.targetType); }} className={`px-3 py-1 rounded text-sm ${isDarkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>Hủy</button>
                     </div>
                 </div>
             )}
@@ -296,13 +296,13 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                     </div>
                 </div>
             )}
-            {violation.status === 'appealed' && <p className="mt-2 text-amber-700"><strong>Lý do kháng cáo:</strong> {violation.appealReason}</p>}
+            {violation.status === 'appealed' && <p className={`mt-2 ${isDarkMode ? 'text-amber-300' : 'text-amber-700'}`}><strong>Lý do kháng cáo:</strong> {violation.appealReason}</p>}
 
             <div className="mt-3 flex gap-4 items-center flex-wrap">
                 {!isAdminView && violation.status === 'reported' && (
                     <div>
                         {!showAppealForm ? (
-                            <button onClick={() => setShowAppealForm(true)} className="text-sm font-semibold text-amber-600 hover:text-amber-700">
+                            <button onClick={() => setShowAppealForm(true)} className={`text-sm font-semibold ${isDarkMode ? 'text-amber-400 hover:text-amber-300' : 'text-amber-600 hover:text-amber-700'}`}>
                                 Kháng cáo
                             </button>
                         ) : (
@@ -318,7 +318,7 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                                     <button onClick={handleAppeal} className="bg-amber-500 text-white px-3 py-1 rounded text-sm hover:bg-amber-600">
                                         Gửi
                                     </button>
-                                    <button onClick={() => setShowAppealForm(false)} className="bg-slate-200 text-slate-700 px-3 py-1 rounded text-sm hover:bg-slate-300">
+                                    <button onClick={() => setShowAppealForm(false)} className={`px-3 py-1 rounded text-sm ${isDarkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>
                                         Hủy
                                     </button>
                                 </div>
@@ -327,38 +327,38 @@ function ViolationCard({ violation, isAdminView, isAdmin, myUserId }: { violatio
                     </div>
                 )}
                 {isAdminView && violation.status === 'appealed' && (
-                    <button onClick={handleResolve} className="text-sm font-semibold text-green-600 hover:text-green-700">
+                    <button onClick={handleResolve} className={`text-sm font-semibold ${isDarkMode ? 'text-green-400 hover:text-green-300' : 'text-green-600 hover:text-green-700'}`}>
                         Đánh dấu đã giải quyết
                     </button>
                 )}
                 {isAdminView && (
-                     <button onClick={() => setShowDeleteModal(true)} className="text-sm font-semibold text-red-600 hover:text-red-700">
+                     <button onClick={() => setShowDeleteModal(true)} className={`text-sm font-semibold ${isDarkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'}`}>
                         Xóa
                     </button>
                 )}
                 {canEdit && !isEditing && (
-                    <button onClick={() => setIsEditing(true)} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                    <button onClick={() => setIsEditing(true)} className={`text-sm font-semibold ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}>
                         Chỉnh sửa chi tiết
                     </button>
                 )}
                 {isAdminView && (
-                    <button onClick={() => setShowLogs((v) => !v)} className="text-sm font-semibold text-slate-600 hover:text-slate-700">
+                    <button onClick={() => setShowLogs((v) => !v)} className={`text-sm font-semibold ${isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'}`}>
                         {showLogs ? 'Ẩn lịch sử' : 'Xem lịch sử chỉnh sửa'}
                     </button>
                 )}
             </div>
             {isAdminView && showLogs && (
-                <div className="mt-3 bg-slate-50/80 rounded p-3 border border-slate-200/80">
-                    <p className="font-semibold mb-2">Lịch sử chỉnh sửa</p>
+                <div className={`mt-3 rounded p-3 border ${isDarkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50/80 border-slate-200/80'}`}>
+                    <p className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : ''}`}>Lịch sử chỉnh sửa</p>
                     {logs === undefined ? (
-                        <p className="text-sm text-slate-500">Đang tải...</p>
+                        <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Đang tải...</p>
                     ) : logs.length === 0 ? (
-                        <p className="text-sm text-slate-500">Chưa có chỉnh sửa nào.</p>
+                        <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Chưa có chỉnh sửa nào.</p>
                     ) : (
                         <ul className="space-y-2 text-sm">
                             {logs.map((log: any) => (
-                                <li key={log._id} className="border-b border-slate-200/80 pb-2">
-                                    <div className="text-slate-700">{new Date(log.timestamp).toLocaleString('vi-VN')}</div>
+                                <li key={log._id} className={`border-b pb-2 ${isDarkMode ? 'border-slate-700' : 'border-slate-200/80'}`}>
+                                    <div className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>{new Date(log.timestamp).toLocaleString('vi-VN')}</div>
                                     <div className="mt-1">
                                         {log.changes.map((c: any, idx: number) => (
                                             <div key={idx}>
@@ -475,7 +475,15 @@ function translateStatus(status: string) {
     }
 }
 
-function statusColor(status: string) {
+function statusColor(status: string, isDarkMode?: boolean) {
+    if (isDarkMode) {
+        switch (status) {
+            case 'reported': return 'bg-rose-500/20 text-rose-300 border-rose-400/30';
+            case 'appealed': return 'bg-amber-500/20 text-amber-300 border-amber-400/30';
+            case 'resolved': return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30';
+            default: return 'bg-slate-700 text-slate-300 border-slate-600';
+        }
+    }
     switch (status) {
         case 'reported': return 'bg-rose-50 text-rose-700 border-rose-200';
         case 'appealed': return 'bg-amber-50 text-amber-700 border-amber-200';

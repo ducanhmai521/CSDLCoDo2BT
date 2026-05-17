@@ -8,17 +8,17 @@ import { Button } from "./components/ui/button";
 import { Link } from "react-router-dom";
 import { Trophy, TrendingUp, Star, Target, ChevronRight, Zap, Users } from "lucide-react";
 
-export default function GradeManagerDashboard({ profile }: { profile: Doc<"userProfiles"> }) {
+export default function GradeManagerDashboard({ profile, isDarkMode }: { profile: Doc<"userProfiles">, isDarkMode?: boolean }) {
     const [viewMode, setViewMode] = useState<"class" | "grade">("class");
     const violations = useQuery(api.violations.getViolationsForGradeManager);
     const myPoints = useQuery(api.reportingPoints.getMyReportingPoints);
     const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`;
     return (
-        <div className="container mx-auto">
+        <div className={`container mx-auto ${isDarkMode ? 'text-slate-200' : ''}`}>
 {/* Reporting Points Card - FIX */}
             <div className="mb-6">
                 <Link to="/bang-xep-hang" className="block group">
-                    <div className="relative overflow-hidden rounded-3xl backdrop-blur-xl bg-slate-900/90 text-white shadow-xl shadow-slate-200/50 transition-all duration-300 hover:scale-[1.01] hover:shadow-2xl hover:shadow-slate-300/50 cursor-pointer border border-slate-800/50">
+                    <div className={`relative overflow-hidden rounded-3xl backdrop-blur-xl shadow-xl transition-all duration-300 hover:scale-[1.01] hover:shadow-2xl cursor-pointer border ${isDarkMode ? 'bg-slate-800/90 text-white shadow-slate-900/50 hover:shadow-slate-900/70 border-slate-700/50' : 'bg-slate-900/90 text-white shadow-slate-200/50 hover:shadow-slate-300/50 border-slate-800/50'}`}>
                         
                         {/* 1. Dynamic Background Layers */}
                         <div className="absolute inset-0 opacity-[0.15] mix-blend-overlay pointer-events-none" style={{ backgroundImage: noiseBg }}></div>
@@ -96,25 +96,25 @@ export default function GradeManagerDashboard({ profile }: { profile: Doc<"userP
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
                 <div className="lg:col-span-1">
-                    <ViolationReportForm />
+                    <ViolationReportForm isDarkMode={isDarkMode} />
                 </div>
                 <div className="lg:col-span-2">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-xl font-semibold">
+                        <h3 className={`text-xl font-semibold ${isDarkMode ? 'text-slate-100' : ''}`}>
                             {viewMode === "class" ? `Vi phạm Lớp ${profile.className}` : "Vi phạm trong Khối của bạn"}
                         </h3>
                         <Button
                             onClick={() => setViewMode(viewMode === "class" ? "grade" : "class")}
                             variant="outline"
-                            className="text-sm font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
+                            className={`text-sm font-medium transition-colors shadow-sm ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-slate-100' : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900'}`}
                         >
                             {viewMode === "class" ? "Xem toàn khối" : "Xem vi phạm lớp"}
                         </Button>
                     </div>
                     {viewMode === "class" ? (
-                        <ViolationList violations={violations?.filter(v => v.violatingClass.toUpperCase().replace(/\s+/g, '') === profile.className.toUpperCase().replace(/\s+/g, ''))} isLoading={violations === undefined} />
+                        <ViolationList violations={violations?.filter(v => v.violatingClass.toUpperCase().replace(/\s+/g, '') === profile.className.toUpperCase().replace(/\s+/g, ''))} isLoading={violations === undefined} isDarkMode={isDarkMode} />
                     ) : (
-                        <ViolationList violations={violations} isLoading={violations === undefined} />
+                        <ViolationList violations={violations} isLoading={violations === undefined} isDarkMode={isDarkMode} />
                     )}
                 </div>
             </div>

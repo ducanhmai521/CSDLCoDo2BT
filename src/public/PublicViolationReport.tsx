@@ -119,13 +119,16 @@ const premiumStyles = `
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-color: rgba(255, 255, 255, 0.4) !important;
+    box-shadow: shadow-sm !important;
+    border-radius: 15px !important;
   }
   .public-report-shell.theme-dark .glass-card {
     background-color: rgba(30, 41, 59, 0.45) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-color: rgba(255, 255, 255, 0.12) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+    box-shadow: shadow-sm !important;
+    border-radius: 15px !important;
   }
 
   .glass-day-expanded {
@@ -515,6 +518,7 @@ const PublicViolationReport = () => {
   // Component State
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekInput, setWeekInput] = useState('1');
+  const [debouncedWeekInput, setDebouncedWeekInput] = useState('1');
 
   // Class Selection State (from localStorage)
   const [selectedClass, setSelectedClass] = useState<string | null>(() => {
@@ -649,8 +653,33 @@ const PublicViolationReport = () => {
       const academicWeek = toAcademicWeek(rawWeek, breakWindow);
       setWeekNumber(academicWeek);
       setWeekInput(academicWeek.toString());
+      setDebouncedWeekInput(academicWeek.toString());
     }
   }, [baseDateStr, breakWindow]);
+
+  // Debounce week input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedWeekInput(weekInput);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [weekInput]);
+
+  // Process debounced input
+  useEffect(() => {
+    if (debouncedWeekInput.trim() === '') {
+      setWeekError('Tuần không được để trống');
+      return;
+    }
+    const num = parseInt(debouncedWeekInput, 10);
+    if (isNaN(num) || num <= 0) {
+      setWeekError('Tuần phải là một số dương hợp lệ');
+    } else {
+      setWeekError(null);
+      setWeekNumber(num);
+    }
+  }, [debouncedWeekInput]);
 
   useEffect(() => {
     if (modalMedia) {
@@ -717,10 +746,7 @@ const PublicViolationReport = () => {
   const handleWeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setWeekInput(val);
-    if (val.trim() === '') { setWeekError('Tuần không được để trống'); return; }
-    const num = parseInt(val, 10);
-    if (isNaN(num) || num <= 0) { setWeekError('Tuần phải là một số dương hợp lệ'); }
-    else { setWeekError(null); setWeekNumber(num); }
+    // Validation sẽ được xử lý bởi debounced effect
   };
 
   const handleClassSelect = (cls: string) => {
@@ -1286,7 +1312,7 @@ const PublicViolationReport = () => {
                 const dayViolations = hideExcusedAbsence
                   ? allDayViolations.filter((v: { violationType: string; }) => v.violationType !== "Nghỉ học có phép")
                   : allDayViolations;
-                const isExpanded = expandedDays[dayTimestamp] !== false;
+                const isExpanded = expandedDays[dayTimestamp] === true;
 
                 // Case: Ẩn nghỉ có phép và chỉ còn nghỉ có phép
                 if (hideExcusedAbsence && dayViolations.length === 0) {
@@ -1305,7 +1331,7 @@ const PublicViolationReport = () => {
                 if (dayViolations.length === 0) return null;
 
                 return (
-                  <div key={dayTimestamp} className="glass-card !p-0 rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+                  <div key={dayTimestamp} className="glass-card !p-0 border border-indigo-300 overflow-hidden mb-3">
                     {/* Header Ngày */}
                     <button
                       onClick={() => toggleDay(dayTimestamp)}
@@ -1324,7 +1350,10 @@ const PublicViolationReport = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium px-2 py-1 rounded ${isExpanded ? 'bg-white/20' : 'bg-indigo-50 text-indigo-600'}`}>
+                        <span className={`text-xs font-medium px-2 py-1 rounded ${isExpanded 
+                          ? 'bg-white/20' 
+                          : (isDarkMode ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/30' : 'bg-indigo-50 text-indigo-600')
+                        }`}>
                           {dayViolations.length} vi phạm
                         </span>
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -1332,7 +1361,7 @@ const PublicViolationReport = () => {
                     </button>
 
                     {/* Body Ngày */}
-                    {isExpanded && (
+                    <div className={`overflow-hidden transition-[max-height] duration-300 ease-in-out ${isExpanded ? 'max-h-[9999px]' : 'max-h-0'}`}>
                       <div className="border-t border-slate-200/50">
                         <div className="divide-y divide-slate-200/50">
                           {dayViolations.map((v: any) => (
@@ -1345,7 +1374,7 @@ const PublicViolationReport = () => {
                           ))}
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
@@ -1487,7 +1516,7 @@ const PublicViolationReport = () => {
             ) : (
               <div className="space-y-4 mt-2">
                 {classViolationsByWeek.map(({ week, violations }) => (
-                  <div key={week} className="glass-card !p-0 rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+                  <div key={week} className="glass-card !p-0 border border-indigo-300 overflow-hidden mb-3">
                     <div className={`w-full px-4 py-3 flex items-center justify-between border-b ${isDarkMode ? "border-slate-600/70" : "border-slate-200/50"
                       } glass-row`}>
                       <div className="flex items-center gap-3">
@@ -1515,7 +1544,7 @@ const PublicViolationReport = () => {
                     ) : (
                       <div className={`p-4 text-center text-sm italic ${isDarkMode ? "text-slate-300 glass-row" : "text-slate-500 glass-row"
                         }`}>
-                        Tuần này lớp ngoan, không có vi phạm nào! 🎉
+                        Tuần này lớp ngoan, không có vi phạm nào!
                       </div>
                     )}
                   </div>

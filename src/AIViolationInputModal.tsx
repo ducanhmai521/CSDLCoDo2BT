@@ -50,8 +50,10 @@ type InputMode = "attendance" | "violations";
 
 export function AIViolationInputModal({
   onBulkSubmitSuccess,
+  isDarkMode,
 }: {
   onBulkSubmitSuccess: () => void;
+  isDarkMode?: boolean;
 }) {
   const [rawText, setRawText] = useState("");
   const [parsedViolations, setParsedViolations] = useState<ParsedViolation[]>(
@@ -619,15 +621,15 @@ export function AIViolationInputModal({
       </DialogTrigger>
       
       {/* SỬA ĐỔI 1: Thêm [&>button]:hidden để ẩn nút X mặc định bị trùng */}
-      <DialogContent className="[&>button]:hidden max-w-3xl w-[100vw] h-[100dvh] sm:h-auto sm:max-h-[85vh] p-0 flex flex-col gap-0 bg-gradient-to-br from-white via-cyan-50 to-blue-50 border-none sm:border sm:rounded-2xl sm:shadow-2xl overflow-hidden">
+      <DialogContent className={`[&>button]:hidden max-w-3xl w-[100vw] h-[100dvh] sm:h-auto sm:max-h-[85vh] p-0 flex flex-col gap-0 border-none sm:border sm:rounded-2xl sm:shadow-2xl overflow-hidden ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-gradient-to-br from-white via-cyan-50 to-blue-50'}`}>
         
         {/* Header giữ nguyên */}
-        <DialogHeader className="flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-100 bg-white/50 backdrop-blur-md flex flex-row items-center justify-between space-y-0">
-          <DialogTitle className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
+        <DialogHeader className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 border-b backdrop-blur-md flex flex-row items-center justify-between space-y-0 ${isDarkMode ? 'border-slate-700 bg-slate-800/50' : 'border-gray-100 bg-white/50'}`}>
+          <DialogTitle className={`text-lg sm:text-xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-slate-100' : 'text-gray-800'}`}>
             {currentView === "input" ? "Nhập liệu AI" : "Kiểm tra kết quả"}
           </DialogTitle>
-          <DialogClose className="rounded-full bg-gray-100 p-2 hover:bg-gray-200 transition-colors">
-            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <DialogClose className={`rounded-full p-2 transition-colors ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200'}`}>
+            <svg className={`w-4 h-4 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </DialogClose>
         </DialogHeader>
 
@@ -642,11 +644,15 @@ export function AIViolationInputModal({
                   onClick={() => setInputMode("attendance")}
                   className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 ${
                     inputMode === "attendance"
-                      ? "border-blue-500 bg-blue-50/80 text-blue-700 shadow-md transform scale-[1.02]"
-                      : "border-gray-100 bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50"
+                      ? isDarkMode 
+                        ? "border-blue-400 bg-blue-500/20 text-blue-300 shadow-md transform scale-[1.02]"
+                        : "border-blue-500 bg-blue-50/80 text-blue-700 shadow-md transform scale-[1.02]"
+                      : isDarkMode
+                        ? "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:bg-slate-700"
+                        : "border-gray-100 bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <div className={`p-2 rounded-full ${inputMode === 'attendance' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                  <div className={`p-2 rounded-full ${inputMode === 'attendance' ? (isDarkMode ? 'bg-blue-500/30' : 'bg-blue-100') : (isDarkMode ? 'bg-slate-700' : 'bg-gray-100')}`}>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                   </div>
                   <div className="text-center">
@@ -659,11 +665,15 @@ export function AIViolationInputModal({
                   onClick={() => setInputMode("violations")}
                   className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 ${
                     inputMode === "violations"
-                      ? "border-blue-500 bg-blue-50/80 text-blue-700 shadow-md transform scale-[1.02]"
-                      : "border-gray-100 bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50"
+                      ? isDarkMode
+                        ? "border-blue-400 bg-blue-500/20 text-blue-300 shadow-md transform scale-[1.02]"
+                        : "border-blue-500 bg-blue-50/80 text-blue-700 shadow-md transform scale-[1.02]"
+                      : isDarkMode
+                        ? "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:bg-slate-700"
+                        : "border-gray-100 bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <div className={`p-2 rounded-full ${inputMode === 'violations' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                  <div className={`p-2 rounded-full ${inputMode === 'violations' ? (isDarkMode ? 'bg-blue-500/30' : 'bg-blue-100') : (isDarkMode ? 'bg-slate-700' : 'bg-gray-100')}`}>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                   </div>
                   <div className="text-center">
@@ -676,21 +686,21 @@ export function AIViolationInputModal({
               {/* Text Input */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-sm font-semibold text-gray-700">Nội dung báo cáo</label>
+                  <label className={`text-sm font-semibold ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>Nội dung báo cáo</label>
                   <div className="flex gap-2">
                     {aiStatus !== undefined && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${aiStatus.remaining <= 0 && !aiStatus.isSuperUser ? 'bg-red-50 text-red-500 border-red-100' : 'bg-blue-50 text-blue-500 border-blue-100'}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${aiStatus.remaining <= 0 && !aiStatus.isSuperUser ? (isDarkMode ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-red-50 text-red-500 border-red-100') : (isDarkMode ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-500 border-blue-100')}`}>
                         AI: {aiStatus.isSuperUser ? "vô hạn" : `${aiStatus.remaining} lượt`}
                       </span>
                     )}
-                    <span className="text-[10px] text-gray-400 bg-white px-2 py-0.5 rounded-full border">{rawText.length} ký tự</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${isDarkMode ? 'text-slate-400 bg-slate-800 border-slate-700' : 'text-gray-400 bg-white border-gray-200'}`}>{rawText.length} ký tự</span>
                   </div>
                 </div>
                 <Textarea
                   placeholder={inputMode === "attendance" 
                     ? `10A1: vắng An, Bình; muộn Cường...\n10A2 đủ...`
                     : `An 10A1 sai dp\nBình 10A2 tóc...`}
-                  className="min-h-[200px] sm:min-h-[250px] resize-none w-full p-4 border-gray-200 bg-white/80 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm md:text-base leading-relaxed shadow-inner"
+                  className={`min-h-[200px] sm:min-h-[250px] resize-none w-full p-4 rounded-xl focus:ring-2 text-sm md:text-base leading-relaxed shadow-inner ${isDarkMode ? 'border-slate-700 bg-slate-800/80 text-slate-200 focus:ring-blue-500 placeholder:text-slate-500' : 'border-gray-200 bg-white/80 text-gray-900 focus:ring-blue-500 placeholder:text-gray-400'}`}
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
                   disabled={isParsing || isSubmitting}
@@ -699,10 +709,10 @@ export function AIViolationInputModal({
 
                {/* Advanced Options Collapsible */}
                {(myProfile?.role === "gradeManager" || myProfile?.isSuperUser) && (
-                <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+                <div className={`border rounded-xl overflow-hidden ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'}`}>
                   <button 
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="w-full flex items-center justify-between p-3 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                    className={`w-full flex items-center justify-between p-3 text-xs font-semibold transition-colors ${isDarkMode ? 'text-slate-400 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-50'}`}
                   >
                     <span>Cài đặt nâng cao (Ngày/Người báo cáo)</span>
                     {showAdvanced ? (
@@ -713,29 +723,29 @@ export function AIViolationInputModal({
                   </button>
                   
                   {showAdvanced && (
-                    <div className="p-3 bg-gray-50 space-y-3 border-t border-gray-100 animate-in slide-in-from-top-2">
+                    <div className={`p-3 space-y-3 border-t animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
                       <div className="space-y-1">
-                         <label className="text-xs text-gray-500">Override ngày</label>
+                         <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>Override ngày</label>
                          <Input
                           type="datetime-local"
-                          className="bg-white text-sm h-9"
+                          className={`text-sm h-9 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-white'}`}
                           onChange={(e) => setCustomDate(e.target.value ? new Date(e.target.value).getTime() : null)}
                         />
                       </div>
                       
                       <div className="space-y-1">
-                        <label className="text-xs text-gray-500">AI model</label>
-                        <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md px-3 py-2">
+                        <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>AI model</label>
+                        <div className={`text-xs border rounded-md px-3 py-2 ${isDarkMode ? 'text-slate-400 bg-slate-800 border-slate-700' : 'text-gray-600 bg-white border-gray-200'}`}>
                           Đang cấu hình:{" "}
-                          <span className="font-mono text-gray-800">
+                          <span className={`font-mono ${isDarkMode ? 'text-slate-300' : 'text-gray-800'}`}>
                             {configuredModelText || "Chưa đặt (sẽ dùng fallback)"}
                           </span>
-                          <div className="mt-1 text-[11px] text-gray-500">
+                          <div className={`mt-1 text-[11px] ${isDarkMode ? 'text-slate-500' : 'text-gray-500'}`}>
                             (Ưu tiên Gemini, fallback OpenRouter. Cấu hình ở Admin Dashboard → Cài đặt → AI)
                           </div>
-                          <div className="mt-1 text-[11px] text-gray-500">
+                          <div className={`mt-1 text-[11px] ${isDarkMode ? 'text-slate-500' : 'text-gray-500'}`}>
                             OpenRouter fallback:{" "}
-                            <span className="font-mono text-gray-700">
+                            <span className={`font-mono ${isDarkMode ? 'text-slate-400' : 'text-gray-700'}`}>
                               {configuredOpenRouterText || "Chưa đặt"}
                             </span>
                           </div>
@@ -744,10 +754,10 @@ export function AIViolationInputModal({
                       
                       {myProfile?.isSuperUser && (
                         <div className="space-y-1">
-                          <label className="text-xs text-gray-500">Override người báo cáo</label>
+                          <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>Override người báo cáo</label>
                           <input
                             list="reporter-list"
-                            className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            className={`flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-input bg-white'}`}
                             placeholder="Nhập hoặc chọn người..."
                             onChange={(e) => {
                               const value = e.target.value;
@@ -766,15 +776,15 @@ export function AIViolationInputModal({
                               <option key={p.userId} value={p.fullName}>{p.fullName} - {p.className}</option>
                             ))}
                           </datalist>
-                          <div className="text-[10px] text-gray-400 leading-tight">
+                          <div className={`text-[10px] leading-tight ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>
                             * Có thể chọn tài khoản có sẵn hoặc tự nhập tên người báo (nếu không có tk).
                           </div>
                         </div>
                       )}
                       {myProfile?.isSuperUser && (
                         <div className="space-y-1">
-                          <label className="text-xs text-gray-500">Debug AI chi tiết</label>
-                          <label className="flex items-center gap-2 text-xs text-gray-700 bg-white border border-gray-200 rounded-md px-3 py-2">
+                          <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>Debug AI chi tiết</label>
+                          <label className={`flex items-center gap-2 text-xs border rounded-md px-3 py-2 ${isDarkMode ? 'text-slate-400 bg-slate-800 border-slate-700' : 'text-gray-700 bg-white border-gray-200'}`}>
                             <input
                               type="checkbox"
                               checked={showAiDebugDetails}
@@ -793,31 +803,31 @@ export function AIViolationInputModal({
             // RESULTS VIEW
             <div className="flex flex-col gap-4 pb-20 animate-in fade-in slide-in-from-right-4 duration-300">
               {(usedModel || configuredModelText) && (
-                <div className="bg-white/70 border border-gray-200 rounded-xl p-3 shadow-sm text-xs text-gray-600">
+                <div className={`border rounded-xl p-3 shadow-sm text-xs ${isDarkMode ? 'bg-slate-800/70 border-slate-700 text-slate-400' : 'bg-white/70 border-gray-200 text-gray-600'}`}>
                   AI model đang dùng:{" "}
-                  <span className="font-mono text-gray-800">{usedModel || configuredModelText}</span>
+                  <span className={`font-mono ${isDarkMode ? 'text-slate-300' : 'text-gray-800'}`}>{usedModel || configuredModelText}</span>
                 </div>
               )}
               {aiDebugInfo && (
-                <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3 shadow-sm text-xs text-slate-700 space-y-2">
+                <div className={`border rounded-xl p-3 shadow-sm text-xs space-y-2 ${isDarkMode ? 'bg-slate-800/70 border-slate-700 text-slate-400' : 'bg-slate-50/70 border-slate-200 text-slate-700'}`}>
                   <div>
                     Verify:{" "}
                     {aiDebugInfo.verificationChanged ? "có chỉnh sửa" : "không chỉnh sửa"}
                   </div>
                   {canShowDebugDetails && (
                     <div>
-                      Verify mode: <span className="font-mono text-slate-800">{aiDebugInfo.verificationMode}</span>
+                      Verify mode: <span className={`font-mono ${isDarkMode ? 'text-slate-300' : 'text-slate-800'}`}>{aiDebugInfo.verificationMode}</span>
                     </div>
                   )}
                   {canShowDebugDetails && aiDebugInfo.correctionsMade.length > 0 && (
-                    <div className="text-[11px] text-slate-600">
+                    <div className={`text-[11px] ${isDarkMode ? 'text-slate-500' : 'text-slate-600'}`}>
                       Sửa bởi verifier: {aiDebugInfo.correctionsMade.join(" | ")}
                     </div>
                   )}
                   {canShowDebugDetails && aiDebugInfo.firstPassTrace.length > 0 && (
                     <details>
-                      <summary className="cursor-pointer text-[11px] text-slate-600">Trace provider/model</summary>
-                      <div className="mt-2 font-mono text-[10px] text-slate-700 whitespace-pre-wrap break-all">
+                      <summary className={`cursor-pointer text-[11px] ${isDarkMode ? 'text-slate-500' : 'text-slate-600'}`}>Trace provider/model</summary>
+                      <div className={`mt-2 font-mono text-[10px] whitespace-pre-wrap break-all ${isDarkMode ? 'text-slate-400' : 'text-slate-700'}`}>
                         {aiDebugInfo.firstPassTrace.join("\n")}
                       </div>
                     </details>
@@ -826,22 +836,22 @@ export function AIViolationInputModal({
               )}
                {/* Attendance Summary */}
                {inputMode === "attendance" && Object.keys(attendanceByClass).length > 0 && (
-                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 shadow-sm">
-                  <h4 className="text-xs font-bold text-blue-800 mb-2 uppercase tracking-wide">Tổng hợp sĩ số</h4>
+                <div className={`border rounded-xl p-3 shadow-sm ${isDarkMode ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50/50 border-blue-100'}`}>
+                  <h4 className={`text-xs font-bold mb-2 uppercase tracking-wide ${isDarkMode ? 'text-blue-400' : 'text-blue-800'}`}>Tổng hợp sĩ số</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {Object.entries(attendanceByClass).map(([className, data]) => {
                       const total = allStudents?.filter(s => normalizeClassName(s.className) === normalizeClassName(className)).length || 0;
                       const present = total - data.absentStudents.length;
                       return (
-                        <div key={className} className="bg-white rounded px-2.5 py-1.5 border border-blue-100 text-xs flex flex-col">
-                          <div className="flex justify-between font-medium text-gray-700">
+                        <div key={className} className={`rounded px-2.5 py-1.5 border text-xs flex flex-col ${isDarkMode ? 'bg-slate-800 border-blue-500/30' : 'bg-white border-blue-100'}`}>
+                          <div className={`flex justify-between font-medium ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                             <span>{className}</span>
                             <span>{present}/{total}</span>
                           </div>
                           {(data.absentStudents.length > 0 || data.lateStudents.length > 0) && (
-                             <div className="mt-1 pt-1 border-t border-gray-50 text-[10px] text-gray-500 leading-tight">
-                                {data.absentStudents.length > 0 && <div className="text-red-500">V: {data.absentStudents.join(", ")}</div>}
-                                {data.lateStudents.length > 0 && <div className="text-orange-500">M: {data.lateStudents.join(", ")}</div>}
+                             <div className={`mt-1 pt-1 border-t text-[10px] leading-tight ${isDarkMode ? 'border-slate-700 text-slate-400' : 'border-gray-50 text-gray-500'}`}>
+                                {data.absentStudents.length > 0 && <div className={isDarkMode ? 'text-red-400' : 'text-red-500'}>V: {data.absentStudents.join(", ")}</div>}
+                                {data.lateStudents.length > 0 && <div className={isDarkMode ? 'text-orange-400' : 'text-orange-500'}>M: {data.lateStudents.join(", ")}</div>}
                              </div>
                           )}
                         </div>
@@ -854,37 +864,37 @@ export function AIViolationInputModal({
               {/* Violations List */}
               <div className="space-y-3">
                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-gray-800">Danh sách vi phạm ({parsedViolations.length})</h3>
-                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-green-700 bg-green-50 border-green-200 hover:bg-green-100" onClick={handleAddViolation}>
+                    <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-gray-800'}`}>Danh sách vi phạm ({parsedViolations.length})</h3>
+                    <Button size="sm" variant="outline" className={`h-7 text-xs gap-1 ${isDarkMode ? 'text-green-400 bg-green-500/20 border-green-500/30 hover:bg-green-500/30' : 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100'}`} onClick={handleAddViolation}>
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                        Thêm
                     </Button>
                  </div>
                  
                  {parsedViolations.length === 0 ? (
-                    <div className="text-center py-10 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-                       <p className="text-gray-400 text-sm">Chưa có vi phạm nào</p>
+                    <div className={`text-center py-10 rounded-xl border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50/50 border-gray-200'}`}>
+                       <p className={`text-sm ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>Chưa có vi phạm nào</p>
                     </div>
                  ) : (
                    parsedViolations.map((v, i) => {
                      const studentOptionsForClass = studentsByClass.get(normalizeClassName(v.violatingClass)) || studentOptions;
                      return (
-                        <div key={i} className="group bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200 hover:border-blue-300 transition-all relative">
+                        <div key={i} className={`group rounded-xl p-3 sm:p-4 shadow-sm border transition-all relative ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
                            {/* Index Badge */}
-                           <div className="absolute -left-2 -top-2 bg-gray-800 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full shadow-md z-10">
+                           <div className={`absolute -left-2 -top-2 text-[10px] w-5 h-5 flex items-center justify-center rounded-full shadow-md z-10 ${isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-gray-800 text-white'}`}>
                              {i + 1}
                            </div>
 
                            {/* Original Text Display */}
                            {v.originalText && (
-                             <div className="mb-3 px-2 py-1.5 bg-blue-50 text-blue-700 text-[10px] rounded border border-blue-200">
+                             <div className={`mb-3 px-2 py-1.5 text-[10px] rounded border ${isDarkMode ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                                <span className="font-semibold">Dữ liệu gốc:</span> {v.originalText}
                              </div>
                            )}
 
                            {/* Warning Alert */}
                            {v.studentName && v.targetType === 'student' && !allStudents?.some(s => s.fullName.toLowerCase() === v.studentName?.toLowerCase() && normalizeClassName(s.className) === normalizeClassName(v.violatingClass)) && (
-                              <div className="mb-3 px-2 py-1.5 bg-yellow-50 text-yellow-800 text-[10px] sm:text-xs rounded border border-yellow-200 flex items-center gap-1.5">
+                              <div className={`mb-3 px-2 py-1.5 text-[10px] sm:text-xs rounded border flex items-center gap-1.5 ${isDarkMode ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : 'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>
                                 ⚠️ Chưa khớp tên trong danh sách. Vui lòng chọn lại.
                               </div>
                            )}
@@ -1012,10 +1022,10 @@ export function AIViolationInputModal({
         </div>
 
         {/* Footer giữ nguyên */}
-        <div className="flex-shrink-0 p-4 border-t border-gray-100 bg-white flex flex-col sm:flex-row gap-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-20">
+        <div className={`flex-shrink-0 p-4 border-t flex flex-col sm:flex-row gap-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-20 ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-gray-100 bg-white'}`}>
           {currentView === "input" ? (
              <>
-               <Button variant="ghost" className="w-full sm:w-auto text-gray-600" onClick={() => setIsOpen(false)}>Hủy</Button>
+               <Button variant="ghost" className={`w-full sm:w-auto ${isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-gray-600'}`} onClick={() => setIsOpen(false)}>Hủy</Button>
                <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
                  <Button
                     onClick={() => {
@@ -1023,7 +1033,7 @@ export function AIViolationInputModal({
                        setCurrentView("results");
                     }}
                     variant="outline"
-                    className="flex-1 sm:flex-none border-gray-300 text-gray-700"
+                    className={`flex-1 sm:flex-none ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-gray-300 text-gray-700'}`}
                     disabled={isSubmitting}
                   >
                     Nhập thủ công
@@ -1031,7 +1041,7 @@ export function AIViolationInputModal({
                   <Button
                     onClick={handleParse}
                     disabled={isParsing || isSubmitting || !allStudents || (aiStatus !== undefined && !aiStatus.isSuperUser && aiStatus.remaining <= 0)}
-                    className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all"
+                    className={`flex-1 sm:flex-none shadow-lg transition-all ${isDarkMode ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/20 hover:shadow-blue-500/30' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200 hover:shadow-blue-300'}`}
                   >
                     {isParsing ? "Đang xử lý..." : "Phân tích AI"}
                   </Button>
@@ -1039,7 +1049,7 @@ export function AIViolationInputModal({
              </>
           ) : (
              <>
-               <Button variant="outline" onClick={handleBackToInput} className="w-full sm:w-auto border-gray-200">
+               <Button variant="outline" onClick={handleBackToInput} className={`w-full sm:w-auto ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-gray-200'}`}>
                   ← Quay lại
                </Button>
                <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
@@ -1047,7 +1057,7 @@ export function AIViolationInputModal({
                      <Button
                         onClick={handleSubmitAndCopy}
                         disabled={isSubmitting || parsedViolations.length === 0}
-                        className="flex-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
+                        className={`flex-1 border ${isDarkMode ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-indigo-500/30' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200'}`}
                      >
                         Gửi & Copy
                      </Button>
@@ -1055,7 +1065,7 @@ export function AIViolationInputModal({
                   <Button
                      onClick={() => handleSubmit()}
                      disabled={isSubmitting || parsedViolations.length === 0}
-                     className="flex-1 sm:flex-none bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-200 hover:shadow-green-300"
+                     className={`flex-1 sm:flex-none shadow-lg transition-all ${isDarkMode ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-green-500/20 hover:shadow-green-500/30' : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-green-200 hover:shadow-green-300'}`}
                   >
                      {isSubmitting ? "Đang gửi..." : `Gửi báo cáo (${parsedViolations.length})`}
                   </Button>

@@ -53,7 +53,7 @@ function toCalendarWeek(academicWeek: number, breakWindow: ReturnType<typeof get
   return academicWeek + breakWindow.skippedWeeks;
 }
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ isDarkMode }: { isDarkMode?: boolean }) {
   const [gradeFilter, setGradeFilter] = useState<string>("");
   const [classFilter, setClassFilter] = useState<string>("");
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>("");
