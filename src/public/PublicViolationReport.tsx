@@ -87,9 +87,7 @@ const premiumStyles = `
     animation: bg-hue-shift 20s ease-in-out infinite;
   }
   .public-report-shell.theme-dark {
-    background: radial-gradient(1200px circle at 15% 0%, rgba(59, 130, 246, 0.2), transparent 45%),
-      radial-gradient(900px circle at 85% 20%, rgba(6, 182, 212, 0.18), transparent 45%),
-      #0f172a;
+    background: #0D1117;
     color: #f8fafc;
   }
   
@@ -107,7 +105,7 @@ const premiumStyles = `
     -webkit-backdrop-filter: blur(16px);
   }
   .public-report-shell.theme-dark .glass-header {
-    background-color: rgba(15, 23, 42, 0.65) !important;
+    background-color: rgba(1, 4, 9, 0.7) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom-color: rgba(255, 255, 255, 0.08) !important;
@@ -119,20 +117,28 @@ const premiumStyles = `
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-color: rgba(255, 255, 255, 0.4) !important;
-    box-shadow: shadow-sm !important;
-    border-radius: 15px !important;
+    box-shadow: none !important;
+    border-radius: 6px !important;
   }
   .public-report-shell.theme-dark .glass-card {
-    background-color: rgba(30, 41, 59, 0.45) !important;
+    background-color: #151B23 !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-color: rgba(255, 255, 255, 0.12) !important;
-    box-shadow: shadow-sm !important;
-    border-radius: 15px !important;
+    box-shadow: none !important;
+    border-radius: 6px !important;
   }
 
   .glass-day-expanded {
-    background: linear-gradient(to right, rgba(79, 70, 229, 0.85), rgba(99, 102, 241, 0.85)) !important;
+    background: rgba(255, 255, 255, 1) !important;
+    color: #1e293b !important;
+  }
+  
+  .public-report-shell.theme-dark .glass-day-expanded {
+    background: rgba(54, 72, 104, 0.6) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #f1f5f9 !important;
   }
   
   .glass-row {
@@ -149,18 +155,18 @@ const premiumStyles = `
     background-color: rgba(248, 250, 252, 0.4) !important;
   }
   .public-report-shell.theme-dark .glass-details {
-    background-color: rgba(15, 23, 42, 0.3) !important;
+    background-color: #010409 !important;
   }
 
   .public-report-shell.theme-dark .bg-white {
-    background-color: rgba(15, 23, 42, 0.88) !important;
+    background-color: #151B23 !important;
   }
   .public-report-shell.theme-dark .bg-slate-50,
   .public-report-shell.theme-dark .bg-slate-50\\/80,
   .public-report-shell.theme-dark .bg-slate-50\\/50,
   .public-report-shell.theme-dark .bg-slate-100,
   .public-report-shell.theme-dark .bg-slate-100\\/80 {
-    background-color: rgba(30, 41, 59, 0.72) !important;
+    background-color: #212830 !important;
   }
   .public-report-shell.theme-dark .text-slate-900,
   .public-report-shell.theme-dark .text-slate-800,
@@ -179,12 +185,12 @@ const premiumStyles = `
     border-color: rgba(148, 163, 184, 0.26) !important;
   }
   .public-report-shell.theme-dark .reporter-badge {
-    background-color: rgba(30, 41, 59, 0.72) !important;
+    background-color: #212830 !important;
     border-color: rgba(148, 163, 184, 0.35) !important;
     box-shadow: none !important;
   }
   .public-report-shell.theme-dark .reporter-badge-inner {
-    background-color: rgba(15, 23, 42, 0.72) !important;
+    background-color: #151B23 !important;
   }
   .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500),
   .public-report-shell.theme-dark .reporter-badge:has(.text-amber-600) {
@@ -589,6 +595,24 @@ const PublicViolationReport = () => {
     () => (baseDateStr ? getBreakWindow(baseDateStr, breakStartDateStr || null, breakEndDateStr || null) : null),
     [baseDateStr, breakStartDateStr, breakEndDateStr]
   );
+
+  // Auto-expand all days on initial load
+  useEffect(() => {
+    if (sortedDays.length > 0 && Object.keys(expandedDays).length === 0) {
+      const allExpanded: { [key: number]: boolean } = {};
+      sortedDays.forEach(day => {
+        allExpanded[day] = true;
+      });
+      setExpandedDays(allExpanded);
+    }
+  }, [sortedDays.length]); // Only run when days are first loaded
+
+  // Collapse all days when week changes
+  useEffect(() => {
+    if (weekNumber && sortedDays.length > 0) {
+      setExpandedDays({});
+    }
+  }, [weekNumber]); // Run when weekNumber changes
 
   // Tuần hiện tại (độc lập với tuần đang chọn ở tab chính)
   const currentWeekNumber = useMemo(() => {
@@ -1336,22 +1360,25 @@ const PublicViolationReport = () => {
                     <button
                       onClick={() => toggleDay(dayTimestamp)}
                       className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${isExpanded
-                        ? 'glass-day-expanded text-white'
-                        : 'glass-row text-slate-800'
+                        ? 'glass-day-expanded'
+                        : 'glass-row ' + (isDarkMode ? 'text-slate-200' : 'text-slate-800')
                         }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-bold text-sm sm:text-base capitalize">
+                        <span className={`font-bold text-sm sm:text-base capitalize ${isExpanded ? (isDarkMode ? 'text-slate-100' : 'text-slate-800') : ''}`}>
                           {format(new Date(dayTimestamp), "iiii", { locale: vi })}
                         </span>
-                        <span className={`text-xs sm:text-sm font-medium px-2 py-0.5 rounded-full ${isExpanded ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        <span className={`text-xs sm:text-sm font-medium px-2 py-0.5 rounded-full ${isExpanded 
+                          ? (isDarkMode ? 'bg-slate-700/50 text-slate-200' : 'bg-slate-200 text-slate-700')
+                          : (isDarkMode ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-600')
+                        }`}>
                           {format(new Date(dayTimestamp), "dd/MM")}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <span className={`text-xs font-medium px-2 py-1 rounded ${isExpanded 
-                          ? 'bg-white/20' 
+                          ? (isDarkMode ? 'bg-slate-700/50 text-slate-200' : 'bg-slate-200 text-slate-700')
                           : (isDarkMode ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/30' : 'bg-indigo-50 text-indigo-600')
                         }`}>
                           {dayViolations.length} vi phạm
