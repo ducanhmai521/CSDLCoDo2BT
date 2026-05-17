@@ -130,7 +130,7 @@ const premiumStyles = `
   }
 
   .glass-day-expanded {
-    background: rgba(255, 255, 255, 1) !important;
+    background: rgba(191, 215, 248, 0.6) !important;
     color: #1e293b !important;
   }
   
