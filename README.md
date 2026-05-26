@@ -223,6 +223,62 @@ npx convex env set OPENROUTER_API_KEY "sk-or-v1-..."
 npx convex env set OPENROUTER_MODEL "openai/gpt-4o-mini"
 ```
 
+#### D. Thiết Lập Zalo Bot (Tùy Chọn - Tra Cứu Vi Phạm Qua Zalo)
+
+Hệ thống hỗ trợ tra cứu vi phạm qua Zalo Bot. Người dùng có thể nhắn tin cho bot để xem vi phạm của lớp theo tuần.
+
+**Bước 1: Tạo Bot Zalo**
+
+**Bước 2: Lấy Access Token**
+
+**Bước 3: Cấu Hình Webhook Cho Zalo Bot**
+1. Thiết lập Webhook URL: `https://your-domain.convex.site/api/zalo-webhook`
+   - Nếu deploy trên Convex, URL sẽ có dạng: `https://abcxyz.convex.site/api/zalo-webhook`
+   - Lấy URL này từ Convex Dashboard > Settings > Deployment URL
+2. Tạo một **Webhook Secret** (chuỗi bí mật bất kỳ để xác thực)
+
+**Bước 4: Cài Đặt Biến Môi Trường**
+
+Thêm 2 biến môi trường vào Convex:
+
+```bash
+# Access Token từ Zalo OA
+npx convex env set ZALO_OA_ACCESS_TOKEN "your_zalo_access_token_here"
+
+# Webhook Secret (chuỗi bạn tự tạo để bảo mật webhook)
+npx convex env set ZALO_WEBHOOK_SECRET "your_webhook_secret_here"
+```
+
+**Bước 5: Kiểm Tra Hoạt Động**
+
+Sau khi cấu hình xong, người dùng có thể nhắn tin cho Zalo OA với các lệnh:
+
+- **Xem vi phạm tuần hiện tại**: Gửi tên lớp
+  ```
+  10A5
+  12B1
+  ```
+
+- **Xem vi phạm tuần cụ thể**: Gửi tên lớp + số tuần
+  ```
+  10A5 tuần 32
+  12A1 tuan 5
+  ```
+
+Bot sẽ tự động trả về danh sách vi phạm với định dạng:
+```
+🚨 Vi phạm lớp 10A5 — Tuần 32
+─────────────────────────
+1. 👤 Nguyễn Văn A
+   📝 Không mặc đồng phục (-2đ)
+   📅 15/01 • Không có lý do
+2. 📝 Vệ sinh lớp kém (-3đ)
+   📅 16/01 • Phòng học bẩn
+─────────────────────────
+📊 Tổng: 2 vi phạm | -5 điểm
+```
+
+
 ### 5. Chạy Dự Án
 
 Sau khi cài đặt xong biến môi trường, hãy mở 2 tab Terminal:
