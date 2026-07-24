@@ -1,7 +1,7 @@
 "use node";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 // R2 configuration
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
@@ -42,5 +42,57 @@ export const deleteR2Object = internalAction({
       console.error("Error deleting R2 object:", error);
       throw new Error(`Failed to delete R2 object: ${args.key}`);
     }
+  },
+});
+
+/** Delete every object under evidence/ prefix (full R2 evidence wipe). */
+export const deleteAllEvidencePrefix = internalAction({
+  args: {},
+  returns: v.object({
+    deleted: v.number(),
+    failed: v.number(),
+  }),
+  handler: async (_ctx) => {
+    let deleted = 0;
+    let failed = 0;
+    let continuationToken: string | undefined;
+
+    do {
+      const listResponse = await s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: R2_BUCKET_NAME,
+          Prefix: "evidence/",
+          ContinuationToken: continuationToken,
+        })
+      );
+
+      const keys = (listResponse.Contents ?? [])
+        .map((obj) => obj.Key)
+        .filter((key): key is string => Boolean(key));
+
+      for (let i = 0; i < keys.length; i += 10) {
+        const batch = keys.slice(i, i + 10);
+        const results = await Promise.allSettled(
+          batch.map((key) =>
+            s3Client.send(
+              new DeleteObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: key,
+              })
+            )
+          )
+        );
+        for (const r of results) {
+          if (r.status === "fulfilled") deleted++;
+          else failed++;
+        }
+      }
+
+      continuationToken = listResponse.IsTruncated
+        ? listResponse.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return { deleted, failed };
   },
 });

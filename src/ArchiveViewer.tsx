@@ -5,7 +5,9 @@
  * The component receives the parsed ZIP contents and renders a simplified
  * dashboard. A sticky banner at the top lets the user exit archive mode.
  */
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 import JSZip from "jszip";
 import {
   format,
@@ -28,6 +30,9 @@ import {
   School,
   CalendarDays,
   Search,
+  Eye,
+  HardDrive,
+  Cloud,
 } from "lucide-react";
 import { normalizeClassName } from "./lib/utils";
 
@@ -207,44 +212,184 @@ interface ArchiveData {
   classes: any[];
   settings: any[];
   reportingPoints: any[];
-  evidenceFiles: Map<string, string>; // basename → object URL
+  evidenceLoader: EvidenceLoader;
   evidenceErrors: Array<{ r2Key: string; error: string }>;
+}
+
+interface EvidenceLoader {
+  has: (basename: string) => boolean;
+  list: () => string[];
+  getUrl: (basename: string) => Promise<string | null>;
+  revokeAll: () => void;
+}
+
+interface ArchiveLoadedInfo {
+  sourceLabel: string;
+  zipSizeBytes: number;
+}
+
+export type ArchiveLaunch = { url?: string; label?: string };
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function mimeFromBasename(basename: string): string {
+  const ext = basename.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  if (ext === "webp") return "image/webp";
+  if (ext === "mp4") return "video/mp4";
+  if (ext === "webm") return "video/webm";
+  if (ext === "mov") return "video/quicktime";
+  return "application/octet-stream";
+}
+
+function isVideoBasename(basename: string): boolean {
+  return /\.(mp4|webm|mov|avi)$/i.test(basename);
+}
+
+function evidenceBasenamesFromViolation(v: any): string[] {
+  return (v.evidenceR2Keys ?? []).map((key: string) =>
+    key.includes("/") ? key.substring(key.lastIndexOf("/") + 1) : key
+  );
+}
+
+function createEvidenceLoader(zip: JSZip): EvidenceLoader {
+  const index = new Map<string, string>();
+  const cache = new Map<string, string>();
+  const evidenceFolder = zip.folder("evidence");
+  if (evidenceFolder) {
+    evidenceFolder.forEach((relativePath, file) => {
+      if (!file.dir) index.set(relativePath, `evidence/${relativePath}`);
+    });
+  }
+
+  return {
+    has: (basename) => index.has(basename),
+    list: () => Array.from(index.keys()),
+    getUrl: async (basename) => {
+      if (cache.has(basename)) return cache.get(basename)!;
+      const path = index.get(basename);
+      if (!path) return null;
+      const file = zip.file(path);
+      if (!file) return null;
+      const blob = await file.async("blob");
+      const typed =
+        blob.type && blob.type !== "application/octet-stream"
+          ? blob
+          : new Blob([blob], { type: mimeFromBasename(basename) });
+      const url = URL.createObjectURL(typed);
+      cache.set(basename, url);
+      return url;
+    },
+    revokeAll: () => {
+      for (const url of cache.values()) URL.revokeObjectURL(url);
+      cache.clear();
+    },
+  };
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 interface ArchiveViewerProps {
   onExit: () => void;
+  initialUrl?: string;
+  initialLabel?: string;
 }
 
-export default function ArchiveViewer({ onExit }: ArchiveViewerProps) {
+export default function ArchiveViewer({ onExit, initialUrl, initialLabel }: ArchiveViewerProps) {
+  const archiveJobs = useQuery(api.archive.listArchiveJobs);
   const [archiveData, setArchiveData] = useState<ArchiveData | null>(null);
+  const [loadedInfo, setLoadedInfo] = useState<ArchiveLoadedInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const evidenceLoaderRef = useRef<EvidenceLoader | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "violations" | "roster" | "users" | "evidence"
   >("overview");
 
-  const handleFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const completedJobs = useMemo(
+    () =>
+      (archiveJobs ?? []).filter(
+        (j) => j.status === "completed" && j.downloadUrl
+      ),
+    [archiveJobs]
+  );
+
+  const cleanupEvidence = useCallback(() => {
+    evidenceLoaderRef.current?.revokeAll();
+    evidenceLoaderRef.current = null;
+  }, []);
+
+  useEffect(() => () => cleanupEvidence(), [cleanupEvidence]);
+
+  const loadFromArrayBuffer = useCallback(
+    async (arrayBuffer: ArrayBuffer, sourceLabel: string) => {
+      cleanupEvidence();
       setLoading(true);
+      setLoadingLabel(sourceLabel);
       setError(null);
       try {
-        const arrayBuffer = await file.arrayBuffer();
         const zip = await JSZip.loadAsync(arrayBuffer);
         const data = await parseZip(zip);
+        evidenceLoaderRef.current = data.evidenceLoader;
         setArchiveData(data);
+        setLoadedInfo({
+          sourceLabel,
+          zipSizeBytes: arrayBuffer.byteLength,
+        });
         setActiveTab("overview");
       } catch (err) {
         setError(`Không thể đọc file archive: ${(err as Error).message}`);
       } finally {
         setLoading(false);
-        e.target.value = "";
+        setLoadingLabel(null);
       }
     },
-    []
+    [cleanupEvidence]
+  );
+
+  const loadFromUrl = useCallback(
+    async (url: string, sourceLabel: string) => {
+      setLoading(true);
+      setLoadingLabel(sourceLabel);
+      setError(null);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        await loadFromArrayBuffer(arrayBuffer, sourceLabel);
+      } catch (err) {
+        setLoading(false);
+        setLoadingLabel(null);
+        setError(`Không thể tải archive: ${(err as Error).message}`);
+      }
+    },
+    [loadFromArrayBuffer]
+  );
+
+  useEffect(() => {
+    if (!initialUrl || archiveData || loading) return;
+    const label = initialLabel ?? "Archive trên server";
+    void loadFromUrl(initialUrl, label);
+  }, [initialUrl, initialLabel, archiveData, loading, loadFromUrl]);
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const arrayBuffer = await file.arrayBuffer();
+      await loadFromArrayBuffer(arrayBuffer, file.name);
+      e.target.value = "";
+    },
+    [loadFromArrayBuffer]
   );
 
   return (
@@ -282,33 +427,99 @@ export default function ArchiveViewer({ onExit }: ArchiveViewerProps) {
       <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
         {/* ── File picker ── */}
         {!archiveData && (
-          <div className="rounded-2xl border border-white/70 bg-white/80 backdrop-blur-sm shadow p-8 text-center space-y-4">
-            <FileArchive className="w-12 h-12 text-slate-400 mx-auto" />
-            <h2 className="text-lg font-semibold text-slate-800">
-              Chọn file Archive (.zip)
-            </h2>
-            <p className="text-sm text-slate-500">
-              Chọn file ZIP đã tải về từ hệ thống để xem dữ liệu lưu trữ mà
-              không cần kết nối database.
-            </p>
-            {loading && (
-              <p className="text-sm text-indigo-600 animate-pulse">
-                Đang đọc file...
-              </p>
-            )}
-            {error && (
-              <p className="text-sm text-red-600 font-medium">{error}</p>
-            )}
-            <label className="inline-flex items-center gap-2 cursor-pointer rounded-xl bg-indigo-900/90 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-900 transition-colors">
-              <Upload className="w-4 h-4" />
-              Chọn file ZIP
-              <input
-                type="file"
-                accept=".zip"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </label>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/70 bg-white/80 backdrop-blur-sm shadow p-6 sm:p-8 space-y-4">
+              <div className="text-center space-y-2">
+                <FileArchive className="w-12 h-12 text-slate-400 mx-auto" />
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Mở Archive để xem offline
+                </h2>
+                <p className="text-sm text-slate-500 max-w-lg mx-auto">
+                  ZIP được giải nén trong trình duyệt (RAM). Bằng chứng chỉ tải khi bạn mở xem —
+                  archive càng nặng càng tốn bộ nhớ; nên đóng tab sau khi xem xong.
+                </p>
+              </div>
+
+              {loading && (
+                <p className="text-sm text-indigo-600 text-center animate-pulse">
+                  Đang tải{loadingLabel ? `: ${loadingLabel}` : "..."}
+                </p>
+              )}
+              {error && (
+                <p className="text-sm text-red-600 font-medium text-center">{error}</p>
+              )}
+
+              {completedJobs.length > 0 && (
+                <div className="text-left space-y-2 pt-2 border-t border-slate-200/80">
+                  <p className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                    <Cloud className="w-3.5 h-3.5" />
+                    Archive đã backup trên server (xem trực tiếp, không cần tải về)
+                  </p>
+                  <ul className="space-y-2">
+                    {completedJobs.map((job) => (
+                      <li
+                        key={job._id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2"
+                      >
+                        <div className="text-sm text-slate-700">
+                          <span className="font-semibold">{job.schoolYear}</span>
+                          <span className="text-slate-500 ml-2">
+                            {format(
+                              toZonedTime(new Date(job.createdAt), TIME_ZONE),
+                              "dd/MM/yyyy HH:mm"
+                            )}
+                          </span>
+                          {job.totalViolations != null && (
+                            <span className="text-xs text-slate-500 ml-2">
+                              · {job.totalViolations} vi phạm
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() =>
+                            void loadFromUrl(
+                              job.downloadUrl!,
+                              `${job.schoolYear} · ${format(toZonedTime(new Date(job.createdAt), TIME_ZONE), "dd/MM/yyyy HH:mm")}`
+                            )
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Xem ngay
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <label className="inline-flex items-center gap-2 cursor-pointer rounded-xl bg-indigo-900/90 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-900 transition-colors">
+                  <Upload className="w-4 h-4" />
+                  Chọn file ZIP trên máy
+                  <input
+                    type="file"
+                    accept=".zip,application/zip"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={loading}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {archiveData && loadedInfo && (
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-2.5 text-xs text-amber-950 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <HardDrive className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              Nguồn: <span className="font-medium">{loadedInfo.sourceLabel}</span>
+            </span>
+            <span>· ZIP ~{formatBytes(loadedInfo.zipSizeBytes)} trong RAM</span>
+            <span>· {archiveData.evidenceLoader.list().length} file bằng chứng (tải lazy)</span>
           </div>
         )}
 
@@ -334,7 +545,7 @@ export default function ArchiveViewer({ onExit }: ArchiveViewerProps) {
                   },
                   {
                     id: "evidence",
-                    label: `Bằng chứng (${archiveData.evidenceFiles.size})`,
+                    label: `Bằng chứng (${archiveData.evidenceLoader.list().length})`,
                   },
                 ] as const
               ).map((tab) => (
@@ -422,22 +633,8 @@ async function parseZip(zip: JSZip): Promise<ArchiveData> {
     readJson("evidence_errors.json", []),
   ]);
 
-  // Build evidence object URLs
-  const evidenceFiles = new Map<string, string>();
-  const evidenceFolder = zip.folder("evidence");
-  if (evidenceFolder) {
-    const tasks: Promise<void>[] = [];
-    evidenceFolder.forEach((relativePath, file) => {
-      if (file.dir) return;
-      tasks.push(
-        file.async("blob").then((blob) => {
-          const url = URL.createObjectURL(blob);
-          evidenceFiles.set(relativePath, url);
-        })
-      );
-    });
-    await Promise.all(tasks);
-  }
+  // Index evidence in zip; decode lazily when viewing
+  const evidenceLoader = createEvidenceLoader(zip);
 
   return {
     metadata,
@@ -449,9 +646,148 @@ async function parseZip(zip: JSZip): Promise<ArchiveData> {
     classes,
     settings,
     reportingPoints,
-    evidenceFiles,
+    evidenceLoader,
     evidenceErrors,
   };
+}
+
+// ─── Evidence UI ─────────────────────────────────────────────────────────────
+
+function EvidenceLightbox({
+  url,
+  basename,
+  onClose,
+}: {
+  url: string;
+  basename: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Xem bằng chứng"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+        aria-label="Đóng"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <div
+        className="max-h-[92vh] max-w-[min(96vw,1200px)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isVideoBasename(basename) ? (
+          <video src={url} controls autoPlay className="max-h-[92vh] max-w-full rounded-lg" />
+        ) : (
+          <img
+            src={url}
+            alt={basename}
+            className="max-h-[92vh] max-w-full rounded-lg object-contain"
+          />
+        )}
+        <p className="mt-2 text-center text-xs text-white/70 truncate">{basename}</p>
+      </div>
+    </div>
+  );
+}
+
+function LazyEvidencePreview({
+  basename,
+  loader,
+  className = "max-h-40 max-w-full rounded-lg border border-slate-200 object-contain cursor-zoom-in hover:opacity-95",
+  onOpen,
+}: {
+  basename: string;
+  loader: EvidenceLoader;
+  className?: string;
+  onOpen?: (url: string, basename: string) => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loader.getUrl(basename).then((u) => {
+      if (cancelled) return;
+      if (u) setUrl(u);
+      else setFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [basename, loader]);
+
+  if (failed) {
+    return (
+      <span className="text-xs text-amber-600">Không đọc được {basename}</span>
+    );
+  }
+  if (!url) {
+    return (
+      <div className="h-24 w-32 rounded-lg border border-slate-200 bg-slate-100 animate-pulse" />
+    );
+  }
+
+  if (isVideoBasename(basename)) {
+    return (
+      <video src={url} controls className="max-h-48 max-w-full rounded-lg border border-slate-200" />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="inline-block text-left"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen?.(url, basename);
+      }}
+    >
+      <img src={url} alt={basename} className={className} />
+    </button>
+  );
+}
+
+type EvidenceGroupItem = { basename: string; violation: any };
+
+function buildEvidenceByClassAndStudent(data: ArchiveData) {
+  const { evidenceLoader, violations } = data;
+  const assigned = new Set<string>();
+  const byClass = new Map<string, Map<string, EvidenceGroupItem[]>>();
+
+  const push = (className: string, studentLabel: string, item: EvidenceGroupItem) => {
+    const cn = normalizeClassName(className || "?");
+    if (!byClass.has(cn)) byClass.set(cn, new Map());
+    const byStudent = byClass.get(cn)!;
+    if (!byStudent.has(studentLabel)) byStudent.set(studentLabel, []);
+    byStudent.get(studentLabel)!.push(item);
+    assigned.add(item.basename);
+  };
+
+  for (const v of violations) {
+    const studentLabel = displayStudentHeading(v);
+    for (const basename of evidenceBasenamesFromViolation(v)) {
+      if (!evidenceLoader.has(basename)) continue;
+      push(v.violatingClass, studentLabel, { basename, violation: v });
+    }
+  }
+
+  const unassigned = evidenceLoader.list().filter((b) => !assigned.has(b));
+  return { byClass, unassigned };
 }
 
 // ─── Tab components ──────────────────────────────────────────────────────────
@@ -496,7 +832,7 @@ function StatBox({
 }
 
 function OverviewTab({ data }: { data: ArchiveData }) {
-  const { metadata, violations, studentRoster, users, evidenceFiles, evidenceErrors } = data;
+  const { metadata, violations, studentRoster, users, evidenceLoader, evidenceErrors } = data;
   const { weekBaseDate } = resolveWeekSettings(data);
   const gradeCounts = [10, 11, 12].map((g) => ({
     grade: g,
@@ -531,7 +867,7 @@ function OverviewTab({ data }: { data: ArchiveData }) {
           <StatBox
             icon={<Image className="w-6 h-6" />}
             label="Bằng chứng"
-            value={evidenceFiles.size}
+            value={evidenceLoader.list().length}
             color="emerald"
           />
           {evidenceErrors.length > 0 && (
@@ -612,7 +948,7 @@ function OverviewTab({ data }: { data: ArchiveData }) {
 }
 
 function ViolationsTab({ data }: { data: ArchiveData }) {
-  const { violations, evidenceFiles } = data;
+  const { violations, evidenceLoader } = data;
   const { weekBaseDate, breakWindow } = resolveWeekSettings(data);
   const [gradeFilter, setGradeFilter] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -819,7 +1155,7 @@ function ViolationsTab({ data }: { data: ArchiveData }) {
                                       <ArchiveViolationRow
                                         key={v._id}
                                         violation={v}
-                                        evidenceFiles={evidenceFiles}
+                                        evidenceLoader={evidenceLoader}
                                       />
                                     ))}
                                   </div>
@@ -843,21 +1179,26 @@ function ViolationsTab({ data }: { data: ArchiveData }) {
 
 function ArchiveViolationRow({
   violation,
-  evidenceFiles,
+  evidenceLoader,
 }: {
   violation: any;
-  evidenceFiles: Map<string, string>;
+  evidenceLoader: EvidenceLoader;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const evidenceBasenames: string[] = (violation.evidenceR2Keys ?? []).map(
-    (key: string) =>
-      key.includes("/") ? key.substring(key.lastIndexOf("/") + 1) : key
-  );
-  const availableEvidence = evidenceBasenames.filter((b) => evidenceFiles.has(b));
+  const [lightbox, setLightbox] = useState<{ url: string; basename: string } | null>(null);
+  const evidenceBasenames = evidenceBasenamesFromViolation(violation);
+  const availableEvidence = evidenceBasenames.filter((b) => evidenceLoader.has(b));
   const ts = getViolationTimestamp(violation);
 
   return (
     <div>
+      {lightbox && (
+        <EvidenceLightbox
+          url={lightbox.url}
+          basename={lightbox.basename}
+          onClose={() => setLightbox(null)}
+        />
+      )}
       <button
         type="button"
         className="w-full text-left px-3 py-2.5 flex items-start gap-3 hover:bg-slate-50/80 transition-colors"
@@ -925,31 +1266,15 @@ function ArchiveViolationRow({
                 Bằng chứng ({availableEvidence.length})
               </p>
               <div className="flex flex-wrap gap-2">
-                {availableEvidence.map((basename) => {
-                  const url = evidenceFiles.get(basename)!;
-                  const isVideo = /\.(mp4|webm|mov|avi)$/i.test(basename);
-                  return isVideo ? (
-                    <video
-                      key={basename}
-                      src={url}
-                      controls
-                      className="max-h-48 rounded-lg border border-slate-200"
-                    />
-                  ) : (
-                    <a
-                      key={basename}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <img
-                        src={url}
-                        alt={basename}
-                        className="max-h-32 rounded-lg border border-slate-200 hover:opacity-90 transition-opacity object-cover"
-                      />
-                    </a>
-                  );
-                })}
+                {availableEvidence.map((basename) => (
+                  <LazyEvidencePreview
+                    key={basename}
+                    basename={basename}
+                    loader={evidenceLoader}
+                    className="max-h-36 max-w-[220px] rounded-lg border border-slate-200 object-contain cursor-zoom-in hover:opacity-95"
+                    onOpen={(url, name) => setLightbox({ url, basename: name })}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -1152,10 +1477,23 @@ function UsersTab({ data }: { data: ArchiveData }) {
 }
 
 function EvidenceTab({ data }: { data: ArchiveData }) {
-  const { evidenceFiles } = data;
-  const entries = Array.from(evidenceFiles.entries());
+  const { evidenceLoader } = data;
+  const [lightbox, setLightbox] = useState<{ url: string; basename: string } | null>(null);
+  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(() => new Set());
 
-  if (entries.length === 0) {
+  const { byClass, unassigned } = useMemo(
+    () => buildEvidenceByClassAndStudent(data),
+    [data]
+  );
+
+  const classNames = useMemo(
+    () => Array.from(byClass.keys()).sort(compareClassNames),
+    [byClass]
+  );
+
+  const totalInArchive = evidenceLoader.list().length;
+
+  if (totalInArchive === 0) {
     return (
       <Card>
         <p className="text-sm text-slate-500 text-center py-4">
@@ -1165,38 +1503,128 @@ function EvidenceTab({ data }: { data: ArchiveData }) {
     );
   }
 
+  const toggleClass = (className: string) => {
+    setExpandedClasses((prev) => {
+      const next = new Set(prev);
+      if (next.has(className)) next.delete(className);
+      else next.add(className);
+      return next;
+    });
+  };
+
   return (
-    <Card>
-      <h3 className="font-semibold text-slate-800 mb-4">
-        Bằng chứng ({entries.length} files)
-      </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[65vh] overflow-y-auto pr-1">
-        {entries.map(([basename, url]) => {
-          const isVideo = /\.(mp4|webm|mov|avi)$/i.test(basename);
-          return (
-            <div key={basename} className="space-y-1">
-              {isVideo ? (
-                <video
-                  src={url}
-                  controls
-                  className="w-full rounded-xl border border-slate-200 bg-black aspect-video object-contain"
-                />
+    <div className="space-y-3">
+      {lightbox && (
+        <EvidenceLightbox
+          url={lightbox.url}
+          basename={lightbox.basename}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+
+      <Card className="p-4">
+        <p className="text-sm text-slate-600">
+          Bằng chứng được gom theo <span className="font-medium">lớp → học sinh</span>.
+          Bấm ảnh để phóng to (không mở tab mới). Ảnh chỉ tải vào RAM khi bạn xem.
+        </p>
+      </Card>
+
+      {classNames.map((className) => {
+        const byStudent = byClass.get(className)!;
+        const studentLabels = Array.from(byStudent.keys()).sort((a, b) =>
+          a.localeCompare(b, "vi")
+        );
+        const fileCount = studentLabels.reduce(
+          (sum, label) => sum + byStudent.get(label)!.length,
+          0
+        );
+        const isOpen = expandedClasses.has(className);
+
+        return (
+          <Card key={className} className="p-0 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleClass(className)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-indigo-50/60 hover:bg-indigo-50 border-b border-indigo-100/80 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <School className="w-4 h-4 text-indigo-700 shrink-0" />
+                <span className="font-semibold text-slate-800">Lớp {className}</span>
+                <span className="text-xs font-medium bg-white/80 text-indigo-800 rounded-full px-2 py-0.5 border border-indigo-100">
+                  {fileCount} file · {studentLabels.length} nhóm
+                </span>
+              </div>
+              {isOpen ? (
+                <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
               ) : (
-                <a href={url} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={url}
-                    alt={basename}
-                    className="w-full rounded-xl border border-slate-200 aspect-square object-cover hover:opacity-90 transition-opacity"
-                  />
-                </a>
+                <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
               )}
-              <p className="text-xs text-slate-500 truncate px-0.5" title={basename}>
-                {basename}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
+            </button>
+
+            {isOpen && (
+              <div className="divide-y divide-slate-100">
+                {studentLabels.map((studentLabel) => {
+                  const items = byStudent.get(studentLabel)!;
+                  return (
+                    <div key={studentLabel} className="px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-slate-500" />
+                        {studentLabel}
+                        <span className="text-xs font-normal text-slate-500">
+                          ({items.length} ảnh/video)
+                        </span>
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        {items.map(({ basename, violation }) => (
+                          <div key={`${studentLabel}-${basename}-${violation._id}`} className="space-y-1 max-w-xs">
+                            <LazyEvidencePreview
+                              basename={basename}
+                              loader={evidenceLoader}
+                              className="max-h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain cursor-zoom-in hover:opacity-95"
+                              onOpen={(url, name) => setLightbox({ url, basename: name })}
+                            />
+                            <p className="text-[11px] text-slate-500 leading-snug">
+                              {violation.violationType}
+                              {" · "}
+                              {format(
+                                toZonedTime(new Date(getViolationTimestamp(violation)), TIME_ZONE),
+                                "dd/MM/yyyy"
+                              )}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+
+      {unassigned.length > 0 && (
+        <Card>
+          <h3 className="font-semibold text-slate-800 mb-3 text-sm">
+            File chưa gắn vi phạm ({unassigned.length})
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            {unassigned.map((basename) => (
+              <div key={basename} className="space-y-1">
+                <LazyEvidencePreview
+                  basename={basename}
+                  loader={evidenceLoader}
+                  className="max-h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain cursor-zoom-in"
+                  onOpen={(url, name) => setLightbox({ url, basename: name })}
+                />
+                <p className="text-[11px] text-slate-500 truncate max-w-[200px]" title={basename}>
+                  {basename}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
   );
 }

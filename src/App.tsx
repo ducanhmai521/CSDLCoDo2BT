@@ -17,18 +17,22 @@ import PublicViolationReport from "./public/PublicViolationReport";
 import EviView from "./public/EviView";
 import PublicAbsenceRequest from "./public/PublicAbsenceRequest";
 import ReportingLeaderboard from "./ReportingLeaderboard";
-import ArchiveViewer from "./ArchiveViewer";
+import ArchiveViewer, { type ArchiveLaunch } from "./ArchiveViewer";
 
 export default function AppWrapper() {
-  const [archiveMode, setArchiveMode] = useState(false);
+  const [archiveLaunch, setArchiveLaunch] = useState<ArchiveLaunch | null>(null);
 
   return (
     <BrowserRouter>
-      {archiveMode ? (
-        <ArchiveViewer onExit={() => setArchiveMode(false)} />
+      {archiveLaunch ? (
+        <ArchiveViewer
+          onExit={() => setArchiveLaunch(null)}
+          initialUrl={archiveLaunch.url}
+          initialLabel={archiveLaunch.label}
+        />
       ) : (
         <Routes>
-          <Route path="/" element={<App onEnterArchiveMode={() => setArchiveMode(true)} />} />
+          <Route path="/" element={<App onEnterArchiveMode={(launch) => setArchiveLaunch(launch ?? {})} />} />
           <Route path="/bang-diem-thi-dua-tho" element={<PublicViolationReport />} />
           <Route path="/bang-bao-cao-vi-pham" element={<PublicViolationReport />} />
           <Route path="/xin-phep" element={<PublicAbsenceRequest />} />
@@ -40,7 +44,7 @@ export default function AppWrapper() {
   );
 }
 
-function App({ onEnterArchiveMode }: { onEnterArchiveMode: () => void }) {
+function App({ onEnterArchiveMode }: { onEnterArchiveMode: (launch?: ArchiveLaunch) => void }) {
   const myProfile = useQuery(api.users.getMyProfile);
   const switchRole = useMutation(api.users.switchRole);
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -205,7 +209,7 @@ function App({ onEnterArchiveMode }: { onEnterArchiveMode: () => void }) {
   );
 }
 
-function Content({ isDarkMode, onEnterArchiveMode }: { isDarkMode: boolean; onEnterArchiveMode: () => void }) {
+function Content({ isDarkMode, onEnterArchiveMode }: { isDarkMode: boolean; onEnterArchiveMode: (launch?: ArchiveLaunch) => void }) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const { isAuthenticated: convexIsAuth } = useConvexAuth();
   const myProfile = useQuery(api.users.getMyProfile);
@@ -390,7 +394,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
   );
 }
 
-function Dashboard({ profile, isDarkMode, onEnterArchiveMode }: { profile: Doc<"userProfiles">, isDarkMode: boolean, onEnterArchiveMode: () => void }) {
+function Dashboard({ profile, isDarkMode, onEnterArchiveMode }: { profile: Doc<"userProfiles">, isDarkMode: boolean, onEnterArchiveMode: (launch?: ArchiveLaunch) => void }) {
   const appealedViolations = useQuery(
     api.violations.getAppealedViolations,
     profile.role === "admin" ? {} : "skip"

@@ -39,3 +39,47 @@ export const setRole = mutation({
     return true;
   },
 });
+
+/**
+ * Remove a Better Auth user and related sessions/accounts (called from parent app).
+ */
+export const deleteByAuthUserId = mutation({
+  args: { authUserId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const uid = args.authUserId;
+
+    const sessions = await ctx.db
+      .query("session")
+      .withIndex("userId", (q) => q.eq("userId", uid))
+      .collect();
+    for (const row of sessions) {
+      await ctx.db.delete(row._id);
+    }
+
+    const accounts = await ctx.db
+      .query("account")
+      .withIndex("userId", (q) => q.eq("userId", uid))
+      .collect();
+    for (const row of accounts) {
+      await ctx.db.delete(row._id);
+    }
+
+    const twoFactorRows = await ctx.db
+      .query("twoFactor")
+      .withIndex("userId", (q) => q.eq("userId", uid))
+      .collect();
+    for (const row of twoFactorRows) {
+      await ctx.db.delete(row._id);
+    }
+
+    const authUsers = await ctx.db.query("user").collect();
+    for (const row of authUsers) {
+      if (String(row._id) === uid || row.userId === uid) {
+        await ctx.db.delete(row._id);
+      }
+    }
+
+    return null;
+  },
+});

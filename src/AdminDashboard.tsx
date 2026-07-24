@@ -53,7 +53,7 @@ function toCalendarWeek(academicWeek: number, breakWindow: ReturnType<typeof get
   return academicWeek + breakWindow.skippedWeeks;
 }
 
-export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isDarkMode?: boolean; onEnterArchiveMode?: () => void }) {
+export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isDarkMode?: boolean; onEnterArchiveMode?: (launch?: { url?: string; label?: string }) => void }) {
   const [gradeFilter, setGradeFilter] = useState<string>("");
   const [classFilter, setClassFilter] = useState<string>("");
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>("");
@@ -103,6 +103,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const setUserPasswordAction = useAction(api.adminTools.setUserPassword);
   const bulkCreateUsersAction = useAction(api.adminTools.bulkCreateUsers);
   const migrateProfilesToBetterAuthAction = useAction(api.adminTools.migrateProfilesToBetterAuth);
+  const resetForNewSchoolYearAction = useAction(api.schoolYearReset.resetForNewSchoolYear);
 
   const generateUploadUrl = useMutation(api.violations.generateUploadUrl);
   const deleteUserProfile = useMutation(api.users.deleteUserProfile);
@@ -113,6 +114,8 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const archiveJobs = useQuery(api.archive.listArchiveJobs);
   const [isCreatingArchive, setIsCreatingArchive] = useState(false);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+  const [resetConfirmPhrase, setResetConfirmPhrase] = useState("");
+  const [isResettingSchoolYear, setIsResettingSchoolYear] = useState(false);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const roster = useQuery(api.users.listRoster);
   const [showRosterModal, setShowRosterModal] = useState(false);
@@ -1611,7 +1614,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
         <div className={panelClass}>
           <h3 className="text-lg font-semibold mb-3 text-slate-800 flex items-center gap-2">
             <Download className="w-5 h-5 text-slate-500" />
-            Lưu trữ dữ liệu (Archive)
+            Lưu trữ dữ liệu
           </h3>
           <p className="text-sm text-slate-600 mb-4">
             Tạo file ZIP toàn bộ dữ liệu năm học (vi phạm, bằng chứng, hồ sơ…) và lưu vào Convex storage. Quá trình xử lý diễn ra nền, bạn có thể theo dõi trạng thái bên dưới.
@@ -1670,7 +1673,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
                     <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Trạng thái</th>
                     <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Vi phạm</th>
                     <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Bằng chứng</th>
-                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Tải xuống</th>
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Thao tác</th>
                     <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Xóa</th>
                   </tr>
                 </thead>
@@ -1707,15 +1710,30 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
                       </td>
                       <td className="py-2 px-3">
                         {job.status === "completed" && job.downloadUrl ? (
-                          <a
-                            href={job.downloadUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-900/90 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-900 transition-colors"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Tải xuống
-                          </a>
+                          <div className="flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onEnterArchiveMode?.({
+                                  url: job.downloadUrl,
+                                  label: `${job.schoolYear} · ${format(toZonedTime(new Date(job.createdAt), TIME_ZONE), "dd/MM/yyyy HH:mm")}`,
+                                })
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600/90 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors"
+                            >
+                              <FileArchive className="w-3.5 h-3.5" />
+                              Xem
+                            </button>
+                            <a
+                              href={job.downloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-900/90 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-900 transition-colors"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Tải
+                            </a>
+                          </div>
                         ) : null}
                       </td>
                       <td className="py-2 px-3">
@@ -1751,9 +1769,73 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
           )}
         </div>
 
-
-
-
+        <div className={`${panelClass} border-red-200/80 bg-red-50/40`}>
+          <h3 className="text-lg font-semibold mb-2 text-red-800 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            Reset năm học mới (xóa sạch dữ liệu)
+          </h3>
+          <p className="text-sm text-red-900/80 mb-4 leading-relaxed">
+            Thao tác này <span className="font-semibold">không thể hoàn tác</span>. Hệ thống sẽ xóa toàn bộ vi phạm,
+            log vi phạm, danh sách học sinh, lớp, điểm báo cáo, mua shop, archive job, cài đặt (tuần gốc, AI…),
+            tài khoản người dùng (trừ admin), bằng chứng trên R2 (prefix <code className="text-xs">evidence/</code>)
+            và file lưu trong Convex storage liên quan. Nên tạo archive backup trước khi chạy.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <div className="flex-1">
+              <label className="text-xs font-medium text-red-800 block mb-1">
+                Nhập mã xác nhận: <span className="font-mono">XOA-NAM-HOC-MOI</span>
+              </label>
+              <input
+                type="text"
+                value={resetConfirmPhrase}
+                onChange={(e) => setResetConfirmPhrase(e.target.value)}
+                placeholder="XOA-NAM-HOC-MOI"
+                className="auth-input-field w-full max-w-md font-mono text-sm"
+                autoComplete="off"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={isResettingSchoolYear || resetConfirmPhrase.trim() !== "XOA-NAM-HOC-MOI"}
+              onClick={async () => {
+                if (
+                  !confirm(
+                    "Bạn chắc chắn muốn XÓA SẠCH dữ liệu năm học? Chỉ giữ lại tài khoản admin. Hãy đã backup archive trước đó."
+                  )
+                ) {
+                  return;
+                }
+                setIsResettingSchoolYear(true);
+                try {
+                  const result = await resetForNewSchoolYearAction({
+                    confirmPhrase: resetConfirmPhrase.trim(),
+                  });
+                  toast.success(
+                    `Đã reset: ${result.deletedViolations} vi phạm, ${result.deletedUsers} user, ${result.deletedR2Objects} file R2, ${result.deletedStorageFiles} file storage.`
+                  );
+                  setResetConfirmPhrase("");
+                } catch (err) {
+                  toast.error((err as Error).message);
+                } finally {
+                  setIsResettingSchoolYear(false);
+                }
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isResettingSchoolYear ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Đang xóa...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Xóa sạch &amp; bắt đầu năm học mới
+                </>
+              )}
+            </button>
+          </div>
+        </div>
 
       </div>
       )}
