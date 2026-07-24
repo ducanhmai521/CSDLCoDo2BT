@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { Doc } from "../convex/_generated/dataModel";
 import ViolationList from "./ViolationList";
 import EmulationScoreTable from "./EmulationScoreTable";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { startOfWeek, startOfDay, endOfDay, toDate, differenceInCalendarWeeks, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
-import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2, Upload, X } from 'lucide-react';
+import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2, Upload, X, FileArchive } from 'lucide-react';
 import { AIViolationInputModal } from "./AIViolationInputModal";
 import ViolationReportForm from "./ViolationReportForm";
 
@@ -53,7 +53,7 @@ function toCalendarWeek(academicWeek: number, breakWindow: ReturnType<typeof get
   return academicWeek + breakWindow.skippedWeeks;
 }
 
-export default function AdminDashboard({ isDarkMode }: { isDarkMode?: boolean }) {
+export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isDarkMode?: boolean; onEnterArchiveMode?: () => void }) {
   const [gradeFilter, setGradeFilter] = useState<string>("");
   const [classFilter, setClassFilter] = useState<string>("");
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>("");
@@ -108,6 +108,11 @@ export default function AdminDashboard({ isDarkMode }: { isDarkMode?: boolean })
   const deleteUserProfile = useMutation(api.users.deleteUserProfile);
   const migrateUserDataAndDeleteProfile = useMutation(api.users.migrateUserDataAndDeleteProfile);
   const reassignAuthAccountMutation = useMutation(api.users.reassignAuthAccount);
+  const createArchiveJobMutation = useMutation(api.archive.createArchiveJob);
+  const deleteArchiveJobMutation = useMutation(api.archive.deleteArchiveJob);
+  const archiveJobs = useQuery(api.archive.listArchiveJobs);
+  const [isCreatingArchive, setIsCreatingArchive] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const roster = useQuery(api.users.listRoster);
   const [showRosterModal, setShowRosterModal] = useState(false);
@@ -129,6 +134,18 @@ export default function AdminDashboard({ isDarkMode }: { isDarkMode?: boolean })
     existingProfileName: string;
     existingProfileId: string;
   } | null>(null);
+  const prevJobStatusRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (!archiveJobs) return;
+    for (const job of archiveJobs) {
+      const prev = prevJobStatusRef.current[job._id];
+      if (prev && prev !== job.status) {
+        if (job.status === "completed") toast.success(`Archive ${job.schoolYear} hoàn tất!`);
+        if (job.status === "failed") toast.error(`Archive ${job.schoolYear} thất bại: ${job.errorMessage}`);
+      }
+      prevJobStatusRef.current[job._id] = job.status;
+    }
+  }, [archiveJobs]);
   const navButtonClass = (active: boolean) =>
     `shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition-all whitespace-nowrap ${
       active
@@ -1589,6 +1606,149 @@ export default function AdminDashboard({ isDarkMode }: { isDarkMode?: boolean })
               Khi model Gemini đầu tiên lỗi, hệ thống tự thử model Gemini tiếp theo; hết Gemini mới qua OpenRouter.
             </p>
           </div>
+        </div>
+
+        <div className={panelClass}>
+          <h3 className="text-lg font-semibold mb-3 text-slate-800 flex items-center gap-2">
+            <Download className="w-5 h-5 text-slate-500" />
+            Lưu trữ dữ liệu (Archive)
+          </h3>
+          <p className="text-sm text-slate-600 mb-4">
+            Tạo file ZIP toàn bộ dữ liệu năm học (vi phạm, bằng chứng, hồ sơ…) và lưu vào Convex storage. Quá trình xử lý diễn ra nền, bạn có thể theo dõi trạng thái bên dưới.
+          </p>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={async () => {
+                setIsCreatingArchive(true);
+                try {
+                  await createArchiveJobMutation();
+                  toast.success("Đã tạo archive job. Đang xử lý...");
+                } catch (err) {
+                  toast.error(`Tạo archive thất bại: ${(err as Error).message}`);
+                } finally {
+                  setIsCreatingArchive(false);
+                }
+              }}
+              disabled={
+                isCreatingArchive ||
+                (archiveJobs?.some((j) => j.status === "processing" || j.status === "pending") ?? false)
+              }
+              className={primaryButtonClass}
+            >
+              {isCreatingArchive ? (
+                <>
+                  <div className="form-loading-spinner mr-2" />
+                  Đang tạo...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Tạo Archive
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => onEnterArchiveMode?.()}
+              className={secondaryButtonClass}
+            >
+              <FileArchive className="w-4 h-4 mr-2" />
+              Xem Archive từ file
+            </button>
+          </div>
+
+          {archiveJobs === undefined ? (
+            <p className="text-sm text-slate-500">Đang tải danh sách archive...</p>
+          ) : archiveJobs.length === 0 ? (
+            <p className="text-sm text-slate-500">Chưa có archive job nào.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-slate-200/80">
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Năm học</th>
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Ngày tạo</th>
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Trạng thái</th>
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Vi phạm</th>
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Bằng chứng</th>
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Tải xuống</th>
+                    <th className="py-2 px-3 text-slate-700 whitespace-nowrap">Xóa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archiveJobs.map((job) => (
+                    <tr key={job._id} className="border-b border-slate-200/60 hover:bg-white/60">
+                      <td className="py-2 px-3 text-slate-700 font-semibold">{job.schoolYear}</td>
+                      <td className="py-2 px-3 text-slate-600 whitespace-nowrap">
+                        {format(toZonedTime(new Date(job.createdAt), TIME_ZONE), "dd/MM/yyyy HH:mm")}
+                      </td>
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        {(job.status === "pending" || job.status === "processing") && (
+                          <span className="inline-flex items-center gap-1.5 text-amber-700">
+                            <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin" />
+                            Đang xử lý...
+                          </span>
+                        )}
+                        {job.status === "completed" && (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                            <span className="text-emerald-500">✓</span> Hoàn tất
+                          </span>
+                        )}
+                        {job.status === "failed" && (
+                          <span className="text-red-600 font-medium">
+                            Thất bại{job.errorMessage ? `: ${job.errorMessage}` : ""}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-slate-700 text-center">
+                        {job.totalViolations !== undefined ? job.totalViolations : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-slate-700 text-center">
+                        {job.totalEvidenceFiles !== undefined ? job.totalEvidenceFiles : "—"}
+                      </td>
+                      <td className="py-2 px-3">
+                        {job.status === "completed" && job.downloadUrl ? (
+                          <a
+                            href={job.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-900/90 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-900 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Tải xuống
+                          </a>
+                        ) : null}
+                      </td>
+                      <td className="py-2 px-3">
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Xóa archive job năm học ${job.schoolYear}? Thao tác này không thể hoàn tác.`)) return;
+                            setDeletingJobId(job._id);
+                            try {
+                              await deleteArchiveJobMutation({ jobId: job._id });
+                              toast.success("Đã xóa archive job.");
+                            } catch (err) {
+                              toast.error(`Xóa thất bại: ${(err as Error).message}`);
+                            } finally {
+                              setDeletingJobId(null);
+                            }
+                          }}
+                          disabled={deletingJobId === job._id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                          title="Xóa archive job này"
+                        >
+                          {deletingJobId === job._id ? (
+                            <div className="w-3 h-3 border border-red-400 border-t-red-600 rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
 

@@ -17,23 +17,30 @@ import PublicViolationReport from "./public/PublicViolationReport";
 import EviView from "./public/EviView";
 import PublicAbsenceRequest from "./public/PublicAbsenceRequest";
 import ReportingLeaderboard from "./ReportingLeaderboard";
+import ArchiveViewer from "./ArchiveViewer";
 
 export default function AppWrapper() {
+  const [archiveMode, setArchiveMode] = useState(false);
+
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/bang-diem-thi-dua-tho" element={<PublicViolationReport />} />
-        <Route path="/bang-bao-cao-vi-pham" element={<PublicViolationReport />} />
-        <Route path="/xin-phep" element={<PublicAbsenceRequest />} />
-        <Route path="/bang-xep-hang" element={<ReportingLeaderboard />} />
-        <Route path="/eviview/*" element={<EviView />} />
-      </Routes>
+      {archiveMode ? (
+        <ArchiveViewer onExit={() => setArchiveMode(false)} />
+      ) : (
+        <Routes>
+          <Route path="/" element={<App onEnterArchiveMode={() => setArchiveMode(true)} />} />
+          <Route path="/bang-diem-thi-dua-tho" element={<PublicViolationReport />} />
+          <Route path="/bang-bao-cao-vi-pham" element={<PublicViolationReport />} />
+          <Route path="/xin-phep" element={<PublicAbsenceRequest />} />
+          <Route path="/bang-xep-hang" element={<ReportingLeaderboard />} />
+          <Route path="/eviview/*" element={<EviView />} />
+        </Routes>
+      )}
     </BrowserRouter>
   );
 }
 
-function App() {
+function App({ onEnterArchiveMode }: { onEnterArchiveMode: () => void }) {
   const myProfile = useQuery(api.users.getMyProfile);
   const switchRole = useMutation(api.users.switchRole);
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -134,7 +141,7 @@ function App() {
       </header>
 
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
-        <Content isDarkMode={isDarkMode} />
+        <Content isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} />
       </main>
 
       <Toaster position="bottom-center" richColors />
@@ -198,7 +205,7 @@ function App() {
   );
 }
 
-function Content({ isDarkMode }: { isDarkMode: boolean }) {
+function Content({ isDarkMode, onEnterArchiveMode }: { isDarkMode: boolean; onEnterArchiveMode: () => void }) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const { isAuthenticated: convexIsAuth } = useConvexAuth();
   const myProfile = useQuery(api.users.getMyProfile);
@@ -237,7 +244,7 @@ function Content({ isDarkMode }: { isDarkMode: boolean }) {
     );
   }
 
-  return <Dashboard profile={myProfile} isDarkMode={isDarkMode} />;
+  return <Dashboard profile={myProfile} isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} />;
 }
 
 function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
@@ -383,7 +390,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
   );
 }
 
-function Dashboard({ profile, isDarkMode }: { profile: Doc<"userProfiles">, isDarkMode: boolean }) {
+function Dashboard({ profile, isDarkMode, onEnterArchiveMode }: { profile: Doc<"userProfiles">, isDarkMode: boolean, onEnterArchiveMode: () => void }) {
   const appealedViolations = useQuery(
     api.violations.getAppealedViolations,
     profile.role === "admin" ? {} : "skip"
@@ -418,7 +425,7 @@ function Dashboard({ profile, isDarkMode }: { profile: Doc<"userProfiles">, isDa
         )}
       </div>
 
-      {profile.role === 'admin' && <AdminDashboard isDarkMode={isDarkMode} />}
+      {profile.role === 'admin' && <AdminDashboard isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} />}
       {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} isDarkMode={isDarkMode} />}
       {profile.role === 'pending' &&
         <div className={`glass-card-subtle p-6 border-l-4 ${isDarkMode ? 'bg-slate-800/50 border-blue-500' : 'border-blue-600'}`}>

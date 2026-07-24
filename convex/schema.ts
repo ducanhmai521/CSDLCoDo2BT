@@ -111,6 +111,21 @@ const applicationTables = {
   }).index("by_userId", ["userId"])
     .index("by_itemId", ["itemId"]),
 
+  archiveJobs: defineTable({
+    schoolYear: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    createdAt: v.number(),
+    downloadUrl: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    totalViolations: v.optional(v.number()),
+    totalEvidenceFiles: v.optional(v.number()),
+  }).index("by_status", ["status"]),
+
 };
 
 export default defineSchema({
