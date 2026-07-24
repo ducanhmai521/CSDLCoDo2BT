@@ -5,12 +5,31 @@ import { Id } from "./_generated/dataModel";
 
 const CONFIRM_PHRASE = "XOA-NAM-HOC-MOI";
 
-function collectStorageId(value: unknown, out: Set<string>) {
-  if (typeof value !== "string") return;
-  // Convex storage document ids are typically long alphanumeric strings
-  if (/^[a-z0-9]{20,}$/i.test(value)) {
-    out.add(value);
+/** Settings kept across school-year reset (AI provider config). */
+const PRESERVED_SETTING_KEYS = new Set([
+  "aiModels",
+  "aiModel",
+  "geminiModels",
+  "openrouterModels",
+]);
+
+/** Settings whose string value is a Convex `_storage` id. */
+const STORAGE_SETTING_KEYS = new Set(["rosterTemplateStorageId"]);
+
+async function filterStorageIds(
+  ctx: { db: { system: { get: (id: Id<"_storage">) => Promise<unknown | null> } } },
+  candidates: Set<string>
+): Promise<Array<Id<"_storage">>> {
+  const valid: Array<Id<"_storage">> = [];
+  for (const id of candidates) {
+    try {
+      const meta = await ctx.db.system.get(id as Id<"_storage">);
+      if (meta) valid.push(id as Id<"_storage">);
+    } catch {
+      // Not a storage id — skip
+    }
   }
+  return valid;
 }
 
 export const wipeDatabaseForNewYear = internalMutation({
@@ -81,9 +100,17 @@ export const wipeDatabaseForNewYear = internalMutation({
       await ctx.db.delete(row._id);
     }
 
-    // Settings (collect storage ids referenced in values before delete)
+    // Settings — wipe year-specific config; keep AI provider settings
     for (const row of await ctx.db.query("settings").collect()) {
-      collectStorageId(row.value, storageIdSet);
+      if (PRESERVED_SETTING_KEYS.has(row.key)) continue;
+
+      if (
+        STORAGE_SETTING_KEYS.has(row.key) &&
+        typeof row.value === "string"
+      ) {
+        storageIdSet.add(row.value);
+      }
+
       await ctx.db.delete(row._id);
     }
 
@@ -104,9 +131,7 @@ export const wipeDatabaseForNewYear = internalMutation({
       deletedUsers++;
     }
 
-    const storageIdsToDelete = Array.from(storageIdSet).map(
-      (id) => id as Id<"_storage">
-    );
+    const storageIdsToDelete = await filterStorageIds(ctx, storageIdSet);
 
     return {
       deletedViolations,

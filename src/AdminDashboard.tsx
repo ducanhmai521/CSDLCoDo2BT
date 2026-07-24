@@ -1776,9 +1776,9 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
           </h3>
           <p className="text-sm text-red-900/80 mb-4 leading-relaxed">
             Thao tác này <span className="font-semibold">không thể hoàn tác</span>. Hệ thống sẽ xóa toàn bộ vi phạm,
-            log vi phạm, danh sách học sinh, lớp, điểm báo cáo, mua shop, archive job, cài đặt (tuần gốc, AI…),
+            log vi phạm, danh sách học sinh, lớp, điểm báo cáo, mua shop, archive job, cài đặt tuần học/nghỉ lễ,
             tài khoản người dùng (trừ admin), bằng chứng trên R2 (prefix <code className="text-xs">evidence/</code>)
-            và file lưu trong Convex storage liên quan. Nên tạo archive backup trước khi chạy.
+            và file lưu trong Convex storage liên quan. <span className="font-semibold">Cấu hình AI (model Gemini/OpenRouter) được giữ nguyên.</span> Nên tạo archive backup trước khi chạy.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
             <div className="flex-1">
