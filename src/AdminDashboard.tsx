@@ -81,6 +81,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
     { username: "", password: "" },
   ]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkRepairing, setBulkRepairing] = useState(false);
   const [bulkSummary, setBulkSummary] = useState<{
     created: number;
     failed: number;
@@ -102,6 +103,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const getBetterAuthUsersAction = useAction(api.adminTools.getBetterAuthUsers);
   const setUserPasswordAction = useAction(api.adminTools.setUserPassword);
   const bulkCreateUsersAction = useAction(api.adminTools.bulkCreateUsers);
+  const repairBulkUserPasswordsAction = useAction(api.adminTools.repairBulkUserPasswords);
   const migrateProfilesToBetterAuthAction = useAction(api.adminTools.migrateProfilesToBetterAuth);
   const resetForNewSchoolYearAction = useAction(api.schoolYearReset.resetForNewSchoolYear);
 
@@ -778,7 +780,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
                   />
                 </label>
                 <span className="text-xs text-slate-500">
-                  Định dạng CSV: cột 1 = username, cột 2 = password
+                  CSV: cột 1 = username, cột 2 = password. Username lưu dạng chữ thường khi đăng nhập.
                 </span>
               </div>
 
@@ -900,7 +902,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
               )}
 
               {/* Actions */}
-              <div className="flex gap-2 justify-end pt-1">
+              <div className="flex flex-wrap gap-2 justify-end pt-1">
                 <button
                   onClick={() => {
                     setShowBulkCreateModal(false);
@@ -909,11 +911,61 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
                     setBetterAuthUsers(null);
                     setBetterAuthUsersLoading(false);
                   }}
-                  disabled={bulkSubmitting}
+                  disabled={bulkSubmitting || bulkRepairing}
                   className="inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-60"
                 >
                   {bulkSummary ? "Đóng" : "Hủy"}
                 </button>
+                {!bulkSummary && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const rows = bulkRows.filter(
+                        (r) => r.username.trim() !== "" && r.password.trim() !== ""
+                      );
+                      if (rows.length === 0) {
+                        toast.error("Thêm ít nhất một dòng username + mật khẩu.");
+                        return;
+                      }
+                      setBulkRepairing(true);
+                      try {
+                        const result = await repairBulkUserPasswordsAction({
+                          users: rows.map((r) => ({
+                            username: r.username.trim(),
+                            password: r.password.trim(),
+                          })),
+                        });
+                        setBulkSummary({
+                          created: result.repaired,
+                          failed: result.failed,
+                          results: result.results.map((r) => ({
+                            username: r.username,
+                            status:
+                              r.status === "repaired"
+                                ? ("created" as const)
+                                : ("failed" as const),
+                            reason: r.reason,
+                          })),
+                        });
+                        toast.success(
+                          `Đã sửa mật khẩu ${result.repaired} tài khoản${result.failed > 0 ? `, thất bại ${result.failed}` : ""}.`
+                        );
+                      } catch (err) {
+                        toast.error((err as Error).message);
+                      } finally {
+                        setBulkRepairing(false);
+                      }
+                    }}
+                    disabled={
+                      bulkSubmitting ||
+                      bulkRepairing ||
+                      bulkRows.every((r) => r.username.trim() === "" || r.password.trim() === "")
+                    }
+                    className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    {bulkRepairing ? "Đang sửa MK..." : "Sửa MK tài khoản đã tạo"}
+                  </button>
+                )}
                 {!bulkSummary && (
                   <button
                     onClick={async () => {

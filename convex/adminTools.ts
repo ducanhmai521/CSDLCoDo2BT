@@ -5,6 +5,91 @@ import * as XLSX from "xlsx";
 import { api, internal, components } from "./_generated/api";
 import { createAuth, authComponent } from "./betterAuth/auth";
 
+function normalizeBulkUsername(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+async function ensureBetterAuthAdminRole(
+  ctx: { runQuery: typeof api extends never ? never : any; runMutation: any },
+  adminAppUserId: string
+) {
+  const callerAuthId = await ctx.runQuery(internal.adminMaintenance.getBetterAuthId, {
+    userId: adminAppUserId,
+  });
+  if (callerAuthId) {
+    await ctx.runMutation((components as any).betterAuth.users.setRole, {
+      betterAuthId: callerAuthId,
+      role: "admin",
+    });
+  }
+}
+
+function resolveBetterAuthUserId(baUser: {
+  id?: string;
+  _id?: string;
+  userId?: string;
+}): string | null {
+  return baUser.id ?? baUser._id ?? baUser.userId ?? null;
+}
+
+async function createBetterAuthUser(
+  auth: ReturnType<typeof createAuth>,
+  headers: Headers,
+  entry: { username: string; password: string; displayName?: string }
+): Promise<{ betterAuthId: string; username: string; email: string }> {
+  const username = normalizeBulkUsername(entry.username);
+  const email = `${username}@internal.local`;
+  const name = entry.displayName?.trim() || username;
+
+  const response = await auth.api.createUser({
+    headers,
+    body: {
+      email,
+      password: entry.password,
+      name,
+      role: "user",
+      data: { username },
+    },
+  });
+
+  if (!response || !(response as { user?: { id: string } }).user) {
+    throw new Error("Không thể tạo tài khoản Better Auth.");
+  }
+
+  const betterAuthId = (response as { user: { id: string } }).user.id;
+
+  const pwResult = await auth.api.setUserPassword({
+    headers,
+    body: {
+      userId: betterAuthId,
+      newPassword: entry.password,
+    },
+  });
+  if (!pwResult.status) {
+    throw new Error("Không thể đặt mật khẩu cho tài khoản mới.");
+  }
+
+  return { betterAuthId, username, email };
+}
+
+async function setBetterAuthUserPassword(
+  auth: ReturnType<typeof createAuth>,
+  headers: Headers,
+  betterAuthUserId: string,
+  password: string
+) {
+  const pwResult = await auth.api.setUserPassword({
+    headers,
+    body: {
+      userId: betterAuthUserId,
+      newPassword: password,
+    },
+  });
+  if (!pwResult.status) {
+    throw new Error("Không thể đặt lại mật khẩu.");
+  }
+}
+
 export const clearStoredFiles = action({
   args: { kind: v.optional(v.union(v.literal("all"), v.literal("evidence"), v.literal("excel"))) },
   handler: async (ctx, args) => {
@@ -147,27 +232,110 @@ export const setUserPassword = action({
       throw new Error("Bạn không có quyền thực hiện hành động này.");
     }
     
-    // Ensure caller has admin role in BetterAuth to bypass plugin checks
-    const callerAuthId = await ctx.runQuery(internal.adminMaintenance.getBetterAuthId, { userId: myProfile.userId });
-    if (callerAuthId) {
-      await ctx.runMutation((components as any).betterAuth.users.setRole, {
-        betterAuthId: callerAuthId,
-        role: "admin"
-      });
-    }
+    await ensureBetterAuthAdminRole(ctx, myProfile.userId);
 
     const { auth, headers } = await authComponent.getAuth(createAuth, ctx as any);
-    const result = await auth.api.setUserPassword({
-      body: {
-        userId: args.betterAuthUserId,
-        newPassword: args.newPassword,
-      },
-      headers,
-    });
-    if (!result.status) {
-      throw new Error("Không thể đặt lại mật khẩu. Vui lòng thử lại.");
-    }
+    await setBetterAuthUserPassword(auth, headers, args.betterAuthUserId, args.newPassword);
     return null;
+  },
+});
+
+export const repairBulkUserPasswords = action({
+  args: {
+    users: v.array(
+      v.object({
+        username: v.string(),
+        password: v.string(),
+      })
+    ),
+  },
+  returns: v.object({
+    repaired: v.number(),
+    failed: v.number(),
+    results: v.array(
+      v.object({
+        username: v.string(),
+        status: v.union(v.literal("repaired"), v.literal("failed")),
+        reason: v.optional(v.string()),
+      })
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const myProfile = await ctx.runQuery(api.users.getMyProfile);
+    if (myProfile?.role !== "admin") {
+      throw new Error("Bạn không có quyền thực hiện hành động này.");
+    }
+
+    await ensureBetterAuthAdminRole(ctx, myProfile.userId);
+    const { auth, headers } = await authComponent.getAuth(createAuth, ctx as any);
+    const baList: { users: Array<any> } = await ctx.runAction(
+      internal.adminTools.listBetterAuthUsers,
+      { limit: 5000 }
+    );
+
+    let repaired = 0;
+    let failed = 0;
+    const results: Array<{
+      username: string;
+      status: "repaired" | "failed";
+      reason?: string;
+    }> = [];
+
+    for (const entry of args.users) {
+      const username = normalizeBulkUsername(entry.username);
+      const baUser = baList.users.find((u: any) => {
+        const candidate = (
+          u.username ??
+          u.name ??
+          u.email?.split("@")[0] ??
+          ""
+        )
+          .toString()
+          .toLowerCase();
+        return candidate === username;
+      });
+
+      if (!baUser) {
+        failed++;
+        results.push({
+          username,
+          status: "failed",
+          reason: "Không tìm thấy tài khoản Better Auth.",
+        });
+        continue;
+      }
+
+      const betterAuthUserId = resolveBetterAuthUserId(baUser);
+      if (!betterAuthUserId) {
+        failed++;
+        results.push({
+          username,
+          status: "failed",
+          reason: "Không đọc được ID tài khoản.",
+        });
+        continue;
+      }
+
+      try {
+        await setBetterAuthUserPassword(
+          auth,
+          headers,
+          betterAuthUserId,
+          entry.password
+        );
+        repaired++;
+        results.push({ username, status: "repaired" });
+      } catch (err: unknown) {
+        failed++;
+        results.push({
+          username,
+          status: "failed",
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return { repaired, failed, results };
   },
 });
 
@@ -201,7 +369,13 @@ export const bulkCreateUsers = action({
       throw new Error("Bạn không có quyền thực hiện hành động này.");
     }
 
+    await ensureBetterAuthAdminRole(ctx, myProfile.userId);
     const { auth, headers } = await authComponent.getAuth(createAuth, ctx as any);
+    const baList: { users: Array<any> } = await ctx.runAction(
+      internal.adminTools.listBetterAuthUsers,
+      { limit: 5000 }
+    );
+
     let created = 0;
     let failed = 0;
     const results: Array<{
@@ -211,36 +385,22 @@ export const bulkCreateUsers = action({
     }> = [];
 
     for (const entry of args.users) {
-      const email = `${entry.username}@internal.local`;
+      const username = normalizeBulkUsername(entry.username);
+      const email = `${username}@internal.local`;
       try {
-        const response = await auth.api.createUser({
-          body: {
-            email,
-            password: entry.password,
-            name: entry.username,
-            username: entry.username,
-          },
+        const { betterAuthId } = await createBetterAuthUser(auth, headers, {
+          username,
+          password: entry.password,
         });
 
-        if (!response || !(response as any).user) {
-          failed++;
-          results.push({
-            username: entry.username,
-            status: "failed",
-            reason: "Không thể tạo tài khoản.",
-          });
-          continue;
-        }
-
-        const betterAuthId: string = (response as any).user.id;
         await ctx.runMutation(api.users.syncBetterAuthUser, {
           betterAuthId,
-          username: entry.username,
+          username,
           email,
         });
 
         created++;
-        results.push({ username: entry.username, status: "created" });
+        results.push({ username, status: "created" });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         const isDuplicate =
@@ -250,9 +410,55 @@ export const bulkCreateUsers = action({
           message.toLowerCase().includes("email") ||
           message.toLowerCase().includes("username");
 
+        if (isDuplicate) {
+          const baUser = baList.users.find((u: any) => {
+            const candidate = (
+              u.username ??
+              u.name ??
+              u.email?.split("@")[0] ??
+              ""
+            )
+              .toString()
+              .toLowerCase();
+            return candidate === username;
+          });
+          const betterAuthUserId = baUser ? resolveBetterAuthUserId(baUser) : null;
+          if (betterAuthUserId) {
+            try {
+              await setBetterAuthUserPassword(
+                auth,
+                headers,
+                betterAuthUserId,
+                entry.password
+              );
+              await ctx.runMutation(api.users.syncBetterAuthUser, {
+                betterAuthId: betterAuthUserId,
+                username,
+                email,
+              });
+              created++;
+              results.push({
+                username,
+                status: "created",
+                reason: "Tài khoản đã tồn tại — đã đặt lại mật khẩu.",
+              });
+              continue;
+            } catch (repairErr: unknown) {
+              failed++;
+              results.push({
+                username,
+                status: "duplicate",
+                reason:
+                  repairErr instanceof Error ? repairErr.message : String(repairErr),
+              });
+              continue;
+            }
+          }
+        }
+
         failed++;
         results.push({
-          username: entry.username,
+          username,
           status: isDuplicate ? "duplicate" : "failed",
           reason: message,
         });
@@ -306,7 +512,8 @@ export const migrateProfilesToBetterAuth = action({
     }
 
     const isDryRun = args.dryRun ?? false;
-    const { auth } = await authComponent.getAuth(createAuth, ctx as any);
+    await ensureBetterAuthAdminRole(ctx, myProfile.userId);
+    const { auth, headers } = await authComponent.getAuth(createAuth, ctx as any);
 
     // Lấy tất cả profiles
     const allProfiles: any[] = await ctx.runQuery(api.users.getAllUserProfiles);
@@ -360,71 +567,55 @@ export const migrateProfilesToBetterAuth = action({
       }
 
       try {
-        // Tạo Better Auth account
-        const response = await auth.api.createUser({
-          body: {
-            email,
-            password: tempPassword,
-            name: profile.fullName,
+        const { betterAuthId, username: createdUsername, email: createdEmail } =
+          await createBetterAuthUser(auth, headers, {
             username,
-          },
-        });
+            password: tempPassword,
+            displayName: profile.fullName,
+          });
 
-        if (!response || !(response as any).user) {
-          throw new Error("createUser trả về rỗng");
-        }
-
-        const betterAuthId: string = (response as any).user.id;
-
-        // Sync vào users table hiện tại (bảo toàn reference của userId)
         await ctx.runMutation(internal.adminMaintenance.patchUserBetterAuthId, {
           userId: profile.userId,
           betterAuthId,
-          username,
-          email,
+          username: createdUsername,
+          email: createdEmail,
         });
 
         created++;
         results.push({
           profileId: profile.profileId,
           fullName: profile.fullName,
-          username,
+          username: createdUsername,
           tempPassword,
           status: "created",
         });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        // Nếu username đã tồn tại, thử thêm suffix
         if (
           message.toLowerCase().includes("already") ||
           message.toLowerCase().includes("duplicate") ||
           message.toLowerCase().includes("exist")
         ) {
-          // Thử với suffix className
           const usernameAlt = `${username}.${profile.className.toLowerCase()}`;
           const tempPasswordAlt = `${usernameAlt}@${profile.className}`;
-          const emailAlt = `${usernameAlt}@internal.local`;
           try {
-            const response2 = await auth.api.createUser({
-              body: {
-                email: emailAlt,
-                password: tempPasswordAlt,
-                name: profile.fullName,
+            const { betterAuthId, username: createdUsername, email: createdEmail } =
+              await createBetterAuthUser(auth, headers, {
                 username: usernameAlt,
-              },
-            });
-            const betterAuthId2: string = (response2 as any).user.id;
+                password: tempPasswordAlt,
+                displayName: profile.fullName,
+              });
             await ctx.runMutation(internal.adminMaintenance.patchUserBetterAuthId, {
               userId: profile.userId,
-              betterAuthId: betterAuthId2,
-              username: usernameAlt,
-              email: emailAlt,
+              betterAuthId,
+              username: createdUsername,
+              email: createdEmail,
             });
             created++;
             results.push({
               profileId: profile.profileId,
               fullName: profile.fullName,
-              username: usernameAlt,
+              username: createdUsername,
               tempPassword: tempPasswordAlt,
               status: "created",
             });

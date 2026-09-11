@@ -15,7 +15,7 @@ export function SignInForm({ isDarkMode }: { isDarkMode?: boolean }) {
     setSubmitting(true);
 
     const formData = new FormData(e.currentTarget);
-    const username = (formData.get("username") as string).trim();
+    const username = (formData.get("username") as string).trim().toLowerCase();
     const password = formData.get("password") as string;
     
     try {
