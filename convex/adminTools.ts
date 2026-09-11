@@ -48,6 +48,7 @@ async function createBetterAuthUser(
       password: entry.password,
       name,
       role: "user",
+      username,
       data: { username },
     },
   });
@@ -237,6 +238,138 @@ export const setUserPassword = action({
     const { auth, headers } = await authComponent.getAuth(createAuth, ctx as any);
     await setBetterAuthUserPassword(auth, headers, args.betterAuthUserId, args.newPassword);
     return null;
+  },
+});
+
+/**
+ * Repair bulk-created accounts that were created without a username field.
+ * This patches the Better Auth user table directly to set username = email prefix.
+ * Safe to run multiple times — only updates accounts where username is null/empty.
+ */
+export const repairMissingUsernames = action({
+  args: {},
+  returns: v.object({
+    repaired: v.number(),
+    skipped: v.number(),
+    failed: v.number(),
+    results: v.array(
+      v.object({
+        betterAuthId: v.string(),
+        email: v.string(),
+        username: v.string(),
+        status: v.union(
+          v.literal("repaired"),
+          v.literal("skipped"),
+          v.literal("failed")
+        ),
+        reason: v.optional(v.string()),
+      })
+    ),
+  }),
+  handler: async (ctx, args): Promise<{
+    repaired: number;
+    skipped: number;
+    failed: number;
+    results: Array<{
+      betterAuthId: string;
+      email: string;
+      username: string;
+      status: "repaired" | "skipped" | "failed";
+      reason?: string;
+    }>;
+  }> => {
+    const myProfile = await ctx.runQuery(api.users.getMyProfile);
+    if (myProfile?.role !== "admin") {
+      throw new Error("Bạn không có quyền thực hiện hành động này.");
+    }
+
+    const baList: { users: Array<any> } = await ctx.runAction(
+      internal.adminTools.listBetterAuthUsers,
+      { limit: 5000 }
+    );
+
+    let repaired = 0;
+    let skipped = 0;
+    let failed = 0;
+    const results: Array<{
+      betterAuthId: string;
+      email: string;
+      username: string;
+      status: "repaired" | "skipped" | "failed";
+      reason?: string;
+    }> = [];
+
+    for (const baUser of baList.users) {
+      const betterAuthId = resolveBetterAuthUserId(baUser);
+      if (!betterAuthId) continue;
+
+      const email: string = baUser.email ?? "";
+      // Derive username from email prefix (same convention used during bulk create)
+      const usernameFromEmail = email.split("@")[0] ?? "";
+
+      // Skip if username is already set
+      const existingUsername: string | null =
+        baUser.username ?? baUser.displayUsername ?? null;
+      if (existingUsername && existingUsername.trim().length > 0) {
+        skipped++;
+        results.push({
+          betterAuthId,
+          email,
+          username: existingUsername,
+          status: "skipped",
+        });
+        continue;
+      }
+
+      if (!usernameFromEmail) {
+        failed++;
+        results.push({
+          betterAuthId,
+          email,
+          username: "",
+          status: "failed",
+          reason: "Không thể lấy username từ email.",
+        });
+        continue;
+      }
+
+      try {
+        const patched: boolean = await ctx.runMutation(
+          (components as any).betterAuth.users.patchUsername,
+          { betterAuthId, username: usernameFromEmail }
+        );
+
+        if (patched) {
+          repaired++;
+          results.push({
+            betterAuthId,
+            email,
+            username: usernameFromEmail,
+            status: "repaired",
+          });
+        } else {
+          failed++;
+          results.push({
+            betterAuthId,
+            email,
+            username: usernameFromEmail,
+            status: "failed",
+            reason: "Không tìm thấy user trong component table.",
+          });
+        }
+      } catch (err: unknown) {
+        failed++;
+        results.push({
+          betterAuthId,
+          email,
+          username: usernameFromEmail,
+          status: "failed",
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return { repaired, skipped, failed, results };
   },
 });
 

@@ -82,6 +82,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   ]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkRepairing, setBulkRepairing] = useState(false);
+  const [bulkFixingUsernames, setBulkFixingUsernames] = useState(false);
   const [bulkSummary, setBulkSummary] = useState<{
     created: number;
     failed: number;
@@ -104,6 +105,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const setUserPasswordAction = useAction(api.adminTools.setUserPassword);
   const bulkCreateUsersAction = useAction(api.adminTools.bulkCreateUsers);
   const repairBulkUserPasswordsAction = useAction(api.adminTools.repairBulkUserPasswords);
+  const repairMissingUsernamesAction = useAction(api.adminTools.repairMissingUsernames);
   const migrateProfilesToBetterAuthAction = useAction(api.adminTools.migrateProfilesToBetterAuth);
   const resetForNewSchoolYearAction = useAction(api.schoolYearReset.resetForNewSchoolYear);
 
@@ -964,6 +966,29 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
                     className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
                   >
                     {bulkRepairing ? "Đang sửa MK..." : "Sửa MK tài khoản đã tạo"}
+                  </button>
+                )}
+                {!bulkSummary && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setBulkFixingUsernames(true);
+                      try {
+                        const result = await repairMissingUsernamesAction({});
+                        toast.success(
+                          `Đã sửa username cho ${result.repaired} tài khoản${result.failed > 0 ? `, thất bại ${result.failed}` : ""}. Bỏ qua ${result.skipped} đã có username.`
+                        );
+                      } catch (err) {
+                        toast.error((err as Error).message);
+                      } finally {
+                        setBulkFixingUsernames(false);
+                      }
+                    }}
+                    disabled={bulkSubmitting || bulkRepairing || bulkFixingUsernames}
+                    className="inline-flex items-center justify-center rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-60"
+                    title="Sửa các tài khoản bulk được tạo thiếu username, khiến đăng nhập 401"
+                  >
+                    {bulkFixingUsernames ? "Đang sửa username..." : "Sửa username thiếu (fix 401)"}
                   </button>
                 )}
                 {!bulkSummary && (

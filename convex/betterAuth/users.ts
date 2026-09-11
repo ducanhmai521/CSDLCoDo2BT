@@ -41,6 +41,29 @@ export const setRole = mutation({
 });
 
 /**
+ * Patch username and displayUsername for a Better Auth user by their string ID.
+ * Used to repair accounts created without a username field.
+ */
+export const patchUsername = mutation({
+  args: {
+    betterAuthId: v.string(),
+    username: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    // The betterAuthId is the string representation of the Convex _id
+    const users = await ctx.db.query("user").collect();
+    const user = users.find((u) => String(u._id) === args.betterAuthId);
+    if (!user) return false;
+    await ctx.db.patch(user._id, {
+      username: args.username,
+      displayUsername: args.username,
+    });
+    return true;
+  },
+});
+
+/**
  * Remove a Better Auth user and related sessions/accounts (called from parent app).
  */
 export const deleteByAuthUserId = mutation({
