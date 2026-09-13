@@ -112,7 +112,7 @@ function App({ onEnterArchiveMode }: { onEnterArchiveMode: (launch?: ArchiveLaun
             {/* App icon in center */}
             <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
               <img
-                src="/favicon.ico"
+                src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
                 alt="logo"
                 className="w-10 h-10 rounded-full"
               />
@@ -126,7 +126,7 @@ function App({ onEnterArchiveMode }: { onEnterArchiveMode: (launch?: ArchiveLaun
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-2xl backdrop-blur-sm ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/20'}`}>
             <img
-              src="/favicon.ico"
+              src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
               alt="logo"
               className="w-8 h-8 rounded-lg"
             />
@@ -445,9 +445,6 @@ function Dashboard({ profile, isDarkMode, onEnterArchiveMode, uiAnimKey }: { pro
               Vai trò của bạn: <span className={`font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{translateRole(profile.role)}</span>
               {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
             </p>
-          </div>
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide animate-morph-in stagger-3 ${isDarkMode ? 'bg-gradient-to-r from-teal-500/25 to-cyan-500/25 text-cyan-300 border border-teal-400/30' : 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border border-teal-200 shadow-sm'}`}>
-            Năm học 2026-2027
           </div>
         </div>
         {profile.role === "admin" && (
