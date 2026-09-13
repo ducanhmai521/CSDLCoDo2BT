@@ -20,17 +20,18 @@ export default {
       },
       colors: {
         primary: {
-          DEFAULT: "hsl(210, 80%, 55%)",
-          hover: "hsl(210, 80%, 65%)",
-          light: "hsl(210, 80%, 90%)",
-          dark: "hsl(210, 80%, 45%)",
+          DEFAULT: "hsl(192, 85%, 50%)",
+          hover: "hsl(192, 85%, 60%)",
+          light: "hsl(192, 80%, 92%)",
+          dark: "hsl(192, 85%, 40%)",
         },
-        secondary: "hsl(210, 10%, 45%)",
-        background: "hsl(220, 20%, 96%)",
+        secondary: "hsl(205, 15%, 45%)",
+        background: "hsl(210, 25%, 97%)",
         surface: "hsl(0, 0%, 100%)",
         accent: {
-          green: "hsl(142, 76%, 45%)",
-          purple: "hsl(262, 80%, 65%)",
+          green: "hsl(160, 72%, 42%)",
+          purple: "hsl(270, 75%, 62%)",
+          amber: "hsl(35, 92%, 55%)",
         },
       },
       borderRadius: {

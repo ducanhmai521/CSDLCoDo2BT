@@ -50,6 +50,22 @@ function App({ onEnterArchiveMode }: { onEnterArchiveMode: (launch?: ArchiveLaun
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false); // Mặc định light mode
   const [showDarkModeWarning, setShowDarkModeWarning] = useState(false);
+  const [uiAnimKey, setUiAnimKey] = useState(0);
+
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { isAuthenticated: convexIsAuth } = useConvexAuth();
+
+  const isDashboardView = !sessionPending && !!session && convexIsAuth && myProfile !== undefined;
+
+  // Show overlay while auth is still resolving
+  const isLoadingOverlay = sessionPending || (!!session && (!convexIsAuth || myProfile === undefined));
+
+  useEffect(() => {
+    if (!sessionPending) {
+      const id = window.setTimeout(() => setUiAnimKey((k) => k + 1), 20);
+      return () => window.clearTimeout(id);
+    }
+  }, [sessionPending, session?.id ?? null, convexIsAuth, myProfile?._id ?? null]);
 
   const handleSwitchRole = async () => {
     try {
@@ -75,12 +91,42 @@ function App({ onEnterArchiveMode }: { onEnterArchiveMode: (launch?: ArchiveLaun
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-cyan-300/25 via-blue-200/20 to-teal-300/25 animated-gradient-bg bg-size-200 animate-gradient-slow'}`}>
-      <header className={`sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl shadow-lg ${isDarkMode ? 'bg-slate-800/90 backdrop-blur-md border border-slate-700' : 'bg-white/50 backdrop-blur-md'}`}>
+    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-sky-300/22 via-cyan-200/18 to-teal-300/25 animated-gradient-bg bg-size-200 animate-gradient-slow'}`}>
+      {/* Full-screen loading overlay — shown only while auth is resolving */}
+      {isLoadingOverlay && (
+        <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 transition-opacity duration-300 ${isDarkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-sky-300/22 via-cyan-200/18 to-teal-300/25'}`}>
+          <div className="relative flex items-center justify-center">
+            {/* Spinning ring */}
+            <svg className="absolute w-20 h-20 animate-spin" viewBox="0 0 80 80" fill="none">
+              <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" strokeLinecap="round"
+                className={isDarkMode ? 'text-slate-700' : 'text-slate-200'} />
+              <circle cx="40" cy="40" r="36" stroke="url(#spinGrad)" strokeWidth="4" strokeLinecap="round"
+                strokeDasharray="56 170" strokeDashoffset="0" />
+              <defs>
+                <linearGradient id="spinGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#14b8a6" />
+                  <stop offset="100%" stopColor="#06b6d4" />
+                </linearGradient>
+              </defs>
+            </svg>
+            {/* App icon in center */}
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
+              <img
+                src="/favicon.ico"
+                alt="logo"
+                className="w-10 h-10 rounded-full"
+              />
+            </div>
+          </div>
+          <p className={`text-sm font-semibold tracking-wide ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Đang xử lý...</p>
+        </div>
+      )}
+
+      <header key={`header-${uiAnimKey}`} className={`sticky top-4 z-10 nav-glass h-16 flex justify-between items-center px-4 md:px-8 mx-4 mt-4 rounded-xl shadow-lg transition-opacity duration-300 ${isLoadingOverlay ? 'opacity-0 pointer-events-none' : ''} ${isDashboardView ? 'animate-morph-in-header stagger-1' : ''} ${isDarkMode ? 'bg-slate-800/90 backdrop-blur-md border border-slate-700' : 'bg-white/50 backdrop-blur-md'}`}>
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-2xl backdrop-blur-sm ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/20'}`}>
             <img
-              src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
+              src="/favicon.ico"
               alt="logo"
               className="w-8 h-8 rounded-lg"
             />
@@ -144,15 +190,15 @@ function App({ onEnterArchiveMode }: { onEnterArchiveMode: (launch?: ArchiveLaun
         </div>
       </header>
 
-      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
-        <Content isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} />
+      <main className={`flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full transition-opacity duration-300 ${isLoadingOverlay ? 'opacity-0 pointer-events-none' : ''}`}>
+        <Content isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} uiAnimKey={uiAnimKey} isDashboardView={isDashboardView} />
       </main>
 
       <Toaster position="bottom-center" richColors />
 
-      <footer className={`py-6 text-center text-sm border-t mt-8 nav-glass ${isDarkMode ? 'text-slate-400 border-slate-700' : 'text-slate-700 border-white/40'}`}>
+      <footer key={`footer-${uiAnimKey}`} className={`py-6 text-center text-sm border-t mt-8 nav-glass transition-opacity duration-300 ${isLoadingOverlay ? 'opacity-0 pointer-events-none' : ''} ${isDashboardView ? 'animate-morph-in-footer stagger-9' : ''} ${isDarkMode ? 'text-slate-400 border-slate-700' : 'text-slate-700 border-white/40'}`}>
         <div className="max-w-7xl mx-auto px-4">
-          <p className={`text-[10px] uppercase tracking-widest font-semibold mb-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2025-2026</p>
+          <p className={`text-[10px] uppercase tracking-widest font-semibold mb-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>CSDL Cờ đỏ THPT Số 2 Bảo Thắng - 2026-2027</p>
           <div className={`flex justify-center gap-4 text-[10px] uppercase tracking-widest font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
             <a href="https://github.com/ducanhmai521/CSDLCoDo2BT" target="_blank" rel="noopener noreferrer" className={`px-2 py-1 rounded-md transition-colors duration-200 ${isDarkMode ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-500 hover:text-blue-700 hover:bg-blue-100'}`}>
               GitHub Repository
@@ -209,7 +255,7 @@ function App({ onEnterArchiveMode }: { onEnterArchiveMode: (launch?: ArchiveLaun
   );
 }
 
-function Content({ isDarkMode, onEnterArchiveMode }: { isDarkMode: boolean; onEnterArchiveMode: (launch?: ArchiveLaunch) => void }) {
+function Content({ isDarkMode, onEnterArchiveMode, uiAnimKey, isDashboardView }: { isDarkMode: boolean; onEnterArchiveMode: (launch?: ArchiveLaunch) => void; uiAnimKey: number; isDashboardView: boolean }) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const { isAuthenticated: convexIsAuth } = useConvexAuth();
   const myProfile = useQuery(api.users.getMyProfile);
@@ -226,83 +272,70 @@ function Content({ isDarkMode, onEnterArchiveMode }: { isDarkMode: boolean; onEn
   const isLoading = !hasCheckedAuth || (!!session && !convexIsAuth) || (!!session && myProfile === undefined);
 
   if (isLoading) {
-    return (
-      <div className={`flex justify-center items-center h-64 glass-card ${isDarkMode ? 'bg-slate-800/50' : ''}`}>
-        <div className="flex flex-col items-center gap-4">
-          <div className={`form-loading-spinner w-12 h-12 ${isDarkMode ? 'border-t-blue-400' : 'border-t-blue-600'}`}></div>
-          <p className={`font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Đang tải dữ liệu...</p>
-        </div>
-      </div>
-    );
+    // Fullscreen overlay is rendered in App — return null here to keep layout clean
+    return null;
   }
 
   if (!session) {
-    return <HomepageHero isDarkMode={isDarkMode} />;
+    return <HomepageHero isDarkMode={isDarkMode} uiAnimKey={uiAnimKey} />;
   }
 
   if (!myProfile) {
     return (
-      <div className={`glass-card ${isDarkMode ? 'bg-slate-800/50' : ''}`}>
+      <div className={`glass-card animate-morph-in stagger-2 ${isDarkMode ? 'bg-slate-800/50' : ''}`}>
         <ProfileCreationForm />
       </div>
     );
   }
 
-  return <Dashboard profile={myProfile} isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} />;
+  return <Dashboard profile={myProfile} isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} uiAnimKey={uiAnimKey} />;
 }
 
-function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
+function HomepageHero({ isDarkMode, uiAnimKey }: { isDarkMode: boolean; uiAnimKey: number }) {
   return (
-    <div>
+    <div key={`hp-${uiAnimKey}`}>
       {/* ── Hero Section ── */}
       <section className="min-h-[calc(100vh-8rem)] flex items-center py-12">
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           {/* Left — tagline + features */}
-          <div className="flex flex-col text-center lg:text-left gap-8 w-full max-w-2xl mx-auto lg:mx-0">
+          <div className="flex flex-col text-center lg:text-left gap-8 w-full max-w-2xl mx-auto lg:mx-0 animate-morph-in-left stagger-2">
             {/* Title Area */}
             <div className="space-y-5 flex flex-col items-center lg:items-start">
-              <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
-                <FiZap className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} />
-                Phiên bản 2025-2026
+              <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold shadow-sm animate-morph-in stagger-1 ${isDarkMode ? 'bg-gradient-to-r from-teal-500/20 to-cyan-500/20 border-teal-400/30 text-teal-200' : 'bg-gradient-to-r from-teal-50 to-cyan-50 border-teal-200 text-teal-700'}`}>
+                <FiZap className={isDarkMode ? 'text-cyan-300' : 'text-teal-500'} />
+                Phiên bản 2026-2027
               </div>
-              <h1 className={`text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold font-display leading-[1.15] tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              <h1 className={`text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold font-display leading-[1.15] tracking-tight animate-morph-in stagger-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                 Quản lý nền nếp
                 <br className="hidden sm:block" />
-                <span className={isDarkMode ? 'text-blue-400' : 'text-blue-600'}> thông minh & hiệu quả</span>
+                <span className={isDarkMode ? 'text-cyan-400' : 'text-teal-600'}> thông minh & hiệu quả</span>
               </h1>
-              <p className={`text-lg md:text-xl leading-relaxed max-w-lg ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              <p className={`text-lg md:text-xl leading-relaxed max-w-lg animate-morph-in stagger-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 Nền tảng chính thức của Đoàn trường THPT Số 2 Bảo Thắng. Giúp số hóa toàn bộ quy trình ghi nhận và xử lý vi phạm.
               </p>
             </div>
 
             {/* Quick links as buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mt-2 w-full sm:w-auto px-4 sm:px-0">
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mt-2 w-full sm:w-auto px-4 sm:px-0 animate-morph-in stagger-4">
               <Link
                 to="/bang-bao-cao-vi-pham"
-                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${isDarkMode ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-teal-600 text-white hover:bg-teal-700'}`}
               >
                 <FiBarChart2 className="text-xl" />
                 Bảng điểm thi đua
-              </Link>
-              <Link
-                to="/xin-phep"
-                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold shadow-md border transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
-              >
-                <FiCheckCircle className={`text-xl ${isDarkMode ? 'text-teal-400' : 'text-teal-600'}`} />
-                Xin phép nghỉ học
               </Link>
             </div>
           </div>
 
           {/* Right — sign-in form */}
-          <div className="w-full max-w-sm mx-auto lg:mr-0">
+          <div className="w-full max-w-sm mx-auto lg:mr-0 animate-morph-in-right stagger-3">
             <SignInForm isDarkMode={isDarkMode} />
           </div>
         </div>
       </section>
 
       {/* ── Features Section ── */}
-      <section className={`py-16 border-t ${isDarkMode ? 'border-slate-700/50' : 'border-white/20'}`}>
+      <section className={`py-16 border-t animate-morph-in stagger-5 ${isDarkMode ? 'border-slate-700/50' : 'border-white/20'}`}>
         <div className="text-center mb-12">
           <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Tính năng nổi bật</p>
           <h2 className={`text-2xl md:text-3xl font-extrabold font-display ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
@@ -312,7 +345,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* Feature 1 */}
-          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+          <div className={`feature-card group animate-morph-in stagger-1 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
               <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400/30 to-blue-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-cyan-500/30 text-cyan-400' : 'border-white/30 text-cyan-600'}`}>
                 <FiShield />
@@ -325,7 +358,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
           </div>
 
           {/* Feature 2 */}
-          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+          <div className={`feature-card group animate-morph-in stagger-2 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
               <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-400/30 to-indigo-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-blue-500/30 text-blue-400' : 'border-white/30 text-blue-600'}`}>
                 <FiBarChart2 />
@@ -338,7 +371,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
           </div>
 
           {/* Feature 3 */}
-          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+          <div className={`feature-card group animate-morph-in stagger-3 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
               <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-400/30 to-purple-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-violet-500/30 text-violet-400' : 'border-white/30 text-violet-600'}`}>
                 <FiZap />
@@ -351,7 +384,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
           </div>
 
           {/* Feature 4 */}
-          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+          <div className={`feature-card group animate-morph-in stagger-4 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
               <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-400/30 to-cyan-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-teal-500/30 text-teal-400' : 'border-white/30 text-teal-600'}`}>
                 <FiTrendingUp />
@@ -364,7 +397,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
           </div>
 
           {/* Feature 5 */}
-          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+          <div className={`feature-card group animate-morph-in stagger-5 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
               <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400/30 to-blue-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-sky-500/30 text-sky-400' : 'border-white/30 text-sky-600'}`}>
                 <FiUsers />
@@ -377,7 +410,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
           </div>
 
           {/* Feature 6 */}
-          <div className={`feature-card group ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+          <div className={`feature-card group animate-morph-in stagger-6 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
             <div className="flex flex-col gap-4">
               <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400/30 to-teal-500/30 border flex items-center justify-center text-lg group-hover:scale-110 transition-transform duration-300 ${isDarkMode ? 'border-emerald-500/30 text-emerald-400' : 'border-white/30 text-emerald-600'}`}>
                 <FiDatabase />
@@ -394,7 +427,7 @@ function HomepageHero({ isDarkMode }: { isDarkMode: boolean }) {
   );
 }
 
-function Dashboard({ profile, isDarkMode, onEnterArchiveMode }: { profile: Doc<"userProfiles">, isDarkMode: boolean, onEnterArchiveMode: (launch?: ArchiveLaunch) => void }) {
+function Dashboard({ profile, isDarkMode, onEnterArchiveMode, uiAnimKey }: { profile: Doc<"userProfiles">, isDarkMode: boolean, onEnterArchiveMode: (launch?: ArchiveLaunch) => void, uiAnimKey: number }) {
   const appealedViolations = useQuery(
     api.violations.getAppealedViolations,
     profile.role === "admin" ? {} : "skip"
@@ -403,13 +436,20 @@ function Dashboard({ profile, isDarkMode, onEnterArchiveMode }: { profile: Doc<"
     ? (appealedViolations ?? []).length
     : 0;
   return (
-    <div>
-      <div className={`glass-card mb-6 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
-        <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>Xin chào, {profile.fullName}!</h1>
-        <p className={`mb-4 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-          Vai trò của bạn: <span className={`font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{translateRole(profile.role)}</span>
-          {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
-        </p>
+    <div key={`dash-${uiAnimKey}`}>
+      <div className={`glass-card mb-6 relative overflow-hidden animate-morph-in stagger-2 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : ''}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>Xin chào, {profile.fullName}!</h1>
+            <p className={`mb-4 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              Vai trò của bạn: <span className={`font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{translateRole(profile.role)}</span>
+              {profile.role === 'pending' && ' (Đang chờ Quản trị viên duyệt)'}
+            </p>
+          </div>
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide animate-morph-in stagger-3 ${isDarkMode ? 'bg-gradient-to-r from-teal-500/25 to-cyan-500/25 text-cyan-300 border border-teal-400/30' : 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border border-teal-200 shadow-sm'}`}>
+            Năm học 2026-2027
+          </div>
+        </div>
         {profile.role === "admin" && (
           <div className="mt-2">
             {appealedViolations === undefined ? (
@@ -429,10 +469,12 @@ function Dashboard({ profile, isDarkMode, onEnterArchiveMode }: { profile: Doc<"
         )}
       </div>
 
-      {profile.role === 'admin' && <AdminDashboard isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} />}
-      {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} isDarkMode={isDarkMode} />}
+      <div className="animate-morph-in stagger-4">
+        {profile.role === 'admin' && <AdminDashboard isDarkMode={isDarkMode} onEnterArchiveMode={onEnterArchiveMode} />}
+        {profile.role === 'gradeManager' && <GradeManagerDashboard profile={profile} isDarkMode={isDarkMode} />}
+      </div>
       {profile.role === 'pending' &&
-        <div className={`glass-card-subtle p-6 border-l-4 ${isDarkMode ? 'bg-slate-800/50 border-blue-500' : 'border-blue-600'}`}>
+        <div className={`glass-card-subtle p-6 border-l-4 animate-morph-in stagger-3 ${isDarkMode ? 'bg-slate-800/50 border-teal-400' : 'border-teal-500'}`}>
           <p className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Tài khoản của bạn đang được xem xét</p>
           <p className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>Vui lòng chờ Quản trị viên xác minh và cấp quyền truy cập.</p>
         </div>

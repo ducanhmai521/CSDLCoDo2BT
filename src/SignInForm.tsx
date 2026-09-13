@@ -47,7 +47,7 @@ export function SignInForm({ isDarkMode }: { isDarkMode?: boolean }) {
   };
 
   const handleForgotPassword = () => {
-    toast.info("Để cấp lại mật khẩu, vui lòng nhắn tin Zalo cho quản trị viên qua SĐT: 0375530961", { duration: 8000 });
+    toast.info("Để cấp lại mật khẩu, vui lòng liên hệ trực tiếp với Ban phụ trách Đội Cờ đỏ của trường.", { duration: 9000 });
   };
 
   return (
