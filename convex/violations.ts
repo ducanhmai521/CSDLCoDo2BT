@@ -445,7 +445,7 @@ export const getPublicEmulationScores = query({
     handler: async (ctx, args) => {
         let startTime, endTime;
 
-        if (args.start && args.end) {
+        if (args.start != null && args.end != null) {
             startTime = args.start;
             endTime = args.end;
         } else {
@@ -510,8 +510,12 @@ export const getPublicEmulationScores = query({
             scoresByClass[v.violatingClass].violations.push(detailedViolation);
         }
         
-        const allClasses = await ctx.db.query("classes").collect();
-        const allClassNames = allClasses.map(c => c.name);
+        // Build class list from violations themselves (don't rely on classes table which may be empty).
+        // Also merge in any classes from the classes table so rows with 0 violations still appear.
+        const allClassesFromTable = await ctx.db.query("classes").collect();
+        const classNamesFromTable = allClassesFromTable.map(c => c.name);
+        const classNamesFromViolations = Object.keys(scoresByClass);
+        const allClassNames = [...new Set([...classNamesFromTable, ...classNamesFromViolations])];
         allClassNames.sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
 
         return allClassNames.map(className => ({
@@ -633,7 +637,7 @@ export const getPublicViolations = query({
     },
     handler: async (ctx, args) => {
         let startTime, endTime;
-        if (args.start && args.end) {
+        if (args.start != null && args.end != null) {
             startTime = args.start;
             endTime = args.end;
         } else {

@@ -158,68 +158,55 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes morphIn {
   0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.97);
-    filter: blur(6px);
-  }
-  60% {
-    filter: blur(0px);
+    transform: translateY(14px) scale(0.98);
   }
   100% {
     opacity: 1;
     transform: translateY(0px) scale(1);
-    filter: blur(0px);
   }
 }
 
 @keyframes morphInLeft {
   0% {
     opacity: 0;
-    transform: translateX(-24px) scale(0.97);
-    filter: blur(4px);
+    transform: translateX(-20px) scale(0.98);
   }
   100% {
     opacity: 1;
     transform: translateX(0px) scale(1);
-    filter: blur(0px);
   }
 }
 
 @keyframes morphInRight {
   0% {
     opacity: 0;
-    transform: translateX(24px) scale(0.97);
-    filter: blur(4px);
+    transform: translateX(20px) scale(0.98);
   }
   100% {
     opacity: 1;
     transform: translateX(0px) scale(1);
-    filter: blur(0px);
   }
 }
 
 @keyframes morphInHeader {
   0% {
     opacity: 0;
-    transform: translateY(-14px) scale(0.985);
-    filter: blur(3px);
+    transform: translateY(-10px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0px) scale(1);
-    filter: blur(0px);
+    transform: translateY(0px);
   }
 }
 
 @keyframes morphInFooter {
   0% {
     opacity: 0;
-    transform: translateY(14px) scale(0.985);
-    filter: blur(3px);
+    transform: translateY(10px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0px) scale(1);
-    filter: blur(0px);
+    transform: translateY(0px);
   }
 }
 
