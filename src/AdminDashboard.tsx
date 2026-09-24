@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { startOfWeek, startOfDay, endOfDay, toDate, differenceInCalendarWeeks, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
-import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2, Upload, X, FileArchive } from 'lucide-react';
+import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2, Upload, X, FileArchive, Search, Filter, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { AIViolationInputModal } from "./AIViolationInputModal";
 import ViolationReportForm from "./ViolationReportForm";
 
@@ -57,6 +57,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const [gradeFilter, setGradeFilter] = useState<string>("");
   const [classFilter, setClassFilter] = useState<string>("");
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>("");
+  const [searchFilter, setSearchFilter] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
   const [dateRange, setDateRange] = useState<{ start: number, end: number }>(getWeekStartAndEnd());
   const [customDateRange, setCustomDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
@@ -2023,73 +2024,178 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
       </div>
       )}
       {activeSection === 'violations' && (
-      <div className="w-full">
+      <div className="w-full space-y-3">
 
-        <div className="my-4 rounded-2xl border border-white/70 bg-white/75 backdrop-blur-sm shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-4">
-                <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)} className="auth-input-field">
-                    <option value="">Tất cả các khối</option>
-                    <option value="10">Khối 10</option>
-                    <option value="11">Khối 11</option>
-                    <option value="12">Khối 12</option>
-                </select>
-                <input
-                    type="text"
-                    placeholder="Lọc theo lớp (vd: 11A2)"
-                    value={classFilter}
-                    onChange={e => setClassFilter(e.target.value)}
-                    className="auth-input-field"
-                />
-                <select value={targetTypeFilter} onChange={e => setTargetTypeFilter(e.target.value)} className="auth-input-field">
-                    <option value="">Tất cả đối tượng</option>
-                    <option value="student">Học sinh</option>
-                    <option value="class">Lớp</option>
-                </select>
-                <div className="col-span-1 md:col-span-4 xl:col-span-8">
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <select value={filterMode} onChange={e => setFilterMode(e.target.value as any)} className="auth-input-field">
-                      <option value="month">Tháng</option>
-                      <option value="week">Tuần học</option>
-                      <option value="custom">Tùy chỉnh</option>
-                    </select>
-                    {filterMode === 'week' && (
-                      <input type="number" min={1} value={weekInput} onChange={e => setWeekInput(parseInt(e.target.value || '1', 10))} className="auth-input-field w-28" placeholder="Tuần #" />
-                    )}
-                    {filterMode === 'month' && (
-                      <input type="month" value={monthInput} onChange={e => setMonthInput(e.target.value)} className="auth-input-field min-w-[180px]" />
-                    )}
-                    {filterMode === 'custom' && (
-                      <div className="flex items-center gap-2">
-                        <input type="text" placeholder="dd/mm/yyyy" value={customDateRange.start} onChange={e => setCustomDateRange(prev => ({...prev, start: e.target.value}))} className="auth-input-field min-w-[160px]"/>
-                        <span>-</span>
-                        <input type="text" placeholder="dd/mm/yyyy" value={customDateRange.end} onChange={e => setCustomDateRange(prev => ({...prev, end: e.target.value}))} className="auth-input-field min-w-[160px]"/>
-                      </div>
-                    )}
-                  </div>
-                </div>
-            </div>
-            <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:items-center">
-                <button
-                    onClick={handleExport}
-                    disabled={isExporting}
-                    className={`${primaryButtonClass} w-full sm:w-auto`}
-                >
-                    {isExporting ? (
-                        <>
-                            <div className="form-loading-spinner mr-2"></div>
-                            Đang xuất...
-                        </>
-                    ) : (
-                        <><Download className="w-5 h-5 inline-block mr-1" /> Xuất Excel</>
-                    )}
+        {/* ── Top bar: Search + Export ── */}
+        <div className={`${panelClass} !p-3`}>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Tìm tên học sinh, lớp, loại vi phạm..."
+                value={searchFilter}
+                onChange={e => setSearchFilter(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-slate-800 placeholder:text-slate-400 transition-all"
+              />
+              {searchFilter && (
+                <button onClick={() => setSearchFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <X className="w-3.5 h-3.5" />
                 </button>
+              )}
             </div>
+            {/* Export button */}
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-900/90 text-white text-sm font-semibold hover:bg-indigo-900 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0"
+            >
+              {isExporting ? (
+                <><div className="form-loading-spinner !w-3.5 !h-3.5 !border-2 border-t-white mr-1"></div>Đang xuất...</>
+              ) : (
+                <><Download className="w-3.5 h-3.5" />Xuất Excel</>
+              )}
+            </button>
+          </div>
         </div>
-        {/* Roster modal removed; content moved to its own section */}
+
+        {/* ── Filter chips row ── */}
+        <div className={`${panelClass} !p-3`}>
+          <div className="flex flex-col gap-3">
+            {/* Row 1: Grade + Target type chips */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1 shrink-0">Khối:</span>
+              {(['', '10', '11', '12'] as const).map(g => (
+                <button
+                  key={g}
+                  onClick={() => setGradeFilter(g)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    gradeFilter === g
+                      ? 'bg-indigo-900 text-white shadow-sm'
+                      : 'bg-white/80 border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700'
+                  }`}
+                >
+                  {g === '' ? 'Tất cả' : `Khối ${g}`}
+                </button>
+              ))}
+
+              <div className="w-px h-4 bg-slate-200 mx-1 hidden sm:block" />
+
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1 shrink-0">Đối tượng:</span>
+              {([['', 'Tất cả'], ['student', 'Học sinh'], ['class', 'Lớp']] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setTargetTypeFilter(val)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    targetTypeFilter === val
+                      ? 'bg-teal-700 text-white shadow-sm'
+                      : 'bg-white/80 border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Row 2: Class text filter + Date range controls */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Class filter input */}
+              <input
+                type="text"
+                placeholder="Lọc lớp cụ thể (vd: 11A2)"
+                value={classFilter}
+                onChange={e => setClassFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-lg border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-slate-800 placeholder:text-slate-400 w-44 transition-all"
+              />
+
+              {/* Date mode toggle */}
+              <div className="flex rounded-lg border border-slate-200 bg-white/80 overflow-hidden text-xs font-semibold shrink-0">
+                {(['week', 'month', 'custom'] as const).map((mode, i) => (
+                  <button
+                    key={mode}
+                    onClick={() => setFilterMode(mode)}
+                    className={`px-3 py-1.5 transition-colors ${i > 0 ? 'border-l border-slate-200' : ''} ${
+                      filterMode === mode ? 'bg-indigo-900 text-white' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {mode === 'week' ? 'Tuần' : mode === 'month' ? 'Tháng' : 'Khoảng ngày'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Date-specific input */}
+              {filterMode === 'week' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500 shrink-0">Tuần:</span>
+                  <input
+                    type="number" min={1} value={weekInput}
+                    onChange={e => setWeekInput(parseInt(e.target.value || '1', 10))}
+                    className="w-16 px-2 py-1.5 text-xs rounded-lg border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-slate-800 text-center"
+                  />
+                  <span className="text-xs text-slate-400">
+                    ({format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'dd/MM')} – {format(toZonedTime(new Date(dateRange.end), TIME_ZONE), 'dd/MM')})
+                  </span>
+                </div>
+              )}
+              {filterMode === 'month' && (
+                <input type="month" value={monthInput} onChange={e => setMonthInput(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-slate-800"
+                />
+              )}
+              {filterMode === 'custom' && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <input type="text" placeholder="dd/mm/yyyy" value={customDateRange.start}
+                    onChange={e => setCustomDateRange(prev => ({...prev, start: e.target.value}))}
+                    className="w-28 px-2 py-1.5 text-xs rounded-lg border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-slate-800 placeholder:text-slate-400"
+                  />
+                  <span className="text-slate-400 text-xs">→</span>
+                  <input type="text" placeholder="dd/mm/yyyy" value={customDateRange.end}
+                    onChange={e => setCustomDateRange(prev => ({...prev, end: e.target.value}))}
+                    className="w-28 px-2 py-1.5 text-xs rounded-lg border border-slate-200 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-slate-800 placeholder:text-slate-400"
+                  />
+                </div>
+              )}
+
+              {/* Active filter summary */}
+              {(gradeFilter || classFilter || targetTypeFilter || searchFilter) && (
+                <button
+                  onClick={() => { setGradeFilter(''); setClassFilter(''); setTargetTypeFilter(''); setSearchFilter(''); }}
+                  className="ml-auto flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700 font-semibold"
+                >
+                  <X className="w-3 h-3" /> Xóa bộ lọc
+                </button>
+              )}
+            </div>
+
+            {/* Result count */}
+            {allViolations !== undefined && (
+              <div className="text-xs text-slate-500">
+                {allViolations.length === 0
+                  ? 'Không có vi phạm nào trong khoảng thời gian này'
+                  : `Đang hiển thị ${allViolations.length} vi phạm`
+                }
+                {(gradeFilter || classFilter || targetTypeFilter) && ' (đã lọc)'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Violation list ── */}
         <ViolationList
-            violations={allViolations}
-            isLoading={allViolations === undefined}
-            isAdminView={true}
+          violations={searchFilter.trim()
+            ? allViolations?.filter(v => {
+                const q = searchFilter.toLowerCase();
+                return (
+                  v.studentName?.toLowerCase().includes(q) ||
+                  v.violatingClass?.toLowerCase().includes(q) ||
+                  v.violationType?.toLowerCase().includes(q) ||
+                  v.details?.toLowerCase().includes(q)
+                );
+              })
+            : allViolations}
+          isLoading={allViolations === undefined}
+          isAdminView={true}
         />
       </div>
       )}
