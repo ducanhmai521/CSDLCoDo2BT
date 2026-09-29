@@ -19,21 +19,16 @@ import { normalizeClassName } from "./lib/utils";
 import { stringSimilarity } from "string-similarity-js";
 import imageCompression from 'browser-image-compression';
 import React from "react";
+import { ViolationTypePicker } from "./components/ViolationTypePicker";
 
-const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
-  (category) => category.violations
-);
-
-const PERSONAL_VIOLATIONS = [
-  "Nghỉ học có phép",
-  "Sai đồng phục/đầu tóc,...",
+// Violations that only apply to individual students
+const PERSONAL_VIOLATION_CODES = [
   "Đi học muộn có phép",
-  "Sử dụng điện thoại sai mục đích",
-  "Đi học muộn/nghỉ học không phép",
-  "Nói tục, chửi thề.",
-  "Hút thuốc lá.",
-  "Vi phạm ATGT.",
-  "Có học sinh đánh nhau."
+  "Đi học muộn không phép",
+  "Học sinh nói tục, chửi thề",
+  "Học sinh hút thuốc lá/thuốc lá điện tử/thuốc lào",
+  "Vi phạm ATGT (không đội mũ, không cài quai, xe phân khối lớn, pô chế, không biển số, dàn hàng, xe ngoài cổng)",
+  "Đăng/chia sẻ thông tin sai sự thật, kích động, xúc phạm người khác trên MXH",
 ];
 
 interface ParsedViolation {
@@ -55,6 +50,11 @@ export function AIViolationInputModal({
   onBulkSubmitSuccess: () => void;
   isDarkMode?: boolean;
 }) {
+  // Live violation categories from DB (admin-configurable), fallback to hardcoded
+  const liveCategories = useQuery(api.violations.getViolationCategories);
+  const activeCategories = liveCategories ?? VIOLATION_CATEGORIES;
+  const ALL_VIOLATIONS = activeCategories.flatMap((c) => c.violations);
+
   const [rawText, setRawText] = useState("");
   const [parsedViolations, setParsedViolations] = useState<ParsedViolation[]>(
     []
@@ -953,25 +953,14 @@ export function AIViolationInputModal({
                               {/* Violation Type */}
                               <div className="col-span-1 sm:col-span-2 space-y-1">
                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Loại vi phạm</label>
-                                <select
+                                <ViolationTypePicker
+                                  categories={activeCategories.map(category => ({
+                                    ...category,
+                                    violations: category.violations.filter(violation => v.targetType === "student" || !PERSONAL_VIOLATION_CODES.includes(violation)),
+                                  })).filter(cat => cat.violations.length > 0)}
                                   value={v.violationType}
-                                  onChange={(e) => handleFieldChange(i, "violationType", e.target.value)}
-                                  className="w-full text-sm border border-gray-200 rounded px-3 py-2 bg-gray-50 focus:bg-white transition-colors focus:ring-1 focus:ring-blue-500 outline-none"
-                                >
-                                  {VIOLATION_CATEGORIES.map((category) => {
-                                    const filteredViolations = category.violations.filter(violation => v.targetType === "student" || !PERSONAL_VIOLATIONS.includes(violation));
-                                    if (filteredViolations.length === 0) return null;
-                                    return (
-                                      <optgroup key={category.name} label={`${category.name} (${category.points} điểm)`}>
-                                        {filteredViolations.map((violation) => (
-                                          <option key={violation} value={violation}>
-                                            {violation}
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    );
-                                  })}
-                                </select>
+                                  onChange={(val) => handleFieldChange(i, "violationType", val)}
+                                />
                               </div>
 
                               {/* Violation Details */}

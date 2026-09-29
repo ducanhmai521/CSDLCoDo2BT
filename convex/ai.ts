@@ -5,12 +5,10 @@ import OpenAI from "openai";
 import { api } from "./_generated/api";
 import { VIOLATION_CATEGORIES } from "./violationPoints";
 
-// Get the full list of violation names
-const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
+// Get the full list of violation names (module-level fallback — overridden at runtime)
+const _FALLBACK_ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(
   (category) => category.violations
 );
-
-const VIOLATION_LIST_WITH_ID = ALL_VIOLATIONS.map((v, i) => `${i}: "${v}"`).join("\n");
 
 // Validation action to double-check and correct AI output
 const validateAndCorrectAI = async (
@@ -19,7 +17,8 @@ const validateAndCorrectAI = async (
   originalText: string,
   firstPassJson: any,
   mode: "attendance" | "violations",
-  debug: boolean
+  debug: boolean,
+  violationList: string
 ): Promise<{ data: any; correctionsMade: string[]; changed: boolean; verificationMode: "diff" | "full_fallback" }> => {
   const validationPrompt = `
 Bạn là trợ lý kiểm tra và sửa lỗi kết quả phân tích báo cáo.
@@ -31,7 +30,7 @@ KẾT QUẢ PHÂN TÍCH LẦN 1 (JSON):
 ${JSON.stringify(firstPassJson, null, 2)}
 
 DANH SÁCH VI PHẠM HỢP LỆ (SỐ THỨ TỰ: TÊN):
-${VIOLATION_LIST_WITH_ID}
+${violationList}
 
 NHIỆM VỤ:
 Kiểm tra kết quả phân tích lần 1 và sửa các lỗi sau (nếu có):
@@ -380,6 +379,10 @@ export const parseAttendanceWithAI = action({
       throw new Error("Missing AI provider config. Please set GEMINI_API_KEY or OPENROUTER_API_KEY.");
     }
 
+    // Fetch AI-enabled violations only (admin can disable individual ones from prompts)
+    const ALL_VIOLATIONS: string[] = await ctx.runQuery(api.violations.getAiViolationList);
+    const VIOLATION_LIST_WITH_ID = ALL_VIOLATIONS.map((v, i) => `${i}: "${v}"`).join("\n");
+
     const prompt = `
 Bạn là trợ lý phân tích báo cáo CỜ ĐỎ của trường học. Cờ đỏ đi từng lớp để kiểm tra sĩ số và vi phạm.
 
@@ -472,7 +475,8 @@ LƯU Ý:
         rawText,
         parsedData,
         "attendance",
-        Boolean(debug)
+        Boolean(debug),
+        VIOLATION_LIST_WITH_ID
       );
 
       const finalData = validationResult.data ?? parsedData;
@@ -578,6 +582,10 @@ export const parseViolationsWithAI = action({
       throw new Error("Missing AI provider config. Please set GEMINI_API_KEY or OPENROUTER_API_KEY.");
     }
 
+    // Fetch AI-enabled violations only (admin can disable individual ones from prompts)
+    const ALL_VIOLATIONS: string[] = await ctx.runQuery(api.violations.getAiViolationList);
+    const VIOLATION_LIST_WITH_ID = ALL_VIOLATIONS.map((v, i) => `${i}: "${v}"`).join("\n");
+
     const prompt = `
 Bạn là trợ lý phân tích báo cáo LỚP TRỰC TUẦN. Lớp trực tuần đứng cổng trường kiểm tra vi phạm của học sinh vào trường.
 
@@ -658,7 +666,8 @@ LƯU Ý CUỐI CÙNG:
         rawText,
         normalizedData,
         "violations",
-        Boolean(debug)
+        Boolean(debug),
+        VIOLATION_LIST_WITH_ID
       );
 
       const finalData = validationResult.data ?? normalizedData;

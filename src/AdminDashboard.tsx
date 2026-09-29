@@ -95,6 +95,14 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const savedWeekBase = useQuery(api.users.getSetting, { key: 'weekBaseDate' });
   const savedBreakStart = useQuery(api.users.getSetting, { key: 'holidayBreakStartDate' });
   const savedBreakEnd = useQuery(api.users.getSetting, { key: 'holidayBreakEndDate' });
+  // Violation categories settings
+  const liveViolationCategories = useQuery(api.violations.getViolationCategories);
+  const setViolationCategoriesMutation = useMutation(api.users.setSettingJson);
+  const [violationCatDraft, setViolationCatDraft] = useState<Array<{ name: string; points: number; violations: string[] }> | null>(null);
+  const [violationCatSaving, setViolationCatSaving] = useState(false);
+  // AI-disabled violations toggle
+  const liveAiDisabled = useQuery(api.users.getSettingJson, { key: 'aiDisabledViolations' });
+  const [aiDisabledSaving, setAiDisabledSaving] = useState(false);
   const savedAiModel = useQuery(api.users.getSetting, { key: 'aiModel' });
   const savedAiModels = useQuery(api.users.getSetting, { key: 'aiModels' });
   const savedGeminiModels = useQuery(api.users.getSetting, { key: 'geminiModels' });
@@ -1845,6 +1853,270 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
               </table>
             </div>
           )}
+        </div>
+
+        {/* ─── Violation Categories Settings ─── */}
+        <div className={panelClass}>
+          <h3 className="text-lg font-semibold mb-1 text-slate-800 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            Danh mục vi phạm
+          </h3>
+          <p className="text-sm text-slate-500 mb-4">
+            Chỉnh sửa tên lỗi, mức trừ điểm và thêm/xóa danh mục. Toggle <span className="font-medium text-indigo-600">AI</span> để bật/tắt lỗi trong prompt gửi AI — lỗi tắt vẫn có trong form nhập thủ công.
+          </p>
+          {(() => {
+            // Use draft if editing, otherwise show live data
+            const working = violationCatDraft ?? liveViolationCategories ?? [];
+            const isEditing = violationCatDraft !== null;
+
+            // AI disabled set (from DB)
+            const disabledSet = new Set<string>(Array.isArray(liveAiDisabled) ? liveAiDisabled : []);
+
+            const toggleAi = async (violationName: string) => {
+              setAiDisabledSaving(true);
+              try {
+                const current = Array.isArray(liveAiDisabled) ? [...liveAiDisabled] : [];
+                const next = disabledSet.has(violationName)
+                  ? current.filter((v: string) => v !== violationName)
+                  : [...current, violationName];
+                await setViolationCategoriesMutation({ key: 'aiDisabledViolations', value: next });
+              } catch (err) {
+                toast.error((err as Error).message);
+              } finally {
+                setAiDisabledSaving(false);
+              }
+            };
+
+            const startEdit = () => {
+              setViolationCatDraft(
+                JSON.parse(JSON.stringify(liveViolationCategories ?? []))
+              );
+            };
+
+            const cancelEdit = () => setViolationCatDraft(null);
+
+            const updateCat = (ci: number, field: 'name' | 'points', val: string) => {
+              if (!violationCatDraft) return;
+              const next = [...violationCatDraft];
+              if (field === 'points') {
+                next[ci] = { ...next[ci], points: Math.max(0, parseInt(val) || 0) };
+              } else {
+                next[ci] = { ...next[ci], name: val };
+              }
+              setViolationCatDraft(next);
+            };
+
+            const updateViolation = (ci: number, vi: number, val: string) => {
+              if (!violationCatDraft) return;
+              const next = [...violationCatDraft];
+              const vs = [...next[ci].violations];
+              vs[vi] = val;
+              next[ci] = { ...next[ci], violations: vs };
+              setViolationCatDraft(next);
+            };
+
+            const addViolation = (ci: number) => {
+              if (!violationCatDraft) return;
+              const next = [...violationCatDraft];
+              next[ci] = { ...next[ci], violations: [...next[ci].violations, ''] };
+              setViolationCatDraft(next);
+            };
+
+            const removeViolation = (ci: number, vi: number) => {
+              if (!violationCatDraft) return;
+              const next = [...violationCatDraft];
+              const vs = next[ci].violations.filter((_, i) => i !== vi);
+              next[ci] = { ...next[ci], violations: vs };
+              setViolationCatDraft(next);
+            };
+
+            const addCategory = () => {
+              if (!violationCatDraft) return;
+              setViolationCatDraft([...violationCatDraft, { name: 'Mức trừ mới', points: 1, violations: [''] }]);
+            };
+
+            const removeCategory = (ci: number) => {
+              if (!violationCatDraft) return;
+              setViolationCatDraft(violationCatDraft.filter((_, i) => i !== ci));
+            };
+
+            const saveCategories = async () => {
+              if (!violationCatDraft) return;
+              // Strip empty violation strings
+              const cleaned = violationCatDraft.map(cat => ({
+                ...cat,
+                violations: cat.violations.map(v => v.trim()).filter(Boolean),
+              })).filter(cat => cat.violations.length > 0);
+              setViolationCatSaving(true);
+              try {
+                await setViolationCategoriesMutation({ key: 'violationCategories', value: cleaned });
+                toast.success('Đã lưu danh mục vi phạm.');
+                setViolationCatDraft(null);
+              } catch (err) {
+                toast.error((err as Error).message);
+              } finally {
+                setViolationCatSaving(false);
+              }
+            };
+
+            const resetToDefault = async () => {
+              if (!confirm('Xóa cài đặt tùy chỉnh và dùng lại danh mục mặc định?')) return;
+              setViolationCatSaving(true);
+              try {
+                await setViolationCategoriesMutation({ key: 'violationCategories', value: [] });
+                toast.success('Đã khôi phục danh mục mặc định.');
+                setViolationCatDraft(null);
+              } catch (err) {
+                toast.error((err as Error).message);
+              } finally {
+                setViolationCatSaving(false);
+              }
+            };
+
+            return (
+              <div className="space-y-4">
+                {!isEditing ? (
+                  <>
+                    {/* Read-only view */}
+                    <div className="space-y-2">
+                      {working.map((cat, ci) => (
+                        <div key={ci} className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-4 py-2.5">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-sm font-semibold text-slate-700">{cat.name}</span>
+                            <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">-{cat.points} điểm</span>
+                          </div>
+                          <ul className="space-y-1">
+                            {cat.violations.map((v, vi) => {
+                              const aiOn = !disabledSet.has(v);
+                              return (
+                                <li key={vi} className="flex items-center justify-between gap-2">
+                                  <span className={`text-sm flex-1 ${aiOn ? 'text-slate-600' : 'text-slate-400 line-through'}`}>
+                                    {v}
+                                  </span>
+                                  <button
+                                    onClick={() => toggleAi(v)}
+                                    disabled={aiDisabledSaving}
+                                    title={aiOn ? 'Tắt khỏi prompt AI' : 'Bật lại trong prompt AI'}
+                                    className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${
+                                      aiOn
+                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
+                                        : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                                    } disabled:opacity-50`}
+                                  >
+                                    AI {aiOn ? '✓' : '✗'}
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      {disabledSet.size > 0
+                        ? `${disabledSet.size} lỗi đang tắt khỏi prompt AI (vẫn có trong form nhập tay).`
+                        : 'Tất cả lỗi đang được gửi vào prompt AI.'}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button onClick={startEdit} className={primaryButtonClass}>
+                        Chỉnh sửa
+                      </button>
+                      <button onClick={resetToDefault} disabled={violationCatSaving} className={secondaryButtonClass}>
+                        Khôi phục mặc định
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Edit view */}
+                    <div className="space-y-3">
+                      {violationCatDraft!.map((cat, ci) => (
+                        <div key={ci} className="rounded-xl border border-slate-200 bg-white/80 p-3 space-y-2">
+                          {/* Category header */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={cat.name}
+                              onChange={e => updateCat(ci, 'name', e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                              placeholder="Tên mức (vd: Mức trừ 5 điểm)"
+                            />
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-xs text-slate-500">-</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={cat.points}
+                                onChange={e => updateCat(ci, 'points', e.target.value)}
+                                className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-center font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                              />
+                              <span className="text-xs text-slate-500">điểm</span>
+                            </div>
+                            <button
+                              onClick={() => removeCategory(ci)}
+                              title="Xóa mức này"
+                              className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          {/* Violations list */}
+                          <div className="space-y-1.5 pl-1">
+                            {cat.violations.map((vio, vi) => (
+                              <div key={vi} className="flex items-center gap-2">
+                                <span className="text-slate-400 text-sm shrink-0">·</span>
+                                <input
+                                  type="text"
+                                  value={vio}
+                                  onChange={e => updateViolation(ci, vi, e.target.value)}
+                                  className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white"
+                                  placeholder="Tên lỗi vi phạm"
+                                />
+                                <button
+                                  onClick={() => removeViolation(ci, vi)}
+                                  className="p-1 rounded text-slate-300 hover:text-red-500 transition-colors"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              onClick={() => addViolation(ci)}
+                              className="ml-4 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                            >
+                              + Thêm lỗi
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={addCategory}
+                      className="w-full rounded-xl border-2 border-dashed border-slate-300 py-2 text-sm font-medium text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                    >
+                      + Thêm mức vi phạm
+                    </button>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        onClick={saveCategories}
+                        disabled={violationCatSaving}
+                        className={primaryButtonClass}
+                      >
+                        {violationCatSaving ? 'Đang lưu...' : 'Lưu danh mục'}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        disabled={violationCatSaving}
+                        className={secondaryButtonClass}
+                      >
+                        Hủy
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div className={`${panelClass} border-red-200/80 bg-red-50/40`}>

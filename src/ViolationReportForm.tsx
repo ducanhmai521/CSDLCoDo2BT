@@ -8,22 +8,24 @@ import { Id } from "../convex/_generated/dataModel";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
 import { AIViolationInputModal } from "./AIViolationInputModal";
 import imageCompression from 'browser-image-compression';
+import { ViolationTypePicker } from "./components/ViolationTypePicker";
 
-const ALL_VIOLATIONS = VIOLATION_CATEGORIES.flatMap(category => category.violations);
-
-const PERSONAL_VIOLATIONS = [
-  "Nghỉ học có phép",
-  "Sai đồng phục/đầu tóc,...",
+// Violations that only apply to individual students (filtered out for class-level reports)
+const PERSONAL_VIOLATION_CODES = [
   "Đi học muộn có phép",
-  "Sử dụng điện thoại sai mục đích",
-  "Đi học muộn/nghỉ học không phép",
-  "Nói tục, chửi thề.",
-  "Hút thuốc lá.",
-  "Vi phạm ATGT.",
-  "Có học sinh đánh nhau."
+  "Đi học muộn không phép",
+  "Học sinh nói tục, chửi thề",
+  "Học sinh hút thuốc lá/thuốc lá điện tử/thuốc lào",
+  "Vi phạm ATGT (không đội mũ, không cài quai, xe phân khối lớn, pô chế, không biển số, dàn hàng, xe ngoài cổng)",
+  "Đăng/chia sẻ thông tin sai sự thật, kích động, xúc phạm người khác trên MXH",
 ];
 
 export default function ViolationReportForm({ showAIModal = true, isDarkMode }: { showAIModal?: boolean, isDarkMode?: boolean }) {
+  // Live violation categories from DB (admin-configurable), fallback to hardcoded
+  const liveCategories = useQuery(api.violations.getViolationCategories);
+  const activeCategories = liveCategories ?? VIOLATION_CATEGORIES;
+  const ALL_VIOLATIONS = activeCategories.flatMap(c => c.violations);
+
   const [targetType, setTargetType] = useState<"student" | "class">("class");
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<{name: string, className: string} | null>(null);
@@ -248,26 +250,16 @@ export default function ViolationReportForm({ showAIModal = true, isDarkMode }: 
             required
           />
         )}
-        <select
-          className="auth-input-field"
+        <ViolationTypePicker
+          categories={activeCategories.map(cat => ({
+            ...cat,
+            violations: cat.violations.filter(v => targetType === "student" || !PERSONAL_VIOLATION_CODES.includes(v)),
+          })).filter(cat => cat.violations.length > 0)}
           value={violationType}
+          onChange={setViolationType}
           disabled={isSubmitting}
-          onChange={(e) => setViolationType(e.target.value)}
-        >
-          {VIOLATION_CATEGORIES.map((category) => {
-            const filteredViolations = category.violations.filter(v => targetType === "student" || !PERSONAL_VIOLATIONS.includes(v));
-            if (filteredViolations.length === 0) return null;
-            return (
-              <optgroup key={category.name} label={`${category.name} (-${category.points} điểm)`}>
-                {filteredViolations.map((violation) => (
-                  <option key={violation} value={violation}>
-                    {violation}
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })}
-        </select>
+          isDarkMode={isDarkMode}
+        />
   
         <div>
           <textarea

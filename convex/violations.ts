@@ -8,7 +8,7 @@ import { Doc, Id } from "./_generated/dataModel";
 const ATTENDANCE_VIOLATIONS = [
   "Nghỉ học có phép",
   "Đi học muộn có phép",
-  "Đi học muộn/nghỉ học không phép",
+  "Đi học muộn không phép",
 ];
 
 async function checkForDuplicate(
@@ -71,6 +71,86 @@ async function checkForDuplicate(
 
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
+});
+
+/** Internal helper: fetch the effective violation categories (DB override → hardcoded). */
+async function getActiveCategories(ctx: QueryCtx) {
+  const row = await ctx.db
+    .query("settings")
+    .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
+    .unique();
+  if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
+    return row.value as { name: string; points: number; violations: string[] }[];
+  }
+  return VIOLATION_CATEGORIES;
+}
+
+/** Build a violation-name → points lookup from the active categories. */
+async function buildPointsMap(ctx: QueryCtx): Promise<Map<string, number>> {
+  const categories = await getActiveCategories(ctx);
+  const map = new Map<string, number>();
+  categories.forEach((cat) => cat.violations.forEach((v) => map.set(v, cat.points)));
+  return map;
+}
+
+/**
+ * Returns the active violation categories.
+ * Admins can override the hardcoded list via the "violationCategories" DB setting.
+ * All other code (forms, scoring) should call this query instead of importing
+ * VIOLATION_CATEGORIES directly so the override is respected.
+ */
+export const getViolationCategories = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      name: v.string(),
+      points: v.number(),
+      violations: v.array(v.string()),
+    })
+  ),
+  handler: async (ctx) => {
+    const row = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
+      .unique();
+    if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
+      return row.value as { name: string; points: number; violations: string[] }[];
+    }
+    return VIOLATION_CATEGORIES;
+  },
+});
+
+/**
+ * Returns a flat list of violation names that are enabled for AI prompt inclusion.
+ * Violations listed in the "aiDisabledViolations" setting are excluded.
+ * This is what the AI actions should use to build their prompts.
+ */
+export const getAiViolationList = query({
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx) => {
+    // Get active categories
+    const catRow = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
+      .unique();
+    const categories: { name: string; points: number; violations: string[] }[] =
+      catRow?.value && Array.isArray(catRow.value) && catRow.value.length > 0
+        ? catRow.value
+        : VIOLATION_CATEGORIES;
+
+    // Get disabled set
+    const disabledRow = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "aiDisabledViolations"))
+      .unique();
+    const disabled: string[] = Array.isArray(disabledRow?.value) ? disabledRow!.value : [];
+    const disabledSet = new Set(disabled);
+
+    return categories
+      .flatMap((c) => c.violations)
+      .filter((v) => !disabledSet.has(v));
+  },
 });
 
 export const reportViolation = mutation({
@@ -163,12 +243,7 @@ async function resolveViolationDetails(ctx: QueryCtx, v: Doc<"violations">): Pro
         evidenceUrls.push(...r2Urls);
     }
 
-    const violationPointsMap = new Map<string, number>();
-    VIOLATION_CATEGORIES.forEach(category => {
-        category.violations.forEach(violationName => {
-            violationPointsMap.set(violationName, category.points);
-        });
-    });
+    const violationPointsMap = await buildPointsMap(ctx);
     const points = violationPointsMap.get(v.violationType) ?? 0;
 
     return {
@@ -479,12 +554,7 @@ export const getPublicEmulationScores = query({
             if (profile) { reporterProfileMap.set(profile.userId, profile.fullName); }
         });
         
-        const violationPointsMap = new Map<string, number>();
-        VIOLATION_CATEGORIES.forEach(category => {
-            category.violations.forEach(violationName => {
-                violationPointsMap.set(violationName, category.points);
-            });
-        });
+        const violationPointsMap = await buildPointsMap(ctx);
 
         const scoresByClass: Record<string, { totalPoints: number; violations: any[] }> = {};
         for (const v of violations) {
@@ -586,12 +656,7 @@ export const getViolationsByClass = query({
             reporterCustomizationMap.set(userId, customization);
         });
 
-        const violationPointsMap = new Map<string, number>();
-        VIOLATION_CATEGORIES.forEach(category => {
-            category.violations.forEach(violationName => {
-                violationPointsMap.set(violationName, category.points);
-            });
-        });
+        const violationPointsMap = await buildPointsMap(ctx);
 
         const detailedViolations = await Promise.all(violations.map(async v => {
             // Get evidence URLs from both Convex storage (legacy) and R2
@@ -698,12 +763,7 @@ export const getPublicViolations = query({
             reporterCustomizationMap.set(userId, customization);
         });
 
-        const violationPointsMap = new Map<string, number>();
-        VIOLATION_CATEGORIES.forEach(category => {
-            category.violations.forEach(violationName => {
-                violationPointsMap.set(violationName, category.points);
-            });
-        });
+        const violationPointsMap = await buildPointsMap(ctx);
 
         // Build result — only send necessary fields to reduce payload size
         const result = violations.map(v => {
@@ -890,12 +950,7 @@ export const bulkReportViolations = mutation({
           `${v.studentName || v.violatingClass}: ${v.violationType}`
         );
       } else {
-        const violationPointsMap = new Map<string, number>();
-        VIOLATION_CATEGORIES.forEach(category => {
-            category.violations.forEach(violationName => {
-                violationPointsMap.set(violationName, category.points);
-            });
-        });
+        const violationPointsMap = await buildPointsMap(ctx);
         const points = violationPointsMap.get(v.violationType) ?? 0;
 
         const rawClass = (v.violatingClass || '').trim();

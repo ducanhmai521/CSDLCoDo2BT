@@ -5,6 +5,7 @@ import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { toast } from "sonner";
 import { VIOLATION_CATEGORIES } from "../convex/violationPoints";
+import { ViolationTypePicker } from "./components/ViolationTypePicker";
 import {
   Loader2, X, Trash2, AlertTriangle, ChevronDown, Pencil, CheckCircle2,
   MessageSquareWarning, Eye, History, Save, Ban, Download, ZoomIn,
@@ -14,9 +15,13 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 
 const PERSONAL_VIOLATIONS = [
-  "Nghỉ học có phép", "Sai đồng phục/đầu tóc,...", "Đi học muộn có phép",
-  "Sử dụng điện thoại sai mục đích", "Đi học muộn/nghỉ học không phép",
-  "Nói tục, chửi thề.", "Hút thuốc lá.", "Vi phạm ATGT.", "Có học sinh đánh nhau."
+  "Đi học muộn có phép",
+  "Đi học muộn không phép",
+  "Học sinh nói tục, chửi thề",
+  "Học sinh hút thuốc lá/thuốc lá điện tử/thuốc lào",
+  "Vi phạm ATGT (không đội mũ, không cài quai, xe phân khối lớn, pô chế, không biển số, dàn hàng, xe ngoài cổng)",
+  "Đăng/chia sẻ thông tin sai sự thật, kích động, xúc phạm người khác trên MXH",
+  "Lớp có học sinh đánh nhau/bạo lực học đường",
 ];
 
 const violationPointsMap = new Map<string, number>();
@@ -436,21 +441,14 @@ function EditModal({
           {/* Violation type */}
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Loại vi phạm</label>
-            <select
-              className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+            <ViolationTypePicker
+              categories={VIOLATION_CATEGORIES.map(cat => ({
+                ...cat,
+                violations: cat.violations.filter(v => editTargetType === "student" || !PERSONAL_VIOLATIONS.includes(v)),
+              })).filter(cat => cat.violations.length > 0)}
               value={editType}
-              onChange={e => setEditType(e.target.value)}
-            >
-              {VIOLATION_CATEGORIES.map(cat => {
-                const filtered = cat.violations.filter(v => editTargetType === "student" || !PERSONAL_VIOLATIONS.includes(v));
-                if (!filtered.length) return null;
-                return (
-                  <optgroup key={cat.name} label={`${cat.name} (-${cat.points}đ)`}>
-                    {filtered.map(v => <option key={v} value={v}>{v}</option>)}
-                  </optgroup>
-                );
-              })}
-            </select>
+              onChange={setEditType}
+            />
           </div>
 
           {/* Details */}

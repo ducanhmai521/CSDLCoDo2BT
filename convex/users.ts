@@ -599,6 +599,39 @@ export const setSetting = mutation({
   },
 });
 
+// Like getSetting but returns any JSON value (objects, arrays, etc.)
+export const getSettingJson = query({
+  args: { key: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+    return row?.value ?? null;
+  },
+});
+
+// Like setSetting but accepts any JSON-serialisable value (objects, arrays, etc.)
+export const setSettingJson = mutation({
+  args: { key: v.string(), value: v.any() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const me = await ctx.runQuery(api.users.getMyProfile);
+    if (me?.role !== "admin") throw new Error("Không có quyền.");
+    const existing = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, { value: args.value });
+    } else {
+      await ctx.db.insert("settings", { key: args.key, value: args.value });
+    }
+    return null;
+  },
+});
+
 export const switchRole = mutation({
   args: {},
   returns: v.union(v.literal("admin"), v.literal("gradeManager")),
