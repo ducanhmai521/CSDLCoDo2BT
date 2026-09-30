@@ -4,7 +4,7 @@ import { format, startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay }
 import { vi } from "date-fns/locale";
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
-  ChevronDown, ChevronUp, Eye, Calendar, AlertCircle,
+  ChevronDown, ChevronUp, Eye, Calendar, AlertCircle, AlertTriangle,
   FileText, Loader2, Trophy, X, User, Users, FileWarning, Download, ShieldCheck, Award, Moon, Sun, Printer, Play
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -364,7 +364,7 @@ function TuBadge({ category, isDarkMode = false }: { category: TuCategoryId | nu
   if (!category) return null;
   const meta = TU_META[category];
   return (
-    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] tracking-wide ${tuBadgeClass(category, isDarkMode)}`}>
+    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] tracking-wide whitespace-nowrap flex-shrink-0 ${tuBadgeClass(category, isDarkMode)}`}>
       {meta.badge}
     </span>
   );
@@ -419,9 +419,34 @@ const ViolationRow = ({
             </span>
             <div className="flex items-center gap-1.5 min-w-0">
               <TuBadge category={category} isDarkMode={isDarkMode} />
-              <span className="text-xs text-slate-500 truncate pr-2">
+              <span className="text-xs text-slate-500 truncate">
                 {violation.violationType || "Vi phạm khác"}
               </span>
+              {/* Mobile-only compact reporter indicator */}
+              {reporterName && (
+                <span className="sm:hidden inline-flex items-center gap-0.5 flex-shrink-0 ml-auto">
+                  {isImportedFromAbsenceRequest ? (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
+                      <FileText className="w-2.5 h-2.5 shrink-0" strokeWidth={2.5} />
+                      XN
+                    </span>
+                  ) : isCustomReporter ? (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
+                      {reporterCustomization?.icon ? <span className="text-[10px] leading-none">{reporterCustomization.icon}</span> : null}
+                      <span className="truncate max-w-[48px]">{reporterName}</span>
+                    </span>
+                  ) : reporterIsSuperUser ? (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
+                      <ShieldCheck className="w-2.5 h-2.5 shrink-0" strokeWidth={2.5} />
+                      <span className="truncate max-w-[48px]">{reporterName}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
+                      <span className="truncate max-w-[48px]">{reporterName}</span>
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
           </div>
 
@@ -451,72 +476,72 @@ const ViolationRow = ({
           )}
 
           {reporterName && (
-            <div className="flex items-center ml-auto pl-2">
+            <div className="hidden sm:flex items-center ml-auto pl-2">
               {isImportedFromAbsenceRequest ? (
-                <div className="reporter-badge relative inline-flex overflow-hidden rounded-lg sm:rounded-full p-[0.5px] flex-shrink-0 cursor-default border border-emerald-200">
-                  <div className="reporter-badge-inner relative flex items-center bg-white rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5 h-full w-full">
-                    <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-emerald-700 shrink-0" strokeWidth={2.5} />
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-                      <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-emerald-700 uppercase leading-tight sm:leading-none sm:border-r sm:border-emerald-100 sm:pr-1.5 border-b border-emerald-50 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+                <div className="reporter-badge relative inline-flex overflow-hidden rounded-full p-[0.5px] flex-shrink-0 cursor-default border border-emerald-200">
+                  <div className="reporter-badge-inner relative flex items-center bg-white rounded-full py-0.5 px-1.5 pl-2 gap-1.5 h-full w-full">
+                    <FileText className="w-3.5 h-3.5 text-emerald-700 shrink-0" strokeWidth={2.5} />
+                    <div className="flex flex-row items-baseline gap-1.5">
+                      <span className="text-[9px] font-extrabold tracking-wider text-emerald-700 uppercase leading-none border-r border-emerald-100 pr-1.5">
                         Nhập từ trang xin nghỉ
                       </span>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
                         {reporterName}
                       </span>
                     </div>
                   </div>
                 </div>
               ) : isCustomReporter ? (
-                <div className="reporter-badge relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-amber-200/70 bg-amber-50/60 overflow-hidden">
-                  <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-                      <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-amber-600 uppercase leading-tight sm:leading-none sm:border-r sm:border-amber-200 sm:pr-1.5 border-b border-amber-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default border border-amber-200/70 bg-amber-50/60 overflow-hidden">
+                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
+                    <div className="flex flex-row items-baseline gap-1.5">
+                      <span className="text-[9px] font-extrabold tracking-wider text-amber-600 uppercase leading-none border-r border-amber-200 pr-1.5">
                         Nguồn
                       </span>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
                         {reporterName}
                       </span>
                     </div>
                   </div>
                 </div>
               ) : reporterIsSuperUser ? (
-                <div className="reporter-badge relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-slate-50/80 overflow-hidden">
-                  <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
+                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-slate-50/80 overflow-hidden">
+                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
                     <ShieldCheck className="admin-shield w-3.5 h-3.5 text-indigo-700 shrink-0" strokeWidth={2.5} />
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-                      <span className="text-[8px] sm:text-[9px] font-extrabold tracking-wider text-slate-700 uppercase leading-tight sm:leading-none sm:border-r sm:border-slate-200 sm:pr-1.5 border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+                    <div className="flex flex-row items-baseline gap-1.5">
+                      <span className="text-[9px] font-extrabold tracking-wider text-slate-700 uppercase leading-none border-r border-slate-200 pr-1.5">
                         Admin nhập
                       </span>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
                         {reporterName}
                       </span>
                     </div>
                   </div>
                 </div>
               ) : reporterCustomization ? (
-                <div className="reporter-badge relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default overflow-hidden border border-slate-200 bg-white">
-                  <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
+                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default overflow-hidden border border-slate-200 bg-white">
+                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
                     {reporterCustomization.icon && (
                       <span className="text-sm leading-none shrink-0">{reporterCustomization.icon}</span>
                     )}
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-                      <span className="reporter-label text-[8px] sm:text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-tight sm:leading-none sm:border-r sm:border-slate-200 sm:pr-1.5 border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+                    <div className="flex flex-row items-baseline gap-1.5">
+                      <span className="reporter-label text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-none border-r border-slate-200 pr-1.5">
                         {reporterCustomization.label || "Nhập bởi"}
                       </span>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
                         {reporterName}
                       </span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="reporter-badge relative inline-flex rounded-lg sm:rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-white overflow-hidden">
-                  <div className="relative flex items-center rounded-lg sm:rounded-full py-1 sm:py-0.5 px-2 sm:px-1.5 sm:pl-2 gap-1.5">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
-                      <span className="reporter-label text-[8px] sm:text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-tight sm:leading-none sm:border-r sm:border-slate-200 sm:pr-1.5 border-b border-slate-100 pb-0.5 mb-0.5 sm:border-b-0 sm:pb-0 sm:mb-0 w-fit">
+                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-white overflow-hidden">
+                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
+                    <div className="flex flex-row items-baseline gap-1.5">
+                      <span className="reporter-label text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-none border-r border-slate-200 pr-1.5">
                         Nhập bởi
                       </span>
-                      <span className="text-[10px] sm:text-xs font-bold text-slate-700 leading-none truncate max-w-[80px] sm:max-w-[120px]">
+                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
                         {reporterName}
                       </span>
                     </div>
@@ -545,6 +570,16 @@ const ViolationRow = ({
               </div>
             </div>
           )}
+
+          <div className="flex gap-3">
+            <div className="mt-0.5 min-w-[20px]"><AlertTriangle className="w-4 h-4 text-slate-400" /></div>
+            <div>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Loại vi phạm</span>
+              <p className="text-slate-700 mt-0.5 font-medium leading-snug">
+                {violation.violationType || "Vi phạm khác"}
+              </p>
+            </div>
+          </div>
 
           <div className="flex gap-3">
             <div className="mt-0.5 min-w-[20px]"><FileWarning className="w-4 h-4 text-slate-400" /></div>
@@ -579,11 +614,10 @@ const ViolationRow = ({
                         e.stopPropagation();
                         onOpenEvidence(violation, url);
                       }}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg transition-colors text-xs font-medium ${
-                        isDarkMode
-                          ? "bg-slate-800 border-indigo-900/50 text-indigo-400 hover:bg-indigo-950/30"
-                          : "bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-                      }`}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg transition-colors text-xs font-medium ${isDarkMode
+                        ? "bg-slate-800 border-indigo-900/50 text-indigo-400 hover:bg-indigo-950/30"
+                        : "bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                        }`}
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Xem bằng chứng {i + 1}</span>
@@ -958,7 +992,7 @@ const PublicViolationReport = () => {
                     <AlertCircle className={`w-6 h-6 ${isDarkMode ? "text-blue-300" : "text-blue-600"}`} />
                   </div>
                   <div>
-                    <h2 className={`text-lg font-bold ${fieldClass}`}>CSDL Nề nếp - Cờ đỏ</h2>
+                    <h2 className={`text-lg font-bold ${fieldClass}`}>CSDLCoDo2BT</h2>
                     <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Thông báo & Hướng dẫn sử dụng</p>
                   </div>
                 </div>
@@ -972,7 +1006,7 @@ const PublicViolationReport = () => {
                         <FileText className={`w-4 h-4 ${isDarkMode ? "text-indigo-300" : "text-indigo-600"}`} />
                       </div>
                       <div>
-                        <p className={`font-bold ${fieldClass}`}>Báo cáo vi phạm</p>
+                        <p className={`font-bold ${fieldClass}`}>Vi phạm</p>
                         <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Xem vi phạm theo từng ngày trong tuần; mở dòng để xem chi tiết và bằng chứng.</p>
                       </div>
                     </div>
@@ -990,7 +1024,7 @@ const PublicViolationReport = () => {
                         <Trophy className={`w-4 h-4 ${isDarkMode ? "text-amber-300" : "text-amber-600"}`} />
                       </div>
                       <div>
-                        <p className={`font-bold ${fieldClass}`}>Bảng điểm thi đua</p>
+                        <p className={`font-bold ${fieldClass}`}>Bảng điểm</p>
                         <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Theo dõi điểm thi đua trên nền 120 điểm chuẩn theo tuần.</p>
                       </div>
                     </div>
@@ -1169,13 +1203,12 @@ const PublicViolationReport = () => {
                       <button
                         key={cls}
                         onClick={() => handleClassSelect(cls)}
-                        className={`px-2 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          selectedClass === cls
-                            ? "bg-emerald-600 text-white"
-                            : isDarkMode
-                              ? "bg-slate-800 text-slate-200 border border-slate-600 hover:border-emerald-400"
-                              : "bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200"
-                        }`}
+                        className={`px-2 py-2 text-sm font-medium rounded-lg transition-colors ${selectedClass === cls
+                          ? "bg-emerald-600 text-white"
+                          : isDarkMode
+                            ? "bg-slate-800 text-slate-200 border border-slate-600 hover:border-emerald-400"
+                            : "bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200"
+                          }`}
                       >
                         {cls.substring(2)}
                       </button>
@@ -1202,19 +1235,15 @@ const PublicViolationReport = () => {
                 </div>
                 <div className="min-w-0 text-center sm:text-left">
                   <h1 className="text-sm sm:text-base font-bold text-slate-800 leading-tight">
-                    CSDL Nề nếp - Cờ đỏ
+                    CSDLCoDo2BT
                   </h1>
-                  <p className="text-[10px] sm:text-xs text-slate-500 leading-snug">
-                    Hệ thống Quản lý Nề nếp & Thi đua Học sinh - THPT số 2 Bảo Thắng
-                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-center gap-2 no-print">
                 <button
                   onClick={() => setIsDarkMode((prev) => !prev)}
-                  className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${
-                    isDarkMode ? "bg-slate-800 border-slate-600 text-amber-300" : "bg-white border-slate-200 text-indigo-600"
-                  }`}
+                  className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${isDarkMode ? "bg-slate-800 border-slate-600 text-amber-300" : "bg-white border-slate-200 text-indigo-600"
+                    }`}
                   title={isDarkMode ? "Chuyển sang nền sáng" : "Chuyển sang nền tối"}
                 >
                   {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-600" />}
@@ -1223,9 +1252,8 @@ const PublicViolationReport = () => {
                 {activeTab === "classSummary" ? (
                   <button
                     onClick={() => setIsClassSelectorOpen(true)}
-                    className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg border transition-colors group ${
-                      isDarkMode ? "bg-slate-800 border-slate-600" : "bg-white border-slate-200 hover:border-emerald-300"
-                    }`}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg border transition-colors group ${isDarkMode ? "bg-slate-800 border-slate-600" : "bg-white border-slate-200 hover:border-emerald-300"
+                      }`}
                   >
                     <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
                       <Users className="w-3 h-3 text-emerald-600" />
@@ -1247,15 +1275,14 @@ const PublicViolationReport = () => {
                         type="text"
                         value={weekInput}
                         onChange={handleWeekChange}
-                        className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-10 sm:w-16 text-center text-xs sm:text-sm rounded font-medium tabular-nums ${
-                          weekError
-                            ? isDarkMode
-                              ? "border-red-500/80 bg-red-500/15 text-red-200"
-                              : "border-red-400 bg-red-50"
-                            : isDarkMode
-                              ? "border-slate-500 bg-slate-900/70 text-slate-100"
-                              : "border-slate-300"
-                        }`}
+                        className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-10 sm:w-16 text-center text-xs sm:text-sm rounded font-medium tabular-nums ${weekError
+                          ? isDarkMode
+                            ? "border-red-500/80 bg-red-500/15 text-red-200"
+                            : "border-red-400 bg-red-50"
+                          : isDarkMode
+                            ? "border-slate-500 bg-slate-900/70 text-slate-100"
+                            : "border-slate-300"
+                          }`}
                       />
                     </div>
                     {dateRange && (
@@ -1280,43 +1307,40 @@ const PublicViolationReport = () => {
             <div className={`flex items-end justify-center sm:justify-start border-b-2 ${isDarkMode ? "border-slate-700/50" : "border-slate-200"}`}>
               <button
                 onClick={() => handleTabChange("violations")}
-                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${
-                  activeTab === "violations"
-                    ? isDarkMode
-                      ? "text-indigo-300 border-indigo-300"
-                      : "text-indigo-600 border-indigo-600"
-                    : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
-                }`}
+                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${activeTab === "violations"
+                  ? isDarkMode
+                    ? "text-indigo-300 border-indigo-300"
+                    : "text-indigo-600 border-indigo-600"
+                  : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
+                  }`}
               >
                 <span className="flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>Báo cáo vi phạm</span>
+                  <span>Vi phạm</span>
                 </span>
               </button>
               <button
                 onClick={() => handleTabChange("scores")}
-                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${
-                  activeTab === "scores"
-                    ? isDarkMode
-                      ? "text-amber-300 border-amber-300"
-                      : "text-amber-600 border-amber-600"
-                    : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
-                }`}
+                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${activeTab === "scores"
+                  ? isDarkMode
+                    ? "text-amber-300 border-amber-300"
+                    : "text-amber-600 border-amber-600"
+                  : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
+                  }`}
               >
                 <span className="flex items-center gap-1.5">
                   <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>Bảng điểm thi đua</span>
+                  <span>Bảng điểm</span>
                 </span>
               </button>
               <button
                 onClick={() => handleTabChange("classSummary")}
-                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${
-                  activeTab === "classSummary"
-                    ? isDarkMode
-                      ? "text-emerald-300 border-emerald-300"
-                      : "text-emerald-600 border-emerald-600"
-                    : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
-                }`}
+                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${activeTab === "classSummary"
+                  ? isDarkMode
+                    ? "text-emerald-300 border-emerald-300"
+                    : "text-emerald-600 border-emerald-600"
+                  : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
+                  }`}
               >
                 <span className="flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1343,15 +1367,14 @@ const PublicViolationReport = () => {
           {(activeTab === "violations" || activeTab === "classSummary") && (
             <button
               onClick={() => setHideExcusedAbsence(!hideExcusedAbsence)}
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[10px] sm:text-xs font-medium whitespace-nowrap flex-shrink-0 ${
-                hideExcusedAbsence
-                  ? isDarkMode
-                    ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 border border-emerald-400/50"
-                    : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                  : isDarkMode
-                    ? "bg-slate-700/60 text-slate-200 hover:bg-slate-600/70 border border-slate-500/70"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
-              }`}
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[10px] sm:text-xs font-medium whitespace-nowrap flex-shrink-0 ${hideExcusedAbsence
+                ? isDarkMode
+                  ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 border border-emerald-400/50"
+                  : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                : isDarkMode
+                  ? "bg-slate-700/60 text-slate-200 hover:bg-slate-600/70 border border-slate-500/70"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                }`}
               title={hideExcusedAbsence ? "Đang ẩn nghỉ có phép" : "Đang hiện nghỉ có phép"}
             >
               <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -1408,28 +1431,25 @@ const PublicViolationReport = () => {
                   <div key={dayTimestamp} className="glass-card !p-0 border border-slate-200/80 overflow-hidden mb-3">
                     <button
                       onClick={() => toggleDay(dayTimestamp)}
-                      className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${
-                        isExpanded ? "glass-day-expanded" : "glass-row " + (isDarkMode ? "text-slate-200" : "text-slate-800")
-                      }`}
+                      className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${isExpanded ? "glass-day-expanded" : "glass-row " + (isDarkMode ? "text-slate-200" : "text-slate-800")
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <span className={`font-bold text-sm sm:text-base capitalize ${isExpanded ? (isDarkMode ? "text-slate-100" : "text-slate-800") : ""}`}>
                           {format(new Date(dayTimestamp), "iiii", { locale: vi })}
                         </span>
-                        <span className={`text-xs sm:text-sm font-medium px-2 py-0.5 rounded-full tabular-nums ${
-                          isExpanded
-                            ? isDarkMode ? "bg-slate-700/50 text-slate-200" : "bg-slate-200 text-slate-700"
-                            : isDarkMode ? "bg-slate-700/50 text-slate-300" : "bg-slate-100 text-slate-600"
-                        }`}>
+                        <span className={`text-xs sm:text-sm font-medium px-2 py-0.5 rounded-full tabular-nums ${isExpanded
+                          ? isDarkMode ? "bg-slate-700/50 text-slate-200" : "bg-slate-200 text-slate-700"
+                          : isDarkMode ? "bg-slate-700/50 text-slate-300" : "bg-slate-100 text-slate-600"
+                          }`}>
                           {format(new Date(dayTimestamp), "dd/MM")}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium px-2 py-1 rounded tabular-nums ${
-                          isExpanded
-                            ? isDarkMode ? "bg-slate-700/50 text-slate-200" : "bg-slate-200 text-slate-700"
-                            : isDarkMode ? "bg-indigo-500/20 text-indigo-300 border border-indigo-400/30" : "bg-indigo-50 text-indigo-600"
-                        }`}>
+                        <span className={`text-xs font-medium px-2 py-1 rounded tabular-nums ${isExpanded
+                          ? isDarkMode ? "bg-slate-700/50 text-slate-200" : "bg-slate-200 text-slate-700"
+                          : isDarkMode ? "bg-indigo-500/20 text-indigo-300 border border-indigo-400/30" : "bg-indigo-50 text-indigo-600"
+                          }`}>
                           {dayViolations.length} vi phạm
                         </span>
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -1490,15 +1510,14 @@ const PublicViolationReport = () => {
                       <button
                         key={String(value)}
                         onClick={() => setGradeFilter(value)}
-                        className={`px-3 py-1.5 text-xs sm:text-sm font-semibold transition-colors ${
-                          gradeFilter === value
-                            ? isDarkMode
-                              ? "bg-amber-500/20 text-amber-200"
-                              : "bg-amber-50 text-amber-800"
-                            : isDarkMode
-                              ? "text-slate-300 hover:bg-slate-800"
-                              : "text-slate-600 hover:bg-slate-50"
-                        }`}
+                        className={`px-3 py-1.5 text-xs sm:text-sm font-semibold transition-colors ${gradeFilter === value
+                          ? isDarkMode
+                            ? "bg-amber-500/20 text-amber-200"
+                            : "bg-amber-50 text-amber-800"
+                          : isDarkMode
+                            ? "text-slate-300 hover:bg-slate-800"
+                            : "text-slate-600 hover:bg-slate-50"
+                          }`}
                       >
                         {label}
                       </button>
@@ -1507,9 +1526,8 @@ const PublicViolationReport = () => {
                   <button
                     type="button"
                     onClick={() => window.print()}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${
-                      isDarkMode ? "border-slate-600 text-slate-200 hover:bg-slate-800" : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                    }`}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${isDarkMode ? "border-slate-600 text-slate-200 hover:bg-slate-800" : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                      }`}
                   >
                     <Printer className="w-3.5 h-3.5" />
                     In bảng điểm
@@ -1543,11 +1561,10 @@ const PublicViolationReport = () => {
                                   <span className={`font-semibold tabular-nums ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}>{score.className}</span>
                                 </td>
                                 <td className="px-2 py-3 text-center align-top">
-                                  <span className={`inline-flex items-center justify-center px-2 py-1 rounded font-bold text-sm tabular-nums ${
-                                    score.totalPoints > 0
-                                      ? isDarkMode ? "bg-red-500/20 text-red-200" : "bg-red-100 text-red-700"
-                                      : isDarkMode ? "bg-emerald-500/20 text-emerald-200" : "bg-emerald-100 text-emerald-700"
-                                  }`}>
+                                  <span className={`inline-flex items-center justify-center px-2 py-1 rounded font-bold text-sm tabular-nums ${score.totalPoints > 0
+                                    ? isDarkMode ? "bg-red-500/20 text-red-200" : "bg-red-100 text-red-700"
+                                    : isDarkMode ? "bg-emerald-500/20 text-emerald-200" : "bg-emerald-100 text-emerald-700"
+                                    }`}>
                                     {score.totalPoints > 0 ? `-${score.totalPoints}` : score.totalPoints}
                                   </span>
                                 </td>
@@ -1570,18 +1587,16 @@ const PublicViolationReport = () => {
                                         return (
                                           <li
                                             key={v._id}
-                                            className={`flex items-start gap-2 rounded-md px-1.5 py-1 ${
-                                              severe ? (isDarkMode ? "bg-rose-500/15 border border-rose-400/30" : "bg-rose-50 border border-rose-200") : ""
-                                            }`}
+                                            className={`flex items-start gap-2 rounded-md px-1.5 py-1 ${severe ? (isDarkMode ? "bg-rose-500/15 border border-rose-400/30" : "bg-rose-50 border border-rose-200") : ""
+                                              }`}
                                           >
                                             <span className={`${isDarkMode ? "text-slate-500" : "text-slate-400"} mt-0.5`}>•</span>
                                             <div className="flex-1 min-w-0">
                                               <div className="flex flex-wrap items-center gap-1.5">
                                                 <TuBadge category={cat} isDarkMode={isDarkMode} />
                                                 {severe && (
-                                                  <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
-                                                    isDarkMode ? "border-rose-400/40 text-rose-200" : "border-rose-200 text-rose-700 bg-white"
-                                                  }`}>
+                                                  <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold ${isDarkMode ? "border-rose-400/40 text-rose-200" : "border-rose-200 text-rose-700 bg-white"
+                                                    }`}>
                                                     Vi phạm nghiêm trọng
                                                   </span>
                                                 )}
@@ -1678,11 +1693,10 @@ const PublicViolationReport = () => {
                   <div key={week} className="glass-card !p-0 border border-slate-200/80 overflow-hidden mb-3">
                     <div className={`w-full px-4 py-3 flex items-center justify-between border-b ${isDarkMode ? "border-slate-600/70" : "border-slate-200/80"} glass-row`}>
                       <span className={`font-bold text-sm sm:text-base ${isDarkMode ? "text-slate-100" : "text-slate-800"}`}>Tuần {week}</span>
-                      <span className={`text-xs font-medium px-2 py-1 rounded tabular-nums ${
-                        violations.length > 0
-                          ? isDarkMode ? "bg-red-500/20 text-red-200 border border-red-400/40" : "bg-red-50 text-red-600 border border-red-100"
-                          : isDarkMode ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                      }`}>
+                      <span className={`text-xs font-medium px-2 py-1 rounded tabular-nums ${violations.length > 0
+                        ? isDarkMode ? "bg-red-500/20 text-red-200 border border-red-400/40" : "bg-red-50 text-red-600 border border-red-100"
+                        : isDarkMode ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                        }`}>
                         {violations.length > 0 ? `${violations.length} vi phạm` : "Không có vi phạm"}
                       </span>
                     </div>
