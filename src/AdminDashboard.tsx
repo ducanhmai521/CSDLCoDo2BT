@@ -388,7 +388,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
             <button className={navButtonClass(activeSection==='actions')} onClick={() => setActiveSection('actions')}>Hành động</button>
             <button className={navButtonClass(activeSection==='overview')} onClick={() => setActiveSection('overview')}>Tổng hợp</button>
             <button className={navButtonClass(activeSection==='violations')} onClick={() => setActiveSection('violations')}>Vi phạm</button>
-            <button className={navButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}>Thi đua</button>
+            <button className={navButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}>Bảng điểm</button>
             <button className={navButtonClass(activeSection==='roster')} onClick={() => setActiveSection('roster')}>Học sinh</button>
             <button className={navButtonClass(activeSection==='systemUsers')} onClick={() => setActiveSection('systemUsers')}>Tài khoản HT</button>
             <button className={navButtonClass(activeSection==='settings')} onClick={() => setActiveSection('settings')}>Cài đặt</button>
@@ -402,7 +402,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
             <button className={sideNavButtonClass(activeSection==='actions')} onClick={() => setActiveSection('actions')}><Clipboard className="w-4 h-4 inline-block mr-2" /> Hành động</button>
             <button className={sideNavButtonClass(activeSection==='overview')} onClick={() => setActiveSection('overview')}><BarChart className="w-4 h-4 inline-block mr-2" /> Tổng hợp</button>
             <button className={sideNavButtonClass(activeSection==='violations')} onClick={() => setActiveSection('violations')}><AlertTriangle className="w-4 h-4 inline-block mr-2" /> Quản lý Vi phạm</button>
-            <button className={sideNavButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}><Trophy className="w-4 h-4 inline-block mr-2" /> Điểm thi đua</button>
+            <button className={sideNavButtonClass(activeSection==='emulation')} onClick={() => setActiveSection('emulation')}><Trophy className="w-4 h-4 inline-block mr-2" /> Bảng điểm thi đua</button>
             <button className={sideNavButtonClass(activeSection==='roster')} onClick={() => setActiveSection('roster')}><Users className="w-4 h-4 inline-block mr-2" /> Danh sách học sinh</button>
             <button className={sideNavButtonClass(activeSection==='systemUsers')} onClick={() => setActiveSection('systemUsers')}><UserCheck className="w-4 h-4 inline-block mr-2" /> User hệ thống</button>
             <button className={sideNavButtonClass(activeSection==='settings')} onClick={() => setActiveSection('settings')}><Settings className="w-4 h-4 inline-block mr-2" /> Cài đặt</button>
@@ -410,7 +410,7 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
         </aside>
         <div className="flex-1 min-w-0 space-y-8">
       {activeSection === 'emulation' && (
-        <EmulationScoreTable />
+        <EmulationScoreTable isDarkMode={isDarkMode} />
       )}
       {activeSection === 'actions' && (
       <div className="w-full space-y-6">
