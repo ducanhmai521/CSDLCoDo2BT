@@ -6,91 +6,92 @@ import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 
 const ATTENDANCE_VIOLATIONS = [
-  "Nghỉ học có phép",
-  "Đi học muộn có phép",
-  "Đi học muộn không phép",
+    "Nghỉ học có phép",
+    "Đi học muộn có phép",
+    "Đi học muộn không phép",
+    "Nghỉ học không phép",
 ];
 
 async function checkForDuplicate(
-  ctx: QueryCtx,
-  args: {
-    violationDate: number;
-    violationType: string;
-    violatingClass: string;
-    studentName?: string;
-    targetType: "student" | "class";
-  }
+    ctx: QueryCtx,
+    args: {
+        violationDate: number;
+        violationType: string;
+        violatingClass: string;
+        studentName?: string;
+        targetType: "student" | "class";
+    }
 ) {
-  const startOfDay = new Date(args.violationDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(args.violationDate);
-  endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = new Date(args.violationDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(args.violationDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-  const isAttendanceViolation =
-    args.targetType === "student" &&
-    ATTENDANCE_VIOLATIONS.includes(args.violationType);
+    const isAttendanceViolation =
+        args.targetType === "student" &&
+        ATTENDANCE_VIOLATIONS.includes(args.violationType);
 
-  let query = ctx.db
-    .query("violations")
-    .withIndex("by_violatingClass", (q) =>
-      q.eq("violatingClass", args.violatingClass)
-    )
-    .filter((q) => {
-      const dateFilter = q.and(
-        q.gte(q.field("violationDate"), startOfDay.getTime()),
-        q.lte(q.field("violationDate"), endOfDay.getTime())
-      );
+    let query = ctx.db
+        .query("violations")
+        .withIndex("by_violatingClass", (q) =>
+            q.eq("violatingClass", args.violatingClass)
+        )
+        .filter((q) => {
+            const dateFilter = q.and(
+                q.gte(q.field("violationDate"), startOfDay.getTime()),
+                q.lte(q.field("violationDate"), endOfDay.getTime())
+            );
 
-      if (isAttendanceViolation) {
-        return q.and(
-          dateFilter,
-          q.or(
-            ...ATTENDANCE_VIOLATIONS.map((v) =>
-              q.eq(q.field("violationType"), v)
-            )
-          )
-        );
-      }
+            if (isAttendanceViolation) {
+                return q.and(
+                    dateFilter,
+                    q.or(
+                        ...ATTENDANCE_VIOLATIONS.map((v) =>
+                            q.eq(q.field("violationType"), v)
+                        )
+                    )
+                );
+            }
 
-      // Original logic
-      return q.and(
-        dateFilter,
-        q.eq(q.field("violationType"), args.violationType)
-      );
-    });
+            // Original logic
+            return q.and(
+                dateFilter,
+                q.eq(q.field("violationType"), args.violationType)
+            );
+        });
 
-  if (args.targetType === "student" && args.studentName) {
-    query = query.filter((q) => q.eq(q.field("studentName"), args.studentName));
-  } else {
-    query = query.filter((q) => q.eq(q.field("targetType"), "class"));
-  }
+    if (args.targetType === "student" && args.studentName) {
+        query = query.filter((q) => q.eq(q.field("studentName"), args.studentName));
+    } else {
+        query = query.filter((q) => q.eq(q.field("targetType"), "class"));
+    }
 
-  const existing = await query.first();
-  return existing;
+    const existing = await query.first();
+    return existing;
 }
 
 export const generateUploadUrl = mutation(async (ctx) => {
-  return await ctx.storage.generateUploadUrl();
+    return await ctx.storage.generateUploadUrl();
 });
 
 /** Internal helper: fetch the effective violation categories (DB override → hardcoded). */
 async function getActiveCategories(ctx: QueryCtx) {
-  const row = await ctx.db
-    .query("settings")
-    .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
-    .unique();
-  if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
-    return row.value as { name: string; points: number; violations: string[] }[];
-  }
-  return VIOLATION_CATEGORIES;
+    const row = await ctx.db
+        .query("settings")
+        .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
+        .unique();
+    if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
+        return row.value as { name: string; points: number; violations: string[] }[];
+    }
+    return VIOLATION_CATEGORIES;
 }
 
 /** Build a violation-name → points lookup from the active categories. */
 async function buildPointsMap(ctx: QueryCtx): Promise<Map<string, number>> {
-  const categories = await getActiveCategories(ctx);
-  const map = new Map<string, number>();
-  categories.forEach((cat) => cat.violations.forEach((v) => map.set(v, cat.points)));
-  return map;
+    const categories = await getActiveCategories(ctx);
+    const map = new Map<string, number>();
+    categories.forEach((cat) => cat.violations.forEach((v) => map.set(v, cat.points)));
+    return map;
 }
 
 /**
@@ -100,24 +101,24 @@ async function buildPointsMap(ctx: QueryCtx): Promise<Map<string, number>> {
  * VIOLATION_CATEGORIES directly so the override is respected.
  */
 export const getViolationCategories = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      name: v.string(),
-      points: v.number(),
-      violations: v.array(v.string()),
-    })
-  ),
-  handler: async (ctx) => {
-    const row = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
-      .unique();
-    if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
-      return row.value as { name: string; points: number; violations: string[] }[];
-    }
-    return VIOLATION_CATEGORIES;
-  },
+    args: {},
+    returns: v.array(
+        v.object({
+            name: v.string(),
+            points: v.number(),
+            violations: v.array(v.string()),
+        })
+    ),
+    handler: async (ctx) => {
+        const row = await ctx.db
+            .query("settings")
+            .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
+            .unique();
+        if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
+            return row.value as { name: string; points: number; violations: string[] }[];
+        }
+        return VIOLATION_CATEGORIES;
+    },
 });
 
 /**
@@ -126,90 +127,90 @@ export const getViolationCategories = query({
  * This is what the AI actions should use to build their prompts.
  */
 export const getAiViolationList = query({
-  args: {},
-  returns: v.array(v.string()),
-  handler: async (ctx) => {
-    // Get active categories
-    const catRow = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
-      .unique();
-    const categories: { name: string; points: number; violations: string[] }[] =
-      catRow?.value && Array.isArray(catRow.value) && catRow.value.length > 0
-        ? catRow.value
-        : VIOLATION_CATEGORIES;
+    args: {},
+    returns: v.array(v.string()),
+    handler: async (ctx) => {
+        // Get active categories
+        const catRow = await ctx.db
+            .query("settings")
+            .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
+            .unique();
+        const categories: { name: string; points: number; violations: string[] }[] =
+            catRow?.value && Array.isArray(catRow.value) && catRow.value.length > 0
+                ? catRow.value
+                : VIOLATION_CATEGORIES;
 
-    // Get disabled set
-    const disabledRow = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "aiDisabledViolations"))
-      .unique();
-    const disabled: string[] = Array.isArray(disabledRow?.value) ? disabledRow!.value : [];
-    const disabledSet = new Set(disabled);
+        // Get disabled set
+        const disabledRow = await ctx.db
+            .query("settings")
+            .withIndex("by_key", (q) => q.eq("key", "aiDisabledViolations"))
+            .unique();
+        const disabled: string[] = Array.isArray(disabledRow?.value) ? disabledRow!.value : [];
+        const disabledSet = new Set(disabled);
 
-    return categories
-      .flatMap((c) => c.violations)
-      .filter((v) => !disabledSet.has(v));
-  },
+        return categories
+            .flatMap((c) => c.violations)
+            .filter((v) => !disabledSet.has(v));
+    },
 });
 
 export const reportViolation = mutation({
-  args: {
-    targetType: v.union(v.literal("student"), v.literal("class")),
-    studentName: v.optional(v.string()),
-    violatingClass: v.string(),
-    violationDate: v.number(),
-    violationType: v.string(),
-    details: v.string(),
-    evidenceFileIds: v.optional(v.array(v.id("_storage"))), // Keep for backward compatibility
-    evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
-  },
-  handler: async (ctx, args) => {
-    const userId = await getUserId(ctx);
-    if (!userId) {
-      throw new Error("Bạn phải đăng nhập để báo cáo vi phạm.");
-    }
+    args: {
+        targetType: v.union(v.literal("student"), v.literal("class")),
+        studentName: v.optional(v.string()),
+        violatingClass: v.string(),
+        violationDate: v.number(),
+        violationType: v.string(),
+        details: v.string(),
+        evidenceFileIds: v.optional(v.array(v.id("_storage"))), // Keep for backward compatibility
+        evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
+    },
+    handler: async (ctx, args) => {
+        const userId = await getUserId(ctx);
+        if (!userId) {
+            throw new Error("Bạn phải đăng nhập để báo cáo vi phạm.");
+        }
 
-    const myProfile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .unique();
+        const myProfile = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
 
-    if (!myProfile || myProfile.role === "pending") {
-      throw new Error("Bạn không có quyền báo cáo vi phạm.");
-    }
+        if (!myProfile || myProfile.role === "pending") {
+            throw new Error("Bạn không có quyền báo cáo vi phạm.");
+        }
 
-    const rawClass = (args.violatingClass || '').trim();
-    const upperNoSpace = rawClass.toUpperCase().replace(/\s+/g, '');
-    const classMatch = upperNoSpace.match(/^(10|11|12)[A-Z]\d{1,2}$/);
-    if (!classMatch) {
-      throw new Error("Tên lớp vi phạm không hợp lệ. Ví dụ: 10A1, 11A2, 12B3.");
-    }
-    const grade = parseInt(classMatch[1], 10);
+        const rawClass = (args.violatingClass || '').trim();
+        const upperNoSpace = rawClass.toUpperCase().replace(/\s+/g, '');
+        const classMatch = upperNoSpace.match(/^(10|11|12)[A-Z]\d{1,2}$/);
+        if (!classMatch) {
+            throw new Error("Tên lớp vi phạm không hợp lệ. Ví dụ: 10A1, 11A2, 12B3.");
+        }
+        const grade = parseInt(classMatch[1], 10);
 
-    const duplicate = await checkForDuplicate(ctx, { ...args, violatingClass: upperNoSpace });
-    if (duplicate) {
-        const target = args.targetType === 'student' ? args.studentName : `Lớp ${args.violatingClass}`;
-        throw new Error(`Lỗi trùng lặp: ${target} đã có vi phạm '${duplicate.violationType}' trong ngày, không thể thêm '${args.violationType}'.`);
-    }
+        const duplicate = await checkForDuplicate(ctx, { ...args, violatingClass: upperNoSpace });
+        if (duplicate) {
+            const target = args.targetType === 'student' ? args.studentName : `Lớp ${args.violatingClass}`;
+            throw new Error(`Lỗi trùng lặp: ${target} đã có vi phạm '${duplicate.violationType}' trong ngày, không thể thêm '${args.violationType}'.`);
+        }
 
-    const violationId = await ctx.db.insert("violations", {
-      reporterId: userId,
-      status: "reported",
-      grade,
-      ...args,
-      violatingClass: upperNoSpace,
-    });
-    
-    // Handle legacy Convex storage files
-    if (args.evidenceFileIds && args.evidenceFileIds.length > 0) {
-      for (const fileId of args.evidenceFileIds) {
-        await ctx.db.insert('storedFiles', { storageId: fileId, kind: 'evidence', timestamp: Date.now() });
-      }
-    }
-    
-    // R2 keys are stored directly in the violation record, no need for separate tracking
-  },
+        const violationId = await ctx.db.insert("violations", {
+            reporterId: userId,
+            status: "reported",
+            grade,
+            ...args,
+            violatingClass: upperNoSpace,
+        });
+
+        // Handle legacy Convex storage files
+        if (args.evidenceFileIds && args.evidenceFileIds.length > 0) {
+            for (const fileId of args.evidenceFileIds) {
+                await ctx.db.insert('storedFiles', { storageId: fileId, kind: 'evidence', timestamp: Date.now() });
+            }
+        }
+
+        // R2 keys are stored directly in the violation record, no need for separate tracking
+    },
 });
 
 export type ViolationWithDetails = Doc<"violations"> & {
@@ -220,16 +221,16 @@ export type ViolationWithDetails = Doc<"violations"> & {
 
 async function resolveViolationDetails(ctx: QueryCtx, v: Doc<"violations">): Promise<ViolationWithDetails> {
     const reporterProfile = await ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', v.reporterId)).unique();
-    
+
     // Get evidence URLs from both Convex storage (legacy) and R2
     const evidenceUrls: (string | null)[] = [];
-    
+
     // Legacy Convex storage URLs
     if (v.evidenceFileIds && v.evidenceFileIds.length > 0) {
         const convexUrls = await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId)));
         evidenceUrls.push(...convexUrls);
     }
-    
+
     // R2 URLs
     if (v.evidenceR2Keys && v.evidenceR2Keys.length > 0) {
         const r2Urls = await Promise.all(v.evidenceR2Keys.map(async (key) => {
@@ -267,7 +268,7 @@ export const getViolationsForGradeManager = query({
             .withIndex("by_grade", q => q.eq("grade", myProfile.grade))
             .order("desc")
             .take(50);
-        
+
         return Promise.all(violations.map(v => resolveViolationDetails(ctx, v)));
     }
 });
@@ -386,7 +387,7 @@ export const getAllViolationsForAdmin = query({
         } else if (args.grade) {
             query = ctx.db.query("violations").withIndex("by_grade", q => q.eq("grade", args.grade!)).order("desc");
         }
-        
+
         let violations = await query.collect();
 
         if (args.className && args.grade) {
@@ -421,7 +422,7 @@ export const resolveViolation = mutation({
 
 // Internal mutation to delete violation from database
 export const deleteViolationFromDb = internalMutation({
-    args: { 
+    args: {
         violationId: v.id("violations"),
         evidenceFileIds: v.optional(v.array(v.id("_storage"))),
     },
@@ -431,7 +432,7 @@ export const deleteViolationFromDb = internalMutation({
         if (args.evidenceFileIds && args.evidenceFileIds.length > 0) {
             await Promise.all(args.evidenceFileIds.map(fileId => ctx.storage.delete(fileId)));
         }
-        
+
         await ctx.db.delete(args.violationId);
         return null;
     }
@@ -446,34 +447,34 @@ export const deleteViolation = action({
         if (myProfile?.role !== 'admin') {
             throw new Error("Bạn không có quyền thực hiện hành động này.");
         }
-        
-        const violation = await ctx.runQuery(internal.violations.getViolationById, { 
-            violationId: args.violationId 
+
+        const violation = await ctx.runQuery(internal.violations.getViolationById, {
+            violationId: args.violationId
         });
-        
+
         if (!violation) {
             throw new Error("Không tìm thấy vi phạm.");
         }
-        
+
         // Remove reporting points (10 points per violation)
         await ctx.runMutation(internal.reportingPoints.removeReportingPointsInternal, {
             userId: violation.reporterId,
             points: 10,
         });
-        
+
         // Delete R2 evidence files
         if (violation.evidenceR2Keys && violation.evidenceR2Keys.length > 0) {
-            await Promise.all(violation.evidenceR2Keys.map((key: string) => 
+            await Promise.all(violation.evidenceR2Keys.map((key: string) =>
                 ctx.runAction(internal.r2Actions.deleteR2Object, { key })
             ));
         }
 
         // Delete violation from database (including legacy Convex storage files)
-        await ctx.runMutation(internal.violations.deleteViolationFromDb, { 
+        await ctx.runMutation(internal.violations.deleteViolationFromDb, {
             violationId: args.violationId,
             evidenceFileIds: violation.evidenceFileIds,
         });
-        
+
         return null;
     }
 });
@@ -541,11 +542,11 @@ export const getPublicEmulationScores = query({
                 q.lte(q.field("violationDate"), endTime)
             ))
             .collect();
-        
+
         // --- OPTIMIZATION: Deduplicate reporter lookups ---
         const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
         const reporterProfiles = await Promise.all(
-            reporterUserIds.map(userId => 
+            reporterUserIds.map(userId =>
                 ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', userId)).unique()
             )
         );
@@ -553,7 +554,7 @@ export const getPublicEmulationScores = query({
         reporterProfiles.forEach(profile => {
             if (profile) { reporterProfileMap.set(profile.userId, profile.fullName); }
         });
-        
+
         const violationPointsMap = await buildPointsMap(ctx);
 
         const scoresByClass: Record<string, { totalPoints: number; violations: any[] }> = {};
@@ -579,7 +580,7 @@ export const getPublicEmulationScores = query({
             scoresByClass[v.violatingClass].totalPoints += points;
             scoresByClass[v.violatingClass].violations.push(detailedViolation);
         }
-        
+
         // Build class list from violations themselves (don't rely on classes table which may be empty).
         // Also merge in any classes from the classes table so rows with 0 violations still appear.
         const allClassesFromTable = await ctx.db.query("classes").collect();
@@ -617,11 +618,11 @@ export const getViolationsByClass = query({
 
         const reporterUserIds = [...new Set(violations.map(v => v.reporterId))];
         const reporterProfiles = await Promise.all(
-            reporterUserIds.map(userId => 
+            reporterUserIds.map(userId =>
                 ctx.db.query('userProfiles').withIndex('by_userId', q => q.eq('userId', userId)).unique()
             )
         );
-        
+
         const reporterProfileMap = new Map();
         const reporterSuperUserMap = new Map();
 
@@ -640,7 +641,7 @@ export const getViolationsByClass = query({
                     .withIndex('by_userId', q => q.eq('userId', userId))
                     .filter(q => q.eq(q.field('isActive'), true))
                     .first();
-                
+
                 if (purchase && purchase.customization) {
                     const item = await ctx.db.get(purchase.itemId);
                     if (item && item.category === 'customization') {
@@ -661,13 +662,13 @@ export const getViolationsByClass = query({
         const detailedViolations = await Promise.all(violations.map(async v => {
             // Get evidence URLs from both Convex storage (legacy) and R2
             const evidenceUrls: (string | null)[] = [];
-            
+
             // Legacy Convex storage URLs
             if (v.evidenceFileIds && v.evidenceFileIds.length > 0) {
                 const convexUrls = await Promise.all(v.evidenceFileIds.map(fileId => ctx.storage.getUrl(fileId)));
                 evidenceUrls.push(...convexUrls);
             }
-            
+
             // R2 URLs
             if (v.evidenceR2Keys && v.evidenceR2Keys.length > 0) {
                 const r2Urls = await Promise.all(v.evidenceR2Keys.map(async (key) => {
@@ -680,7 +681,7 @@ export const getViolationsByClass = query({
                 }));
                 evidenceUrls.push(...r2Urls);
             }
-            
+
             return {
                 ...v,
                 reporterName: v.customReporterName || reporterProfileMap.get(v.reporterId) || 'Không rõ',
@@ -892,100 +893,100 @@ export const getViolationLogs = query({
     }
 });
 export const bulkReportViolations = mutation({
-  args: {
-    violations: v.array(
-      v.object({
-        studentName: v.optional(v.string()),
-        violatingClass: v.string(),
-        violationType: v.string(),
-        details: v.optional(v.string()),
-        targetType: v.union(v.literal("student"), v.literal("class")),
-        evidenceFileIds: v.optional(v.array(v.id("_storage"))), // Keep for backward compatibility
-        evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
-      })
-    ),
-    customDate: v.optional(v.number()),
-    customReporterId: v.optional(v.id("users")),
-    customReporterName: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated.");
-    }
-
-    const myProfile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
-      .unique();
-
-    if (!myProfile || myProfile.role === "pending") {
-      throw new Error("You do not have permission to report violations.");
-    }
-
-    // Check if user is superUser for custom reporter override
-    const reporterId = (myProfile.isSuperUser && args.customReporterId) 
-      ? args.customReporterId 
-      : userId;
-      
-    const customReporterName = (myProfile.isSuperUser && args.customReporterName && !args.customReporterId)
-      ? args.customReporterName
-      : undefined;
-
-    const duplicates: string[] = [];
-    let successCount = 0;
-    const violationDate = args.customDate ?? Date.now();
-
-    for (const v of args.violations) {
-      const isDuplicate = await checkForDuplicate(ctx, {
-        violationDate,
-        violationType: v.violationType,
-        violatingClass: v.violatingClass,
-        studentName: v.studentName,
-        targetType: v.targetType,
-      });
-
-      if (isDuplicate) {
-        duplicates.push(
-          `${v.studentName || v.violatingClass}: ${v.violationType}`
-        );
-      } else {
-        const violationPointsMap = await buildPointsMap(ctx);
-        const points = violationPointsMap.get(v.violationType) ?? 0;
-
-        const rawClass = (v.violatingClass || '').trim();
-        const upperNoSpace = rawClass.toUpperCase().replace(/\s+/g, '');
-        const classMatch = upperNoSpace.match(/^(10|11|12)[A-Z]\d{1,2}$/);
-        if (!classMatch) {
-          // Skip invalid class names in bulk upload
-          continue;
+    args: {
+        violations: v.array(
+            v.object({
+                studentName: v.optional(v.string()),
+                violatingClass: v.string(),
+                violationType: v.string(),
+                details: v.optional(v.string()),
+                targetType: v.union(v.literal("student"), v.literal("class")),
+                evidenceFileIds: v.optional(v.array(v.id("_storage"))), // Keep for backward compatibility
+                evidenceR2Keys: v.optional(v.array(v.string())), // New field for R2 keys
+            })
+        ),
+        customDate: v.optional(v.number()),
+        customReporterId: v.optional(v.id("users")),
+        customReporterName: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const userId = await getUserId(ctx);
+        if (!userId) {
+            throw new Error("Not authenticated.");
         }
-        const grade = parseInt(classMatch[1], 10);
 
-        await ctx.db.insert("violations", {
-          reporterId: reporterId,
-          customReporterName,
-          violationDate,
-          violationType: v.violationType,
-          details: v.details,
-          studentName: v.studentName,
-          violatingClass: upperNoSpace,
-          grade,
-          targetType: v.targetType,
-          evidenceFileIds: v.evidenceFileIds, // Legacy Convex storage
-          evidenceR2Keys: v.evidenceR2Keys, // New R2 storage
-          status: "reported",
-        });
-        successCount++;
-      }
-    }
+        const myProfile = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
 
-    return {
-      successCount,
-      duplicateCount: duplicates.length,
-      duplicates,
-    };
-  },
+        if (!myProfile || myProfile.role === "pending") {
+            throw new Error("You do not have permission to report violations.");
+        }
+
+        // Check if user is superUser for custom reporter override
+        const reporterId = (myProfile.isSuperUser && args.customReporterId)
+            ? args.customReporterId
+            : userId;
+
+        const customReporterName = (myProfile.isSuperUser && args.customReporterName && !args.customReporterId)
+            ? args.customReporterName
+            : undefined;
+
+        const duplicates: string[] = [];
+        let successCount = 0;
+        const violationDate = args.customDate ?? Date.now();
+
+        for (const v of args.violations) {
+            const isDuplicate = await checkForDuplicate(ctx, {
+                violationDate,
+                violationType: v.violationType,
+                violatingClass: v.violatingClass,
+                studentName: v.studentName,
+                targetType: v.targetType,
+            });
+
+            if (isDuplicate) {
+                duplicates.push(
+                    `${v.studentName || v.violatingClass}: ${v.violationType}`
+                );
+            } else {
+                const violationPointsMap = await buildPointsMap(ctx);
+                const points = violationPointsMap.get(v.violationType) ?? 0;
+
+                const rawClass = (v.violatingClass || '').trim();
+                const upperNoSpace = rawClass.toUpperCase().replace(/\s+/g, '');
+                const classMatch = upperNoSpace.match(/^(10|11|12)[A-Z]\d{1,2}$/);
+                if (!classMatch) {
+                    // Skip invalid class names in bulk upload
+                    continue;
+                }
+                const grade = parseInt(classMatch[1], 10);
+
+                await ctx.db.insert("violations", {
+                    reporterId: reporterId,
+                    customReporterName,
+                    violationDate,
+                    violationType: v.violationType,
+                    details: v.details,
+                    studentName: v.studentName,
+                    violatingClass: upperNoSpace,
+                    grade,
+                    targetType: v.targetType,
+                    evidenceFileIds: v.evidenceFileIds, // Legacy Convex storage
+                    evidenceR2Keys: v.evidenceR2Keys, // New R2 storage
+                    status: "reported",
+                });
+                successCount++;
+            }
+        }
+
+        return {
+            successCount,
+            duplicateCount: duplicates.length,
+            duplicates,
+        };
+    },
 });
 
 export const getOverviewForDate = query({
@@ -1015,7 +1016,7 @@ export const getOverviewForDate = query({
             byReporter[reporter] = (byReporter[reporter] || 0) + 1;
         }
 
-        const toSortedArray = (obj: Record<string, number>) => Object.entries(obj).sort((a,b) => b[1]-a[1]).map(([key, count]) => ({ key, count }));
+        const toSortedArray = (obj: Record<string, number>) => Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([key, count]) => ({ key, count }));
 
         const details = withDetails.map(v => ({
             _id: v._id,
@@ -1038,21 +1039,21 @@ export const getOverviewForDate = query({
 });
 
 export const populateClassesTable = internalMutation({
-  handler: async (ctx) => {
-    const allStudentDocs = await ctx.db.query("studentRoster").collect();
-    const allClassNames = [...new Set(allStudentDocs.map(s => s.className))];
+    handler: async (ctx) => {
+        const allStudentDocs = await ctx.db.query("studentRoster").collect();
+        const allClassNames = [...new Set(allStudentDocs.map(s => s.className))];
 
-    const existingClasses = await ctx.db.query("classes").collect();
-    for (const cls of existingClasses) {
-      await ctx.db.delete(cls._id);
-    }
-    
-    for (const className of allClassNames) {
-      const existing = await ctx.db.query("classes").withIndex("by_name", q => q.eq("name", className)).unique();
-      if (!existing) {
-        await ctx.db.insert("classes", { name: className });
-      }
-    }
-    console.log(`Đã điền xong ${allClassNames.length} lớp vào bảng 'classes'.`);
-  },
+        const existingClasses = await ctx.db.query("classes").collect();
+        for (const cls of existingClasses) {
+            await ctx.db.delete(cls._id);
+        }
+
+        for (const className of allClassNames) {
+            const existing = await ctx.db.query("classes").withIndex("by_name", q => q.eq("name", className)).unique();
+            if (!existing) {
+                await ctx.db.insert("classes", { name: className });
+            }
+        }
+        console.log(`Đã điền xong ${allClassNames.length} lớp vào bảng 'classes'.`);
+    },
 });

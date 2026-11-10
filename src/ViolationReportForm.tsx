@@ -14,6 +14,7 @@ import { ViolationTypePicker } from "./components/ViolationTypePicker";
 const PERSONAL_VIOLATION_CODES = [
   "Đi học muộn có phép",
   "Đi học muộn không phép",
+  "Nghỉ học không phép",
   "Học sinh nói tục, chửi thề",
   "Học sinh hút thuốc lá/thuốc lá điện tử/thuốc lào",
   "Vi phạm ATGT (không đội mũ, không cài quai, xe phân khối lớn, pô chế, không biển số, dàn hàng, xe ngoài cổng)",

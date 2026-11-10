@@ -25,6 +25,7 @@ import { ViolationTypePicker } from "./components/ViolationTypePicker";
 const PERSONAL_VIOLATION_CODES = [
   "Đi học muộn có phép",
   "Đi học muộn không phép",
+  "Nghỉ học không phép",
   "Học sinh nói tục, chửi thề",
   "Học sinh hút thuốc lá/thuốc lá điện tử/thuốc lào",
   "Vi phạm ATGT (không đội mũ, không cài quai, xe phân khối lớn, pô chế, không biển số, dàn hàng, xe ngoài cổng)",
@@ -86,7 +87,7 @@ export function AIViolationInputModal({
       const viewport = document.querySelector('meta[name="viewport"]');
       const originalContent = viewport?.getAttribute('content');
       viewport?.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      
+
       return () => {
         if (originalContent) {
           viewport?.setAttribute('content', originalContent);
@@ -183,16 +184,16 @@ export function AIViolationInputModal({
         { id: toastId }
       );
       const debugEnabled = Boolean(isSuperUser && showAiDebugDetails);
-      const result = inputMode === "attendance" 
+      const result = inputMode === "attendance"
         ? await parseAttendanceWithAI({ rawText, debug: debugEnabled })
         : await parseViolationsWithAI({ rawText, debug: debugEnabled });
 
       const backendDebug = ((result as any).aiDebug || null) as
         | {
-            firstPassTrace?: string[];
-            verificationChanged?: boolean;
-            verificationMode?: string;
-          }
+          firstPassTrace?: string[];
+          verificationChanged?: boolean;
+          verificationMode?: string;
+        }
         | null;
       const corrections = (result as any).correctionsMade as string[] | undefined;
       setAiDebugInfo({
@@ -228,14 +229,14 @@ export function AIViolationInputModal({
           const exactMatch = targetStudents.find(
             (s) => s.fullName.toLowerCase() === parsedName
           );
-          
+
           if (exactMatch) {
             matchedViolation.studentName = exactMatch.fullName;
           } else {
             const containsMatches = targetStudents.filter((s) =>
               s.fullName.toLowerCase().includes(parsedName)
             );
-            
+
             if (containsMatches.length === 1) {
               matchedViolation.studentName = containsMatches[0].fullName;
             } else {
@@ -261,11 +262,11 @@ export function AIViolationInputModal({
       setParsedViolations(matchedResults);
       setCheckedClasses(result.checkedClasses);
       setUsedModel("usedModel" in result ? (result as any).usedModel : null);
-      
+
       if (inputMode === "attendance" && 'attendanceByClass' in result) {
         setAttendanceByClass(result.attendanceByClass as Record<string, { absentStudents: string[]; lateStudents: string[] }>);
       }
-      
+
       setCurrentView("results");
       const elapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
       const modelLabel =
@@ -322,10 +323,10 @@ export function AIViolationInputModal({
 
   const handleTargetTypeChange = (index: number, type: "student" | "class") => {
     const updated = [...parsedViolations];
-    updated[index] = { 
-      ...updated[index], 
-      targetType: type, 
-      studentName: type === "student" ? (updated[index].studentName || "") : null 
+    updated[index] = {
+      ...updated[index],
+      targetType: type,
+      studentName: type === "student" ? (updated[index].studentName || "") : null
     };
     setParsedViolations(updated);
   };
@@ -411,11 +412,11 @@ export function AIViolationInputModal({
         const normalizedClass = normalizeClassName(className);
         const attendanceData = attendanceByClass[normalizedClass];
         const totalStudents = classRosterCounts[normalizedClass] || 0;
-        
+
         const absentCount = attendanceData?.absentStudents.length || 0;
         const lateCount = attendanceData?.lateStudents.length || 0;
         const presentCount = totalStudents - absentCount;
-        
+
         let line = `${className}: ${presentCount}/${totalStudents}`;
         if (absentCount > 0) line += ` (Vắng: ${attendanceData!.absentStudents.join(", ")})`;
         if (lateCount > 0) line += ` (Muộn có phép: ${attendanceData!.lateStudents.join(", ")})`;
@@ -520,20 +521,20 @@ export function AIViolationInputModal({
               try {
                 let fileToUpload = file;
                 if (file.type.startsWith('image/')) {
-                    fileToUpload = await imageCompression(file, compressionOptions);
+                  fileToUpload = await imageCompression(file, compressionOptions);
                 }
 
                 const { uploadUrl, key } = await generateR2UploadUrl({
                   fileName: fileToUpload.name,
                   contentType: fileToUpload.type,
                 });
-                
+
                 const result = await fetch(uploadUrl, {
                   method: "PUT",
                   headers: { "Content-Type": fileToUpload.type },
                   body: fileToUpload,
                 });
-                
+
                 return result.ok ? key : null;
               } catch (error) {
                 console.error(error);
@@ -565,7 +566,7 @@ export function AIViolationInputModal({
         await addReportingPoints({
           points: result.successCount * 10,
         });
-        
+
         toast.success(`Gửi thành công ${result.successCount} báo cáo. (+${result.successCount * 10} điểm báo cáo)`);
       }
       if (result.duplicateCount > 0) toast.warning(`${result.duplicateCount} báo cáo trùng lặp đã bỏ qua.`);
@@ -613,16 +614,16 @@ export function AIViolationInputModal({
         >
           <span className="absolute inset-0 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 opacity-60 blur-xl animate-pulse" />
           <span className="relative flex items-center justify-center gap-2 group-hover:scale-105 transition-transform">
-             {/* Icon Magic */}
-             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-             Nhập liệu hàng loạt
+            {/* Icon Magic */}
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            Nhập liệu hàng loạt
           </span>
         </Button>
       </DialogTrigger>
-      
+
       {/* SỬA ĐỔI 1: Thêm [&>button]:hidden để ẩn nút X mặc định bị trùng */}
       <DialogContent className={`[&>button]:hidden max-w-3xl w-[100vw] h-[100dvh] sm:h-auto sm:max-h-[85vh] p-0 flex flex-col gap-0 border-none sm:border sm:rounded-2xl sm:shadow-2xl overflow-hidden ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-gradient-to-br from-white via-cyan-50 to-blue-50'}`}>
-        
+
         {/* Header giữ nguyên */}
         <DialogHeader className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 border-b backdrop-blur-md flex flex-row items-center justify-between space-y-0 ${isDarkMode ? 'border-slate-700 bg-slate-800/50' : 'border-gray-100 bg-white/50'}`}>
           <DialogTitle className={`text-lg sm:text-xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-slate-100' : 'text-gray-800'}`}>
@@ -636,21 +637,20 @@ export function AIViolationInputModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {currentView === "input" ? (
-             // ... Phần input mode giữ nguyên như cũ
-             <div className="flex flex-col gap-5 pb-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            // ... Phần input mode giữ nguyên như cũ
+            <div className="flex flex-col gap-5 pb-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Mode Selection */}
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setInputMode("attendance")}
-                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 ${
-                    inputMode === "attendance"
-                      ? isDarkMode 
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 ${inputMode === "attendance"
+                      ? isDarkMode
                         ? "border-blue-400 bg-blue-500/20 text-blue-300 shadow-md transform scale-[1.02]"
                         : "border-blue-500 bg-blue-50/80 text-blue-700 shadow-md transform scale-[1.02]"
                       : isDarkMode
                         ? "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:bg-slate-700"
                         : "border-gray-100 bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <div className={`p-2 rounded-full ${inputMode === 'attendance' ? (isDarkMode ? 'bg-blue-500/30' : 'bg-blue-100') : (isDarkMode ? 'bg-slate-700' : 'bg-gray-100')}`}>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
@@ -663,15 +663,14 @@ export function AIViolationInputModal({
 
                 <button
                   onClick={() => setInputMode("violations")}
-                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 ${
-                    inputMode === "violations"
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 ${inputMode === "violations"
                       ? isDarkMode
                         ? "border-blue-400 bg-blue-500/20 text-blue-300 shadow-md transform scale-[1.02]"
                         : "border-blue-500 bg-blue-50/80 text-blue-700 shadow-md transform scale-[1.02]"
                       : isDarkMode
                         ? "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:bg-slate-700"
                         : "border-gray-100 bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <div className={`p-2 rounded-full ${inputMode === 'violations' ? (isDarkMode ? 'bg-blue-500/30' : 'bg-blue-100') : (isDarkMode ? 'bg-slate-700' : 'bg-gray-100')}`}>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -697,7 +696,7 @@ export function AIViolationInputModal({
                   </div>
                 </div>
                 <Textarea
-                  placeholder={inputMode === "attendance" 
+                  placeholder={inputMode === "attendance"
                     ? `10A1: vắng An, Bình; muộn Cường...\n10A2 đủ...`
                     : `An 10A1 sai dp\nBình 10A2 tóc...`}
                   className={`min-h-[200px] sm:min-h-[250px] resize-none w-full p-4 rounded-xl focus:ring-2 text-sm md:text-base leading-relaxed shadow-inner ${isDarkMode ? 'border-slate-700 bg-slate-800/80 text-slate-200 focus:ring-blue-500 placeholder:text-slate-500' : 'border-gray-200 bg-white/80 text-gray-900 focus:ring-blue-500 placeholder:text-gray-400'}`}
@@ -707,32 +706,32 @@ export function AIViolationInputModal({
                 />
               </div>
 
-               {/* Advanced Options Collapsible */}
-               {(myProfile?.role === "gradeManager" || myProfile?.isSuperUser) && (
+              {/* Advanced Options Collapsible */}
+              {(myProfile?.role === "gradeManager" || myProfile?.isSuperUser) && (
                 <div className={`border rounded-xl overflow-hidden ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'}`}>
-                  <button 
+                  <button
                     onClick={() => setShowAdvanced(!showAdvanced)}
                     className={`w-full flex items-center justify-between p-3 text-xs font-semibold transition-colors ${isDarkMode ? 'text-slate-400 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-50'}`}
                   >
                     <span>Cài đặt nâng cao (Ngày/Người báo cáo)</span>
                     {showAdvanced ? (
-                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
                     ) : (
-                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     )}
                   </button>
-                  
+
                   {showAdvanced && (
                     <div className={`p-3 space-y-3 border-t animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
                       <div className="space-y-1">
-                         <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>Override ngày</label>
-                         <Input
+                        <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>Override ngày</label>
+                        <Input
                           type="datetime-local"
                           className={`text-sm h-9 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-white'}`}
                           onChange={(e) => setCustomDate(e.target.value ? new Date(e.target.value).getTime() : null)}
                         />
                       </div>
-                      
+
                       <div className="space-y-1">
                         <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>AI model</label>
                         <div className={`text-xs border rounded-md px-3 py-2 ${isDarkMode ? 'text-slate-400 bg-slate-800 border-slate-700' : 'text-gray-600 bg-white border-gray-200'}`}>
@@ -751,7 +750,7 @@ export function AIViolationInputModal({
                           </div>
                         </div>
                       </div>
-                      
+
                       {myProfile?.isSuperUser && (
                         <div className="space-y-1">
                           <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>Override người báo cáo</label>
@@ -834,8 +833,8 @@ export function AIViolationInputModal({
                   )}
                 </div>
               )}
-               {/* Attendance Summary */}
-               {inputMode === "attendance" && Object.keys(attendanceByClass).length > 0 && (
+              {/* Attendance Summary */}
+              {inputMode === "attendance" && Object.keys(attendanceByClass).length > 0 && (
                 <div className={`border rounded-xl p-3 shadow-sm ${isDarkMode ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50/50 border-blue-100'}`}>
                   <h4 className={`text-xs font-bold mb-2 uppercase tracking-wide ${isDarkMode ? 'text-blue-400' : 'text-blue-800'}`}>Tổng hợp sĩ số</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -849,10 +848,10 @@ export function AIViolationInputModal({
                             <span>{present}/{total}</span>
                           </div>
                           {(data.absentStudents.length > 0 || data.lateStudents.length > 0) && (
-                             <div className={`mt-1 pt-1 border-t text-[10px] leading-tight ${isDarkMode ? 'border-slate-700 text-slate-400' : 'border-gray-50 text-gray-500'}`}>
-                                {data.absentStudents.length > 0 && <div className={isDarkMode ? 'text-red-400' : 'text-red-500'}>V: {data.absentStudents.join(", ")}</div>}
-                                {data.lateStudents.length > 0 && <div className={isDarkMode ? 'text-orange-400' : 'text-orange-500'}>M: {data.lateStudents.join(", ")}</div>}
-                             </div>
+                            <div className={`mt-1 pt-1 border-t text-[10px] leading-tight ${isDarkMode ? 'border-slate-700 text-slate-400' : 'border-gray-50 text-gray-500'}`}>
+                              {data.absentStudents.length > 0 && <div className={isDarkMode ? 'text-red-400' : 'text-red-500'}>V: {data.absentStudents.join(", ")}</div>}
+                              {data.lateStudents.length > 0 && <div className={isDarkMode ? 'text-orange-400' : 'text-orange-500'}>M: {data.lateStudents.join(", ")}</div>}
+                            </div>
                           )}
                         </div>
                       );
@@ -863,148 +862,148 @@ export function AIViolationInputModal({
 
               {/* Violations List */}
               <div className="space-y-3">
-                 <div className="flex items-center justify-between">
-                    <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-gray-800'}`}>Danh sách vi phạm ({parsedViolations.length})</h3>
-                    <Button size="sm" variant="outline" className={`h-7 text-xs gap-1 ${isDarkMode ? 'text-green-400 bg-green-500/20 border-green-500/30 hover:bg-green-500/30' : 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100'}`} onClick={handleAddViolation}>
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                       Thêm
-                    </Button>
-                 </div>
-                 
-                 {parsedViolations.length === 0 ? (
-                    <div className={`text-center py-10 rounded-xl border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50/50 border-gray-200'}`}>
-                       <p className={`text-sm ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>Chưa có vi phạm nào</p>
-                    </div>
-                 ) : (
-                   parsedViolations.map((v, i) => {
-                     const studentOptionsForClass = studentsByClass.get(normalizeClassName(v.violatingClass)) || studentOptions;
-                     return (
-                        <div key={i} className={`group rounded-xl p-3 sm:p-4 shadow-sm border transition-all relative ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
-                           {/* Index Badge */}
-                           <div className={`absolute -left-2 -top-2 text-[10px] w-5 h-5 flex items-center justify-center rounded-full shadow-md z-10 ${isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-gray-800 text-white'}`}>
-                             {i + 1}
-                           </div>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-gray-800'}`}>Danh sách vi phạm ({parsedViolations.length})</h3>
+                  <Button size="sm" variant="outline" className={`h-7 text-xs gap-1 ${isDarkMode ? 'text-green-400 bg-green-500/20 border-green-500/30 hover:bg-green-500/30' : 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100'}`} onClick={handleAddViolation}>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Thêm
+                  </Button>
+                </div>
 
-                           {/* Original Text Display */}
-                           {v.originalText && (
-                             <div className={`mb-3 px-2 py-1.5 text-[10px] rounded border ${isDarkMode ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                               <span className="font-semibold">Dữ liệu gốc:</span> {v.originalText}
-                             </div>
-                           )}
-
-                           {/* Warning Alert */}
-                           {v.studentName && v.targetType === 'student' && !allStudents?.some(s => s.fullName.toLowerCase() === v.studentName?.toLowerCase() && normalizeClassName(s.className) === normalizeClassName(v.violatingClass)) && (
-                              <div className={`mb-3 px-2 py-1.5 text-[10px] sm:text-xs rounded border flex items-center gap-1.5 ${isDarkMode ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : 'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>
-                                ⚠️ Chưa khớp tên trong danh sách. Vui lòng chọn lại.
-                              </div>
-                           )}
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                             <div className="col-span-1 sm:col-span-2 flex items-center justify-between gap-2">
-                               <div className="text-[10px] font-bold text-gray-500 uppercase">Đối tượng</div>
-                               <div className="flex rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                                 <button
-                                   onClick={() => handleTargetTypeChange(i, "student")}
-                                   className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "student" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
-                                   type="button"
-                                 >
-                                   Cá nhân
-                                 </button>
-                                 <button
-                                   onClick={() => handleTargetTypeChange(i, "class")}
-                                   className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "class" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
-                                   type="button"
-                                 >
-                                   Cấp lớp
-                                 </button>
-                               </div>
-                             </div>
-
-                             {/* Class FIRST */}
-                             <div className={`space-y-1 ${v.targetType === "class" ? "col-span-1 sm:col-span-2" : ""}`}>
-                               <label className="text-[10px] font-bold text-gray-500 uppercase">Lớp</label>
-                               <input
-                                 value={v.violatingClass}
-                                 onChange={(e) => handleFieldChange(i, "violatingClass", e.target.value)}
-                                 className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent"
-                                 placeholder="Ví dụ: 10A5"
-                               />
-                             </div>
-
-                             {/* Student SECOND (only if student) */}
-                             {v.targetType === "student" && (
-                               <div className="space-y-1">
-                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Học sinh</label>
-                                 <input
-                                   list={`students-list-${i}`}
-                                   value={v.studentName || ""}
-                                   onChange={(e) => handleFieldChange(i, "studentName", e.target.value)}
-                                   className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent placeholder:font-normal"
-                                   placeholder="Nhập tên..."
-                                 />
-                                 <datalist id={`students-list-${i}`}>
-                                   {studentOptionsForClass.map((opt: any) => (
-                                     <option key={opt.id} value={opt.value}>{opt.label}</option>
-                                   ))}
-                                 </datalist>
-                               </div>
-                             )}
-                              
-                              {/* Violation Type */}
-                              <div className="col-span-1 sm:col-span-2 space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Loại vi phạm</label>
-                                <ViolationTypePicker
-                                  categories={activeCategories.map(category => ({
-                                    ...category,
-                                    violations: category.violations.filter(violation => v.targetType === "student" || !PERSONAL_VIOLATION_CODES.includes(violation)),
-                                  })).filter(cat => cat.violations.length > 0)}
-                                  value={v.violationType}
-                                  onChange={(val) => handleFieldChange(i, "violationType", val)}
-                                />
-                              </div>
-
-                              {/* Violation Details */}
-                              <div className="col-span-1 sm:col-span-2 space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Chi tiết</label>
-                                <input
-                                    value={v.details || ""}
-                                    onChange={(e) => handleFieldChange(i, "details", e.target.value)}
-                                    className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
-                                    placeholder="Ví dụ: quần bò, không sơ vin..."
-                                />
-                              </div>
-
-                              {/* Evidence Upload */}
-                              <div className="col-span-1 sm:col-span-2 space-y-2 pt-1">
-                                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                                    <label className="flex-shrink-0 cursor-pointer w-12 h-12 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                                       <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFileChange(i, e.target.files)} />
-                                       <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    </label>
-                                    
-                                    {v.evidenceFiles?.map((file, idx) => (
-                                       <div key={idx} className="relative flex-shrink-0 w-12 h-12 group/img">
-                                          <img src={URL.createObjectURL(file)} className="w-full h-full object-cover rounded-lg border border-gray-200" alt="evidence" />
-                                          <button 
-                                            onClick={() => handleRemoveFile(i, idx)}
-                                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 shadow-sm opacity-100 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity"
-                                          >
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                          </button>
-                                       </div>
-                                    ))}
-                                 </div>
-                              </div>
-                           </div>
-
-                           {/* Delete Button */}
-                           <button onClick={() => handleDeleteViolation(i)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors">
-                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                           </button>
+                {parsedViolations.length === 0 ? (
+                  <div className={`text-center py-10 rounded-xl border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50/50 border-gray-200'}`}>
+                    <p className={`text-sm ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>Chưa có vi phạm nào</p>
+                  </div>
+                ) : (
+                  parsedViolations.map((v, i) => {
+                    const studentOptionsForClass = studentsByClass.get(normalizeClassName(v.violatingClass)) || studentOptions;
+                    return (
+                      <div key={i} className={`group rounded-xl p-3 sm:p-4 shadow-sm border transition-all relative ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
+                        {/* Index Badge */}
+                        <div className={`absolute -left-2 -top-2 text-[10px] w-5 h-5 flex items-center justify-center rounded-full shadow-md z-10 ${isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-gray-800 text-white'}`}>
+                          {i + 1}
                         </div>
-                     );
-                   })
-                 )}
+
+                        {/* Original Text Display */}
+                        {v.originalText && (
+                          <div className={`mb-3 px-2 py-1.5 text-[10px] rounded border ${isDarkMode ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                            <span className="font-semibold">Dữ liệu gốc:</span> {v.originalText}
+                          </div>
+                        )}
+
+                        {/* Warning Alert */}
+                        {v.studentName && v.targetType === 'student' && !allStudents?.some(s => s.fullName.toLowerCase() === v.studentName?.toLowerCase() && normalizeClassName(s.className) === normalizeClassName(v.violatingClass)) && (
+                          <div className={`mb-3 px-2 py-1.5 text-[10px] sm:text-xs rounded border flex items-center gap-1.5 ${isDarkMode ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' : 'bg-yellow-50 text-yellow-800 border-yellow-200'}`}>
+                            ⚠️ Chưa khớp tên trong danh sách. Vui lòng chọn lại.
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="col-span-1 sm:col-span-2 flex items-center justify-between gap-2">
+                            <div className="text-[10px] font-bold text-gray-500 uppercase">Đối tượng</div>
+                            <div className="flex rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                              <button
+                                onClick={() => handleTargetTypeChange(i, "student")}
+                                className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "student" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
+                                type="button"
+                              >
+                                Cá nhân
+                              </button>
+                              <button
+                                onClick={() => handleTargetTypeChange(i, "class")}
+                                className={`px-3 py-1 text-xs font-semibold transition-colors ${v.targetType === "class" ? "bg-white text-gray-800" : "text-gray-500 hover:text-gray-700"}`}
+                                type="button"
+                              >
+                                Cấp lớp
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Class FIRST */}
+                          <div className={`space-y-1 ${v.targetType === "class" ? "col-span-1 sm:col-span-2" : ""}`}>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase">Lớp</label>
+                            <input
+                              value={v.violatingClass}
+                              onChange={(e) => handleFieldChange(i, "violatingClass", e.target.value)}
+                              className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent"
+                              placeholder="Ví dụ: 10A5"
+                            />
+                          </div>
+
+                          {/* Student SECOND (only if student) */}
+                          {v.targetType === "student" && (
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase">Học sinh</label>
+                              <input
+                                list={`students-list-${i}`}
+                                value={v.studentName || ""}
+                                onChange={(e) => handleFieldChange(i, "studentName", e.target.value)}
+                                className="w-full text-sm font-medium border-b border-gray-200 focus:border-blue-500 outline-none py-1.5 bg-transparent placeholder:font-normal"
+                                placeholder="Nhập tên..."
+                              />
+                              <datalist id={`students-list-${i}`}>
+                                {studentOptionsForClass.map((opt: any) => (
+                                  <option key={opt.id} value={opt.value}>{opt.label}</option>
+                                ))}
+                              </datalist>
+                            </div>
+                          )}
+
+                          {/* Violation Type */}
+                          <div className="col-span-1 sm:col-span-2 space-y-1">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase">Loại vi phạm</label>
+                            <ViolationTypePicker
+                              categories={activeCategories.map(category => ({
+                                ...category,
+                                violations: category.violations.filter(violation => v.targetType === "student" || !PERSONAL_VIOLATION_CODES.includes(violation)),
+                              })).filter(cat => cat.violations.length > 0)}
+                              value={v.violationType}
+                              onChange={(val) => handleFieldChange(i, "violationType", val)}
+                            />
+                          </div>
+
+                          {/* Violation Details */}
+                          <div className="col-span-1 sm:col-span-2 space-y-1">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase">Chi tiết</label>
+                            <input
+                              value={v.details || ""}
+                              onChange={(e) => handleFieldChange(i, "details", e.target.value)}
+                              className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                              placeholder="Ví dụ: quần bò, không sơ vin..."
+                            />
+                          </div>
+
+                          {/* Evidence Upload */}
+                          <div className="col-span-1 sm:col-span-2 space-y-2 pt-1">
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                              <label className="flex-shrink-0 cursor-pointer w-12 h-12 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                                <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFileChange(i, e.target.files)} />
+                                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                              </label>
+
+                              {v.evidenceFiles?.map((file, idx) => (
+                                <div key={idx} className="relative flex-shrink-0 w-12 h-12 group/img">
+                                  <img src={URL.createObjectURL(file)} className="w-full h-full object-cover rounded-lg border border-gray-200" alt="evidence" />
+                                  <button
+                                    onClick={() => handleRemoveFile(i, idx)}
+                                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 shadow-sm opacity-100 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Delete Button */}
+                        <button onClick={() => handleDeleteViolation(i)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -1013,53 +1012,53 @@ export function AIViolationInputModal({
         {/* Footer giữ nguyên */}
         <div className={`flex-shrink-0 p-4 border-t flex flex-col sm:flex-row gap-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-20 ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-gray-100 bg-white'}`}>
           {currentView === "input" ? (
-             <>
-               <Button variant="ghost" className={`w-full sm:w-auto ${isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-gray-600'}`} onClick={() => setIsOpen(false)}>Hủy</Button>
-               <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-                 <Button
-                    onClick={() => {
-                       if (rawText.trim() && !window.confirm("Bỏ qua dữ liệu đã nhập?")) return;
-                       setCurrentView("results");
-                    }}
-                    variant="outline"
-                    className={`flex-1 sm:flex-none ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-gray-300 text-gray-700'}`}
-                    disabled={isSubmitting}
-                  >
-                    Nhập thủ công
-                  </Button>
-                  <Button
-                    onClick={handleParse}
-                    disabled={isParsing || isSubmitting || !allStudents || (aiStatus !== undefined && !aiStatus.isSuperUser && aiStatus.remaining <= 0)}
-                    className={`flex-1 sm:flex-none shadow-lg transition-all ${isDarkMode ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/20 hover:shadow-blue-500/30' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200 hover:shadow-blue-300'}`}
-                  >
-                    {isParsing ? "Đang xử lý..." : "Phân tích AI"}
-                  </Button>
-               </div>
-             </>
+            <>
+              <Button variant="ghost" className={`w-full sm:w-auto ${isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-gray-600'}`} onClick={() => setIsOpen(false)}>Hủy</Button>
+              <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+                <Button
+                  onClick={() => {
+                    if (rawText.trim() && !window.confirm("Bỏ qua dữ liệu đã nhập?")) return;
+                    setCurrentView("results");
+                  }}
+                  variant="outline"
+                  className={`flex-1 sm:flex-none ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-gray-300 text-gray-700'}`}
+                  disabled={isSubmitting}
+                >
+                  Nhập thủ công
+                </Button>
+                <Button
+                  onClick={handleParse}
+                  disabled={isParsing || isSubmitting || !allStudents || (aiStatus !== undefined && !aiStatus.isSuperUser && aiStatus.remaining <= 0)}
+                  className={`flex-1 sm:flex-none shadow-lg transition-all ${isDarkMode ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/20 hover:shadow-blue-500/30' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-200 hover:shadow-blue-300'}`}
+                >
+                  {isParsing ? "Đang xử lý..." : "Phân tích AI"}
+                </Button>
+              </div>
+            </>
           ) : (
-             <>
-               <Button variant="outline" onClick={handleBackToInput} className={`w-full sm:w-auto ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-gray-200'}`}>
-                  ← Quay lại
-               </Button>
-               <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-                  {inputMode === "attendance" && (
-                     <Button
-                        onClick={handleSubmitAndCopy}
-                        disabled={isSubmitting || parsedViolations.length === 0}
-                        className={`flex-1 border ${isDarkMode ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-indigo-500/30' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200'}`}
-                     >
-                        Gửi & Copy
-                     </Button>
-                  )}
+            <>
+              <Button variant="outline" onClick={handleBackToInput} className={`w-full sm:w-auto ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-gray-200'}`}>
+                ← Quay lại
+              </Button>
+              <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+                {inputMode === "attendance" && (
                   <Button
-                     onClick={() => handleSubmit()}
-                     disabled={isSubmitting || parsedViolations.length === 0}
-                     className={`flex-1 sm:flex-none shadow-lg transition-all ${isDarkMode ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-green-500/20 hover:shadow-green-500/30' : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-green-200 hover:shadow-green-300'}`}
+                    onClick={handleSubmitAndCopy}
+                    disabled={isSubmitting || parsedViolations.length === 0}
+                    className={`flex-1 border ${isDarkMode ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-indigo-500/30' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200'}`}
                   >
-                     {isSubmitting ? "Đang gửi..." : `Gửi báo cáo (${parsedViolations.length})`}
+                    Gửi & Copy
                   </Button>
-               </div>
-             </>
+                )}
+                <Button
+                  onClick={() => handleSubmit()}
+                  disabled={isSubmitting || parsedViolations.length === 0}
+                  className={`flex-1 sm:flex-none shadow-lg transition-all ${isDarkMode ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-green-500/20 hover:shadow-green-500/30' : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-green-200 hover:shadow-green-300'}`}
+                >
+                  {isSubmitting ? "Đang gửi..." : `Gửi báo cáo (${parsedViolations.length})`}
+                </Button>
+              </div>
+            </>
           )}
         </div>
 

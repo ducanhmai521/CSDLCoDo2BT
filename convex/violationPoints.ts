@@ -8,6 +8,7 @@ export const VIOLATION_CATEGORIES = [
     violations: [
       "Đi học muộn có phép",
       "Thiếu đồ dùng học tập hoặc thiếu ghế chào cờ",
+      "Nghỉ học không phép",
     ],
   },
   {
