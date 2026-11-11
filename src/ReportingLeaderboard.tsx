@@ -4,7 +4,6 @@ import { Trophy, Medal, Award, Star, TrendingUp, Users, Target, Zap, Shield, Arr
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
-import ItemCustomizationModal from "./components/ItemCustomizationModal";
 
 // Noise Texture (Giữ nguyên)
 const NoiseOverlay = () => (
@@ -33,15 +32,6 @@ export default function ReportingLeaderboard() {
   const myProfile = useQuery(api.users.getMyProfile);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'shop'>('leaderboard');
   const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
-  const [customizationModal, setCustomizationModal] = useState<{
-    isOpen: boolean;
-    purchase: any;
-    item: any;
-  }>({
-    isOpen: false,
-    purchase: null,
-    item: null,
-  });
   
   const purchaseItem = useMutation(api.shop.purchaseItem);
 
@@ -72,19 +62,7 @@ export default function ReportingLeaderboard() {
       return;
     }
 
-    // Handle different item types
-    switch (item.category) {
-      case 'customization':
-        setCustomizationModal({
-          isOpen: true,
-          purchase,
-          item,
-        });
-        break;
-      // Add more cases for future item types
-      default:
-        toast.info('Loại sản phẩm này chưa được hỗ trợ');
-    }
+    toast.info('Vật phẩm đã được kích hoạt trên tài khoản của bạn');
   };
 
   const getRankIcon = (rank: number) => {
@@ -489,15 +467,6 @@ export default function ReportingLeaderboard() {
               </div>
         </div>
       </div>
-
-      {/* Customization Modal */}
-      <ItemCustomizationModal
-        isOpen={customizationModal.isOpen}
-        onClose={() => setCustomizationModal({ isOpen: false, purchase: null, item: null })}
-        purchase={customizationModal.purchase}
-        item={customizationModal.item}
-        userProfile={myProfile}
-      />
     </div>
   );
 }

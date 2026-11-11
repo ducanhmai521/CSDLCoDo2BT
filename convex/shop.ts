@@ -17,7 +17,10 @@ export const getShopItems = query({
   handler: async (ctx) => {
     return await ctx.db
       .query("shopItems")
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .filter((q) => q.and(
+        q.eq(q.field("isActive"), true),
+        q.neq(q.field("category"), "customization")
+      ))
       .collect();
   },
 });
@@ -165,40 +168,20 @@ export const updateCustomization = mutation({
   },
 });
 
-// Initialize shop items (run once)
+// Clean up deprecated customization items
 export const initializeShopItems = mutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    // Check if items already exist
-    const existingItems = await ctx.db.query("shopItems").collect();
-    if (existingItems.length > 0) return null;
+    // Delete any deprecated badge customization items
+    const badgeItems = await ctx.db
+      .query("shopItems")
+      .filter((q) => q.eq(q.field("category"), "customization"))
+      .collect();
 
-    // Create the custom badge item
-    await ctx.db.insert("shopItems", {
-      name: "Tùy chỉnh thẻ tên người báo cáo",
-      description: "Tự chọn màu sắc và icon cho thẻ tên của bạn khi báo cáo vi phạm.",
-      price: 400,
-      category: "customization",
-      isActive: true,
-      metadata: {
-        type: "reporter_badge",
-        allowedIcons: ["Star", "Heart", "Zap", "Crown", "Diamond", "Flame", "Sparkles", "Award", "Badge"],
-        allowedColors: [
-          { name: "Emerald", from: "emerald-500", to: "emerald-600" },
-          { name: "Blue", from: "blue-500", to: "blue-600" },
-          { name: "Purple", from: "purple-500", to: "purple-600" },
-          { name: "Pink", from: "pink-500", to: "pink-600" },
-          { name: "Orange", from: "orange-500", to: "orange-600" },
-          { name: "Red", from: "red-500", to: "red-600" },
-          { name: "Yellow", from: "yellow-500", to: "yellow-600" },
-          { name: "Teal", from: "teal-500", to: "teal-600" },
-        ],
-        forbiddenCombos: [
-          { icon: "ShieldCheck", colorFrom: "indigo-600", colorTo: "indigo-600" }, // Admin combo
-        ],
-      },
-    });
+    for (const item of badgeItems) {
+      await ctx.db.delete(item._id);
+    }
 
     return null;
   },

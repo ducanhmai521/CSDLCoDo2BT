@@ -633,30 +633,6 @@ export const getViolationsByClass = query({
             }
         });
 
-        // Get reporter customizations
-        const reporterCustomizations = await Promise.all(
-            reporterUserIds.map(async userId => {
-                const purchase = await ctx.db
-                    .query('userPurchases')
-                    .withIndex('by_userId', q => q.eq('userId', userId))
-                    .filter(q => q.eq(q.field('isActive'), true))
-                    .first();
-
-                if (purchase && purchase.customization) {
-                    const item = await ctx.db.get(purchase.itemId);
-                    if (item && item.category === 'customization') {
-                        return { userId, customization: purchase.customization };
-                    }
-                }
-                return { userId, customization: null };
-            })
-        );
-
-        const reporterCustomizationMap = new Map();
-        reporterCustomizations.forEach(({ userId, customization }) => {
-            reporterCustomizationMap.set(userId, customization);
-        });
-
         const violationPointsMap = await buildPointsMap(ctx);
 
         const detailedViolations = await Promise.all(violations.map(async v => {
@@ -686,7 +662,6 @@ export const getViolationsByClass = query({
                 ...v,
                 reporterName: v.customReporterName || reporterProfileMap.get(v.reporterId) || 'Không rõ',
                 reporterIsSuperUser: reporterSuperUserMap.get(v.reporterId) ?? false,
-                reporterCustomization: reporterCustomizationMap.get(v.reporterId) ?? null,
                 evidenceUrls,
                 points: violationPointsMap.get(v.violationType) ?? 0,
             };
@@ -743,27 +718,6 @@ export const getPublicViolations = query({
             }
         });
 
-        const reporterCustomizations = await Promise.all(
-            reporterUserIds.map(async userId => {
-                const purchase = await ctx.db
-                    .query('userPurchases')
-                    .withIndex('by_userId', q => q.eq('userId', userId))
-                    .filter(q => q.eq(q.field('isActive'), true))
-                    .first();
-                if (purchase && purchase.customization) {
-                    const item = await ctx.db.get(purchase.itemId);
-                    if (item && item.category === 'customization') {
-                        return { userId, customization: purchase.customization };
-                    }
-                }
-                return { userId, customization: null };
-            })
-        );
-        const reporterCustomizationMap = new Map<string, any>(); // userId -> customization
-        reporterCustomizations.forEach(({ userId, customization }) => {
-            reporterCustomizationMap.set(userId, customization);
-        });
-
         const violationPointsMap = await buildPointsMap(ctx);
 
         // Build result — only send necessary fields to reduce payload size
@@ -790,7 +744,6 @@ export const getPublicViolations = query({
                 customReporterName: v.customReporterName,
                 reporterName: v.customReporterName || reporterProfileMap.get(v.reporterId) || 'Không rõ',
                 reporterIsSuperUser: reporterSuperUserMap.get(v.reporterId) ?? false,
-                reporterCustomization: reporterCustomizationMap.get(v.reporterId) ?? null,
                 evidenceUrls,
                 points: violationPointsMap.get(v.violationType) ?? 0,
             };

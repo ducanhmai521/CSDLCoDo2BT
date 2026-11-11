@@ -13,7 +13,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import {
   ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Calendar, AlertCircle, AlertTriangle,
-  FileText, Loader2, Trophy, X, User, Users, FileWarning, Download, ShieldCheck, Award,
+  FileText, Loader2, Trophy, X, User, Users, FileWarning, Download, ShieldCheck, Shield, Award,
   Moon, Sun, Play, Paperclip, ArrowUp
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -479,57 +479,47 @@ const Overlay = ({
 
 const ReporterBadge = ({ violation, compact }: { violation: any; compact: boolean }) => {
   const reporterName: string | undefined = violation.requesterName || violation.reporterName;
-  if (!reporterName) return null;
-
   const imported = Boolean(violation.requesterName);
-  const custom = Boolean(violation.customReporterName);
   const isAdmin = Boolean(violation.reporterIsSuperUser);
-  const customization = violation.reporterCustomization || null;
 
-  let tone: Tone = "slate";
-  let label = "Nhập bởi";
-  let icon: ReactNode = null;
+  let tone: Tone = "rose";
+  let label = "Đội cờ đỏ";
+  let compactLabel = "Đội cờ đỏ";
+  let icon: ReactNode = <Shield className="h-3 w-3 shrink-0" strokeWidth={2.5} />;
 
   if (imported) {
     tone = "emerald";
-    label = "Nhập từ trang xin nghỉ";
+    label = "Đơn xin nghỉ";
+    compactLabel = "Xin nghỉ";
     icon = <FileText className="h-3 w-3 shrink-0" strokeWidth={2.5} />;
-  } else if (custom) {
-    tone = "amber";
-    label = "Nguồn";
-    if (customization?.icon) icon = <span className="text-[11px] leading-none">{customization.icon}</span>;
   } else if (isAdmin) {
     tone = "indigo";
     label = "Admin nhập";
+    compactLabel = "Admin nhập";
     icon = <ShieldCheck className="h-3 w-3 shrink-0" strokeWidth={2.5} />;
-  } else if (customization) {
-    label = customization.label || "Nhập bởi";
-    if (customization.icon) icon = <span className="text-[11px] leading-none">{customization.icon}</span>;
   }
+
+  const tooltip = reporterName ? `${label} (${reporterName})` : label;
 
   if (compact) {
     return (
-      <span className={`chip tone-${tone} sm:hidden ml-auto inline-flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none`}>
-        {imported ? (
-          <>
-            {icon}
-            XN
-          </>
-        ) : (
-          <>
-            {icon}
-            <span className="max-w-[56px] truncate">{reporterName}</span>
-          </>
-        )}
+      <span
+        className={`chip tone-${tone} sm:hidden ml-auto inline-flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none`}
+        title={tooltip}
+      >
+        {icon}
+        <span>{compactLabel}</span>
       </span>
     );
   }
 
   return (
-    <span className={`chip tone-${tone} hidden flex-shrink-0 items-center gap-1.5 rounded-full py-1 pl-2.5 pr-3 text-xs sm:inline-flex`} title={`${label}: ${reporterName}`}>
+    <span
+      className={`chip tone-${tone} hidden flex-shrink-0 items-center gap-1.5 rounded-full py-1 px-2.5 text-xs font-semibold sm:inline-flex`}
+      title={tooltip}
+    >
       {icon}
-      <span className="whitespace-nowrap font-medium opacity-80">{label}</span>
-      <span className="max-w-[130px] truncate font-semibold">{reporterName}</span>
+      <span>{label}</span>
     </span>
   );
 };
@@ -1927,7 +1917,7 @@ const PublicViolationReport = () => {
       <header className="header sticky top-0 z-30" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto max-w-6xl">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pb-2 pt-2.5 sm:px-4">
-            <div className="mr-auto flex min-w-0 items-center gap-2.5">
+            <div className="flex min-w-0 items-center gap-2.5 sm:mr-auto">
               <div className="s1 bd flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border" style={isDarkMode ? { background: "rgba(241,245,249,.9)" } : undefined}>
                 <img
                   src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
@@ -1938,8 +1928,12 @@ const PublicViolationReport = () => {
                   }}
                 />
               </div>
-              <h1 className="truncate text-base font-bold leading-tight t1">CSDLCoDo2BT</h1>
+              <h1 className="hidden sm:block truncate text-base font-bold leading-tight t1">CSDLCoDo2BT</h1>
             </div>
+
+            <h1 className="sm:hidden flex-1 text-center truncate text-base font-bold leading-tight t1 px-1">
+              CSDLCoDo2BT
+            </h1>
 
             <div className="no-print order-2 flex-shrink-0 sm:order-3">
               <button
