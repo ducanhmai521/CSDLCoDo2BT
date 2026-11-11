@@ -654,7 +654,7 @@ const PublicViolationReport = () => {
   const [weekError, setWeekError] = useState<string | null>(null);
   const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
   const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
-  const [hideExcusedAbsence, setHideExcusedAbsence] = useState(true);
+  const [hideExcusedAbsence, setHideExcusedAbsence] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
   const [hasAcknowledged, setHasAcknowledged] = useState(() => {
     return localStorage.getItem("violationReportUnderstood_v2") === "true";

@@ -17,6 +17,7 @@ import { vi } from "date-fns/locale";
 const PERSONAL_VIOLATIONS = [
   "Đi học muộn có phép",
   "Đi học muộn không phép",
+  "Nghỉ học có phép",
   "Nghỉ học không phép",
   "Học sinh nói tục, chửi thề",
   "Học sinh hút thuốc lá/thuốc lá điện tử/thuốc lào",

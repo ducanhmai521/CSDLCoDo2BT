@@ -7,8 +7,8 @@ export const VIOLATION_CATEGORIES = [
     points: 3,
     violations: [
       "Đi học muộn có phép",
+      "Nghỉ học có phép",
       "Thiếu đồ dùng học tập hoặc thiếu ghế chào cờ",
-      "Nghỉ học không phép",
     ],
   },
   {
@@ -16,6 +16,7 @@ export const VIOLATION_CATEGORIES = [
     points: 5,
     violations: [
       "Đi học muộn không phép",
+      "Nghỉ học không phép",
       "Truy bài lộn xộn (đùa nghịch, làm việc riêng, gây ồn...)",
     ],
   },
