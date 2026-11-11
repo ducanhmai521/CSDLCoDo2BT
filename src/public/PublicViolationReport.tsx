@@ -1687,7 +1687,7 @@ const PublicViolationReport = () => {
   const [hasAcknowledged, setHasAcknowledged] = useState(() => readStored(ACK_KEY) === "true");
   const [selectedClass, setSelectedClass] = useState<string | null>(() => readStored(CLASS_KEY));
   const [isClassSelectorOpen, setIsClassSelectorOpen] = useState(false);
-  const [hideExcusedAbsence, setHideExcusedAbsence] = useState(false);
+  const [hideExcusedAbsence, setHideExcusedAbsence] = useState(true);
   const [gradeFilter, setGradeFilter] = useState<GradeFilter>("all");
   const [viewer, setViewer] = useState<ViewerState | null>(null);
 
