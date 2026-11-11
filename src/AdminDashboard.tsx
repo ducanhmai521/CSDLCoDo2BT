@@ -7,7 +7,7 @@ import EmulationScoreTable from "./EmulationScoreTable";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { startOfWeek, startOfDay, endOfDay, toDate, differenceInCalendarWeeks, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
-import { normalizeClassName, isValidClassName, triggerFileDownload } from "./lib/utils";
+import { normalizeClassName, isValidClassName } from "./lib/utils";
 import { BarChart, AlertTriangle, Trophy, Users, CheckCircle, Settings, Clock, School, GraduationCap, UserCheck, Clipboard, Download, Trash2, Upload, X, FileArchive, Search, Filter, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { AIViolationInputModal } from "./AIViolationInputModal";
 import ViolationReportForm from "./ViolationReportForm";
@@ -58,7 +58,6 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const [classFilter, setClassFilter] = useState<string>("");
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>("");
   const [searchFilter, setSearchFilter] = useState<string>("");
-  const [isExporting, setIsExporting] = useState(false);
   const [dateRange, setDateRange] = useState<{ start: number, end: number }>(getWeekStartAndEnd());
   const [customDateRange, setCustomDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [filterMode, setFilterMode] = useState<'month' | 'week' | 'custom'>('week');
@@ -214,40 +213,6 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
   const _overviewStart = _parsedOverview ? startOfDay(toZonedTime(_parsedOverview, TIME_ZONE)).getTime() : startOfDay(toZonedTime(new Date(), TIME_ZONE)).getTime();
   const _overviewEnd = _parsedOverview ? endOfDay(toZonedTime(_parsedOverview, TIME_ZONE)).getTime() : endOfDay(toZonedTime(new Date(), TIME_ZONE)).getTime();
   const overviewViolations = useQuery(api.violations.getAdminOverviewViolations, { dateRange: { start: _overviewStart, end: _overviewEnd } });
-  // TODO: if needed, implement pagination UI here while keeping export using full filtered set on server
-  const exportViolations = useAction(api.excelExport.exportViolations);
-
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-        const startStr = format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'dd/MM/yyyy');
-        const endStr = format(toZonedTime(new Date(dateRange.end), TIME_ZONE), 'dd/MM/yyyy');
-        let headerLabel = '';
-        let filename = 'vi-pham';
-        if (filterMode === 'week') {
-          headerLabel = `Tuần ${weekInput} (${startStr} - ${endStr})`;
-          filename = `vi-pham-tuan-${weekInput}-${format(new Date(), 'yyyy-MM-dd')}`;
-        } else if (filterMode === 'month') {
-          const monthStr = format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'MM/yyyy');
-          headerLabel = `Tháng ${monthStr} (${startStr} - ${endStr})`;
-          filename = `vi-pham-thang-${format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'yyyy-MM')}`;
-        } else {
-          headerLabel = `Khoảng ngày (${startStr} - ${endStr})`;
-          filename = `vi-pham-${format(toZonedTime(new Date(dateRange.start), TIME_ZONE), 'yyyy-MM-dd')}-den-${format(toZonedTime(new Date(dateRange.end), TIME_ZONE), 'yyyy-MM-dd')}`;
-        }
-        const url = await exportViolations({ ...filters, weekLabel: headerLabel } as any);
-        if (url) {
-            await triggerFileDownload(url, `${filename}.xlsx`);
-            toast.success("Đã xuất tệp Excel thành công!");
-        } else {
-            throw new Error("Không thể tạo URL cho tệp Excel.");
-        }
-    } catch (error) {
-        toast.error((error as Error).message);
-    } finally {
-        setIsExporting(false);
-    }
-  };
 
   function parseDDMMYYYY(value: string) {
     const [dd, mm, yyyy] = value.split('/').map((s) => parseInt(s, 10));
@@ -2298,37 +2263,22 @@ export default function AdminDashboard({ isDarkMode, onEnterArchiveMode }: { isD
       {activeSection === 'violations' && (
       <div className="w-full space-y-3">
 
-        {/* ── Top bar: Search + Export ── */}
+        {/* ── Top bar: Search ── */}
         <div className={`${panelClass} !p-3`}>
-          <div className="flex flex-col sm:flex-row gap-2">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Tìm tên học sinh, lớp, loại vi phạm..."
-                value={searchFilter}
-                onChange={e => setSearchFilter(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-slate-800 placeholder:text-slate-400 transition-all"
-              />
-              {searchFilter && (
-                <button onClick={() => setSearchFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-            {/* Export button */}
-            <button
-              onClick={handleExport}
-              disabled={isExporting}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-900/90 text-white text-sm font-semibold hover:bg-indigo-900 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0"
-            >
-              {isExporting ? (
-                <><div className="form-loading-spinner !w-3.5 !h-3.5 !border-2 border-t-white mr-1"></div>Đang xuất...</>
-              ) : (
-                <><Download className="w-3.5 h-3.5" />Xuất Excel</>
-              )}
-            </button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Tìm tên học sinh, lớp, loại vi phạm..."
+              value={searchFilter}
+              onChange={e => setSearchFilter(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200/80 bg-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-slate-800 placeholder:text-slate-400 transition-all"
+            />
+            {searchFilter && (
+              <button onClick={() => setSearchFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 

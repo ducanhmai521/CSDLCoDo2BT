@@ -24,8 +24,6 @@ import {
   ChevronRight,
   Search,
   Award,
-  Eye,
-  X,
   Info,
   ArrowUpDown,
   ExternalLink,
@@ -33,8 +31,6 @@ import {
 import { toast } from "sonner";
 import {
   export5TuExcelWorkbook,
-  CRITERIA_5_TU,
-  matchViolationToCriterion,
   getWeeklyRank,
   computeClassRankings,
   ClassViolationData,
@@ -107,9 +103,6 @@ export default function EmulationScoreTable({ isDarkMode = false }: { isDarkMode
   const [sortBy, setSortBy] = useState<"rank" | "class">("rank");
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
-
-  // Modal preview of a specific class
-  const [previewClass, setPreviewClass] = useState<ClassViolationData | null>(null);
 
   const breakWindow = useMemo(() => {
     if (!savedWeekBase || typeof savedWeekBase !== "string") return null;
@@ -611,7 +604,6 @@ export default function EmulationScoreTable({ isDarkMode = false }: { isDarkMode
                   <th className="py-3.5 px-4 text-center w-28">Tổng trừ</th>
                   <th className="py-3.5 px-4 text-center w-36">Xếp loại</th>
                   <th className="py-3.5 px-4 text-center w-28">Số vi phạm</th>
-                  <th className="py-3.5 px-4 text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody
@@ -703,18 +695,6 @@ export default function EmulationScoreTable({ isDarkMode = false }: { isDarkMode
                       <td className="py-3 px-4 text-center text-slate-600 dark:text-slate-300 tabular-nums font-medium">
                         {item.violations.length}
                       </td>
-
-                      {/* Nút Xem chi tiết */}
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewClass(item)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs transition-colors shadow-sm"
-                        >
-                          <Eye className="h-3.5 w-3.5 text-teal-600" />
-                          <span>Xem phiếu 5 Tự</span>
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -723,194 +703,6 @@ export default function EmulationScoreTable({ isDarkMode = false }: { isDarkMode
           </div>
         )}
       </div>
-
-      {/* ─── Modal Preview Phiếu 5 Tự của lớp ─── */}
-      {previewClass && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className={cn(
-              "relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden",
-              isDarkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-            )}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-600 text-white font-bold text-sm">
-                  {previewClass.className}
-                </span>
-                <div>
-                  <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-slate-100">
-                    Phiếu Chấm Điểm 5 Tự - Lớp {previewClass.className}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Tuần {academicWeek} ({dateRangeLabel}) • Điểm đạt:{" "}
-                    <strong className="text-teal-600 font-bold">
-                      {Math.max(0, 120 - previewClass.totalPoints)} / 120
-                    </strong>{" "}
-                    • Xếp loại: <strong>{getWeeklyRank(Math.max(0, 120 - previewClass.totalPoints))}</strong>
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewClass(null)}
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Modal Body: 5-Tự inspection layout */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-              <div className="text-center pb-2 border-b border-slate-200/60">
-                <p className="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider">
-                  Trường THPT Số 2 Bảo Thắng - Ban Chấp Hành Đoàn Trường
-                </p>
-                <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100 uppercase mt-0.5">
-                  Phiếu Chấm Điểm Nề Nếp Thi Đua Học Sinh (Mô hình 5 Tự)
-                </p>
-                <p className="text-xs italic text-slate-500">
-                  (Căn cứ Quyết định số 01-QĐ/ĐTN ngày 26/08/2026 của BCH Đoàn trường)
-                </p>
-                <p className="text-xs italic text-rose-600 font-medium mt-1">
-                  * Lưu ý: Chưa bao gồm điểm thưởng và điểm giờ học. Chi tiết vi phạm xem tại codo2bt.vercel.app/bang-bao-cao-vi-pham
-                </p>
-              </div>
-
-              {/* Info summary strip */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                <div>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">
-                    Lớp: {previewClass.className}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-slate-600 dark:text-slate-400">
-                    Tuần học: <strong className="text-slate-800 dark:text-slate-200">{academicWeek}</strong>
-                  </span>
-                  <span className="font-semibold text-slate-600 dark:text-slate-400">
-                    Xếp loại tuần:{" "}
-                    <strong className="text-teal-700 dark:text-teal-300 font-bold">
-                      {getWeeklyRank(Math.max(0, 120 - previewClass.totalPoints))}
-                    </strong>
-                  </span>
-                </div>
-              </div>
-
-              {/* Table of 27 criteria grouped */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden text-xs">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-[#1F4E79] text-white font-bold text-center">
-                      <th className="py-2.5 px-2 w-10">STT</th>
-                      <th className="py-2.5 px-3 text-left">Nội dung vi phạm / Tiêu chí</th>
-                      <th className="py-2.5 px-2 w-16">Mức trừ</th>
-                      <th className="py-2.5 px-2 w-16">Số lượt</th>
-                      <th className="py-2.5 px-2 w-20">Tổng trừ</th>
-                      <th className="py-2.5 px-3 text-left">Tên HS vi phạm / Ghi chú</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {[
-                      { id: "I", title: "I. TỰ GIÁC (Chuyên cần, Giờ giấc, Học tập & Báo cáo)" },
-                      { id: "II", title: "II. TỰ TRỌNG (Đồng phục, Tác phong cá nhân & Văn hóa ứng xử)" },
-                      { id: "III", title: "III. TỰ CHỦ (Nề nếp giờ học, An toàn mạng & Văn minh học đường)" },
-                      { id: "IV", title: "IV. TỰ CẨN (An toàn giao thông, Phòng chống bạo lực & Chất cấm)" },
-                      { id: "V", title: "V. TỰ RÈN (Bảo vệ tài sản, Vệ sinh môi trường & Nhiệm vụ tập thể)" },
-                    ].map((cat) => {
-                      const catCriteria = CRITERIA_5_TU.filter((c) => c.category === cat.id);
-                      return (
-                        <div key={cat.id} style={{ display: "contents" }}>
-                          <tr className="bg-[#2F5597] text-white font-bold">
-                            <td colSpan={6} className="py-2 px-3">
-                              {cat.title}
-                            </td>
-                          </tr>
-                          {catCriteria.map((crit) => {
-                            const matchedViolations = previewClass.violations.filter(
-                              (v) => matchViolationToCriterion(v) === crit.stt
-                            );
-                            const count = matchedViolations.length;
-                            const totalDeduction = count * crit.points;
-
-                            return (
-                              <tr
-                                key={crit.stt}
-                                className={cn(
-                                  "hover:bg-slate-50 dark:hover:bg-slate-800/60",
-                                  count > 0 ? "bg-amber-50/50 dark:bg-amber-950/20" : ""
-                                )}
-                              >
-                                <td className="py-2 px-2 text-center text-slate-400 font-medium">
-                                  {crit.stt}
-                                </td>
-                                <td className="py-2 px-3 text-slate-700 dark:text-slate-300">
-                                  {crit.name}
-                                </td>
-                                <td className="py-2 px-2 text-center font-semibold text-slate-600 dark:text-slate-400">
-                                  {crit.points}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-200 bg-[#D9E1F2]/40">
-                                  {count}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold bg-[#E2EFDA]/40 text-rose-600">
-                                  {totalDeduction > 0 ? `-${totalDeduction}` : 0}
-                                </td>
-                                <td className="py-2 px-3 text-slate-600 dark:text-slate-400">
-                                  {matchedViolations.length > 0 ? (
-                                    <div className="space-y-1">
-                                      {matchedViolations.map((m, mIdx) => (
-                                        <div key={mIdx} className="text-[11px]">
-                                          <strong className="text-slate-800 dark:text-slate-200">
-                                            {m.studentName || "Vi phạm tập thể"}
-                                          </strong>
-                                          {m.violationDate && (
-                                            <span className="text-slate-400 ml-1">
-                                              ({format(new Date(m.violationDate), "dd/MM")})
-                                            </span>
-                                          )}
-                                          {m.details && (
-                                            <span className="text-slate-600 dark:text-slate-400 ml-1">
-                                              : {m.details}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-slate-400 italic">—</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Watermark note */}
-              <div className="text-right text-[11px] text-slate-400 italic pt-2">
-                Báo cáo tạo bởi: {creatorName}, vào lúc {format(new Date(), "dd/MM/yyyy HH:mm:ss")} trên trang CSDLCoDo2BT
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
-              <Button
-                variant="outline"
-                onClick={() => setPreviewClass(null)}
-                className="px-4 py-2 text-sm rounded-xl"
-              >
-                Đóng
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
