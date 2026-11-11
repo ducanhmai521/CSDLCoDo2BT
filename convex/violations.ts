@@ -11,6 +11,8 @@ const ATTENDANCE_VIOLATIONS = [
     "Đi học muộn không phép",
     "Nghỉ học không phép",
 ];
+const normClass = (s: string) => (s || "").trim().toUpperCase().replace(/\s+/g, "");
+const normName = (s?: string) => (s ?? "").normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ");
 
 async function checkForDuplicate(
     ctx: QueryCtx,
@@ -27,47 +29,32 @@ async function checkForDuplicate(
     const endOfDay = new Date(args.violationDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const isAttendanceViolation =
+    const sameDay = await ctx.db
+        .query("violations")
+        .withIndex("by_violatingClass", (q) =>
+            q.eq("violatingClass", normClass(args.violatingClass))
+        )
+        .filter((q) =>
+            q.and(
+                q.gte(q.field("violationDate"), startOfDay.getTime()),
+                q.lte(q.field("violationDate"), endOfDay.getTime())
+            )
+        )
+        .collect();
+
+    const isAttendance =
         args.targetType === "student" &&
         ATTENDANCE_VIOLATIONS.includes(args.violationType);
 
-    let query = ctx.db
-        .query("violations")
-        .withIndex("by_violatingClass", (q) =>
-            q.eq("violatingClass", args.violatingClass)
-        )
-        .filter((q) => {
-            const dateFilter = q.and(
-                q.gte(q.field("violationDate"), startOfDay.getTime()),
-                q.lte(q.field("violationDate"), endOfDay.getTime())
-            );
-
-            if (isAttendanceViolation) {
-                return q.and(
-                    dateFilter,
-                    q.or(
-                        ...ATTENDANCE_VIOLATIONS.map((v) =>
-                            q.eq(q.field("violationType"), v)
-                        )
-                    )
-                );
-            }
-
-            // Original logic
-            return q.and(
-                dateFilter,
-                q.eq(q.field("violationType"), args.violationType)
-            );
-        });
-
-    if (args.targetType === "student" && args.studentName) {
-        query = query.filter((q) => q.eq(q.field("studentName"), args.studentName));
-    } else {
-        query = query.filter((q) => q.eq(q.field("targetType"), "class"));
-    }
-
-    const existing = await query.first();
-    return existing;
+    return sameDay.find((e) => {
+        if (args.targetType === "student" && args.studentName) {
+            if (normName(e.studentName) !== normName(args.studentName)) return false;
+            return isAttendance
+                ? ATTENDANCE_VIOLATIONS.includes(e.violationType)
+                : e.violationType === args.violationType;
+        }
+        return e.targetType === "class" && e.violationType === args.violationType;
+    });
 }
 
 export const generateUploadUrl = mutation(async (ctx) => {
