@@ -1,11 +1,11 @@
 /**
- * ArchiveViewer – loads a local .zip archive file and renders the data
- * as a read-only view of violations, evidence, metadata, etc.
+ * ArchiveViewer – All-in-One (Đã tích hợp Spotify Wrapped Story & Recap Insights)
  *
- * The component receives the parsed ZIP contents and renders a simplified
- * dashboard. A sticky banner at the top lets the user exit archive mode.
+ * Tự động phân tích dữ liệu ZIP, dải bong bóng Story, phát recap âm thanh Web Audio,
+ * biểu đồ insight thời gian thực và thẻ tổng kết Ticket năm học.
  */
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, useId } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import JSZip from "jszip";
@@ -33,10 +33,92 @@ import {
   Eye,
   HardDrive,
   Cloud,
+  Sparkles,
+  TrendingUp,
+  Flame,
+  Award,
+  Smile,
+  Camera,
+  Play,
+  RotateCcw,
+  ArrowRight,
+  Clock,
+  Layers,
+  Volume2,
+  VolumeX,
+  Share2,
+  Check,
 } from "lucide-react";
 import { normalizeClassName } from "./lib/utils";
 
 const TIME_ZONE = "Asia/Ho_Chi_Minh";
+const SLIDE_MS = 6500;
+const CLOSE_MS = 250;
+const WEEKDAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"];
+const WEEKDAYS_SHORT = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+
+/* ═══════════════════════════════ Web Audio FX ═══════════════════════════════ */
+
+class SoundEffects {
+  private ctx: AudioContext | null = null;
+  public enabled = true;
+
+  private init() {
+    if (!this.ctx && typeof window !== "undefined") {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === "suspended") {
+      void this.ctx.resume();
+    }
+  }
+
+  playPop() {
+    if (!this.enabled) return;
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.06);
+      gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.08);
+    } catch {}
+  }
+
+  playFanfare() {
+    if (!this.enabled) return;
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const freqs = [523.25, 659.25, 783.99, 1046.5];
+      freqs.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.value = freq;
+        const start = this.ctx.currentTime + idx * 0.08;
+        gain.gain.setValueAtTime(0.08, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.3);
+      });
+    } catch {}
+  }
+}
+
+const sfx = new SoundEffects();
+
+/* ═══════════════════════════════ Date & Academic Helpers ═══════════════════════════════ */
 
 function getWeekStart(tsOrDate: number | Date) {
   return startOfWeek(new Date(tsOrDate), { weekStartsOn: 1 });
@@ -189,7 +271,217 @@ function groupViolations(
   return grouped;
 }
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════ Recap Calculation ═══════════════════════════════ */
+
+export type Counted = { name: string; count: number };
+
+export interface RecapStats {
+  total: number;
+  studentTargets: number;
+  classTargets: number;
+  firstTs: number;
+  lastTs: number;
+  weeks: { week: number; count: number }[];
+  peakWeek: { week: number; count: number } | null;
+  quietWeek: { week: number; count: number } | null;
+  avgPerWeek: number;
+  weekday: number[];
+  peakWeekday: number;
+  timeSlot: { morningEarly: number; morningClass: number; noon: number; afternoon: number };
+  peakTimeSlot: { label: string; count: number; pct: number } | null;
+  grades: { grade: number; count: number; pct: number }[];
+  types: Counted[];
+  classes: Counted[];
+  exemplary: { zero: string[]; lowest: Counted[] } | null;
+  cleanStudents: { clean: number; total: number; pct: number } | null;
+  evidence: { withEvidence: number; pct: number; files: number };
+  reporters: Counted[];
+}
+
+const fold = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tally = (items: string[]): Counted[] => {
+  const m = new Map<string, number>();
+  for (const k of items) m.set(k, (m.get(k) ?? 0) + 1);
+  return [...m]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "vi", { numeric: true }));
+};
+
+const pctOf = (n: number, total: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+
+function computeRecapStats(input: {
+  violations: any[];
+  studentRoster: any[];
+  userProfiles: any[];
+  evidenceFileCount: number;
+  getWeek: (v: any) => number;
+  getTimestamp: (v: any) => number;
+}): RecapStats {
+  const { violations, studentRoster, userProfiles, evidenceFileCount, getWeek, getTimestamp } = input;
+  const total = violations.length;
+
+  let studentTargets = 0;
+  let classTargets = 0;
+  let firstTs = Infinity;
+  let lastTs = 0;
+  let withEvidence = 0;
+  const weekMap = new Map<number, number>();
+  const weekday = [0, 0, 0, 0, 0, 0, 0];
+  const timeSlot = { morningEarly: 0, morningClass: 0, noon: 0, afternoon: 0 };
+  const gradeCounts = new Map<number, number>([[10, 0], [11, 0], [12, 0]]);
+
+  const typeList: string[] = [];
+  const classList: string[] = [];
+  const reporterList: string[] = [];
+  const violatedStudents = new Set<string>();
+
+  const profileName = new Map<string, string>();
+  for (const p of userProfiles) {
+    if (p?.userId) profileName.set(String(p.userId), String(p.fullName ?? p.name ?? "").trim());
+  }
+
+  for (const v of violations) {
+    if (v.targetType === "class") classTargets++;
+    else studentTargets++;
+
+    const cls = normalizeClassName(v.violatingClass || "");
+    if (cls) classList.push(cls);
+
+    const grade = getViolationGrade(v);
+    if (gradeCounts.has(grade)) {
+      gradeCounts.set(grade, gradeCounts.get(grade)! + 1);
+    }
+
+    const ts = getTimestamp(v);
+    if (ts > 0) {
+      firstTs = Math.min(firstTs, ts);
+      lastTs = Math.max(lastTs, ts);
+      const dateInTz = toZonedTime(new Date(ts), TIME_ZONE);
+      const day = dateInTz.getDay();
+      weekday[(day + 6) % 7]++;
+
+      const timeVal = dateInTz.getHours() * 60 + dateInTz.getMinutes();
+      if (timeVal >= 390 && timeVal <= 450) timeSlot.morningEarly++;
+      else if (timeVal > 450 && timeVal < 690) timeSlot.morningClass++;
+      else if (timeVal >= 690 && timeVal <= 780) timeSlot.noon++;
+      else timeSlot.afternoon++;
+    }
+
+    const w = getWeek(v);
+    if (Number.isFinite(w) && w >= 1 && w <= 80) weekMap.set(w, (weekMap.get(w) ?? 0) + 1);
+
+    if (v.violationType) typeList.push(String(v.violationType));
+
+    if (v.targetType !== "class" && v.studentName && cls) {
+      violatedStudents.add(`${cls}|${fold(String(v.studentName))}`);
+    }
+
+    if ((v.evidenceR2Keys?.length ?? 0) > 0 || (v.evidenceFileIds?.length ?? 0) > 0) withEvidence++;
+
+    const reporter = v.customReporterName || profileName.get(String(v.reporterId));
+    if (reporter) reporterList.push(String(reporter).trim());
+  }
+
+  const weeks: { week: number; count: number }[] = [];
+  if (weekMap.size > 0) {
+    const keys = [...weekMap.keys()];
+    const lo = Math.min(...keys);
+    const hi = Math.max(...keys);
+    for (let w = lo; w <= hi; w++) weeks.push({ week: w, count: weekMap.get(w) ?? 0 });
+  }
+
+  const peakWeek = weeks.reduce<{ week: number; count: number } | null>(
+    (best, w) => (!best || w.count > best.count ? w : best),
+    null
+  );
+  const quietWeek = weeks.reduce<{ week: number; count: number } | null>(
+    (best, w) => (!best || w.count < best.count ? w : best),
+    null
+  );
+
+  const peakDayCount = Math.max(...weekday);
+  const peakWeekday = peakDayCount > 0 ? weekday.indexOf(peakDayCount) : -1;
+
+  const slots = [
+    { label: "Đầu giờ sáng (6h30-7h30)", count: timeSlot.morningEarly },
+    { label: "Trong giờ học sáng", count: timeSlot.morningClass },
+    { label: "Giờ nghỉ trưa", count: timeSlot.noon },
+    { label: "Buổi chiều & tan học", count: timeSlot.afternoon },
+  ];
+  const maxSlot = slots.reduce((best, cur) => (cur.count > best.count ? cur : best), slots[0]);
+  const peakTimeSlot =
+    maxSlot.count > 0 ? { ...maxSlot, pct: pctOf(maxSlot.count, total) } : null;
+
+  const grades = [10, 11, 12].map((g) => {
+    const c = gradeCounts.get(g) ?? 0;
+    return { grade: g, count: c, pct: pctOf(c, total) };
+  });
+
+  const classes = tally(classList);
+
+  let exemplary: RecapStats["exemplary"] = null;
+  const rosterClasses = new Set<string>();
+  for (const s of studentRoster) {
+    const c = normalizeClassName(s?.className || "");
+    if (c) rosterClasses.add(c);
+  }
+  if (rosterClasses.size > 0) {
+    const counts = new Map(classes.map((c) => [c.name, c.count]));
+    const all = [...rosterClasses]
+      .map((name) => ({ name, count: counts.get(name) ?? 0 }))
+      .sort((a, b) => a.count - b.count || a.name.localeCompare(b.name, "vi", { numeric: true }));
+    exemplary = {
+      zero: all.filter((c) => c.count === 0).map((c) => c.name),
+      lowest: all.slice(0, 3),
+    };
+  }
+
+  let cleanStudents: RecapStats["cleanStudents"] = null;
+  if (studentRoster.length > 0) {
+    let clean = 0;
+    for (const s of studentRoster) {
+      const key = `${normalizeClassName(s?.className || "")}|${fold(String(s?.fullName ?? s?.name ?? ""))}`;
+      if (!violatedStudents.has(key)) clean++;
+    }
+    const matched = studentRoster.length - clean;
+    if (!(matched === 0 && studentTargets > 0)) {
+      cleanStudents = { clean, total: studentRoster.length, pct: pctOf(clean, studentRoster.length) };
+    }
+  }
+
+  return {
+    total,
+    studentTargets,
+    classTargets,
+    firstTs: Number.isFinite(firstTs) ? firstTs : 0,
+    lastTs,
+    weeks,
+    peakWeek,
+    quietWeek,
+    avgPerWeek: weeks.length ? total / weeks.length : 0,
+    weekday,
+    peakWeekday,
+    timeSlot,
+    peakTimeSlot,
+    grades,
+    types: tally(typeList),
+    classes,
+    exemplary,
+    cleanStudents,
+    evidence: { withEvidence, pct: pctOf(withEvidence, total), files: evidenceFileCount },
+    reporters: tally(reporterList),
+  };
+}
+
+/* ═══════════════════════════════ Types ═══════════════════════════════ */
 
 interface ArchiveMetadata {
   schoolYear: string;
@@ -227,8 +519,6 @@ interface ArchiveLoadedInfo {
   sourceLabel: string;
   zipSizeBytes: number;
 }
-
-export type ArchiveLaunch = { url?: string; label?: string };
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -293,7 +583,1162 @@ function createEvidenceLoader(zip: JSZip): EvidenceLoader {
   };
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
+/* ═══════════════════════════════ Recap Story CSS ═══════════════════════════════ */
+
+const RECAP_CSS = `
+@keyframes ar-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ar-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ar-card-in { from { opacity: 0; transform: translateY(28px) scale(.95); } to { opacity: 1; transform: none; } }
+@keyframes ar-card-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(14px) scale(.97); } }
+.ar-overlay { animation: ar-fade-in .25s ease-out both; }
+.ar-overlay[data-closing="true"] { animation: ar-fade-out ${CLOSE_MS}ms ease-in both; }
+.ar-card { animation: ar-card-in .38s cubic-bezier(.16,1,.3,1) both; }
+.ar-card[data-closing="true"] { animation: ar-card-out ${CLOSE_MS}ms cubic-bezier(.32,0,.67,0) both; }
+.ar-slide { animation: ar-fade-in .35s ease-out both; }
+
+@keyframes ar-rise { from { opacity: 0; transform: translateY(14px); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
+.ar-rise { animation: ar-rise .75s var(--d, 0s) cubic-bezier(.16,1,.3,1) both; }
+@keyframes ar-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.ar-grow { transform-origin: bottom; animation: ar-grow .8s var(--d, 0s) cubic-bezier(.16,1,.3,1) both; }
+@keyframes ar-growx { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ar-growx { transform-origin: left; animation: ar-growx .8s var(--d, 0s) cubic-bezier(.16,1,.3,1) both; }
+@keyframes ar-ring { from { stroke-dashoffset: 100; } to { stroke-dashoffset: var(--off, 0); } }
+.ar-ring { animation: ar-ring 1.3s .3s cubic-bezier(.16,1,.3,1) both; }
+
+@keyframes ar-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ar-fill { animation-name: ar-fill; animation-timing-function: linear; animation-fill-mode: forwards; }
+
+@keyframes ar-float { from { transform: translate(-6%, -5%) scale(1); } to { transform: translate(7%, 6%) scale(1.15); } }
+.ar-blob {
+  position: absolute; width: 85%; aspect-ratio: 1; border-radius: 9999px; filter: blur(75px); opacity: .55;
+  transition: background-color 1s cubic-bezier(.16,1,.3,1);
+  animation: ar-float 12s ease-in-out infinite alternate;
+}
+.ar-grad { background: linear-gradient(120deg, #fff, #fde68a 60%, #fbcfe8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ar-kicker { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+
+@keyframes ar-pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(236,72,153,.55); } 100% { box-shadow: 0 0 0 10px rgba(236,72,153,0); } }
+.ar-pulse { animation: ar-pulse-ring 2.2s ease-out infinite; }
+
+@keyframes ar-confetti {
+  0%   { opacity: 0; transform: translate(0, 0) rotate(0); }
+  10%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 380px)) rotate(var(--r)); }
+}
+.ar-confetti { position: absolute; border-radius: 2px; animation: ar-confetti 2.6s cubic-bezier(.2,.7,.3,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-overlay, .ar-card, .ar-slide, .ar-rise, .ar-grow, .ar-growx, .ar-ring, .ar-blob, .ar-pulse, .ar-confetti {
+    animation-duration: .01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important;
+  }
+}
+`;
+
+const reducedMotion = () =>
+  typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+const rise = (d: number) => ({ "--d": `${d}s` }) as React.CSSProperties;
+const fmtDate = (ts: number) => format(toZonedTime(new Date(ts), TIME_ZONE), "dd/MM/yyyy");
+
+function useCountUp(to: number, { ms = 1100, delay = 250, decimals = 0 } = {}) {
+  const [v, setV] = useState(() => (reducedMotion() ? to : 0));
+  useEffect(() => {
+    if (reducedMotion()) {
+      setV(to);
+      return;
+    }
+    let raf = 0;
+    let start = 0;
+    const t = window.setTimeout(() => {
+      const tick = (now: number) => {
+        if (!start) start = now;
+        const p = Math.min(1, (now - start) / ms);
+        setV(to * (1 - Math.pow(1 - p, 4)));
+        if (p < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }, delay);
+    return () => {
+      window.clearTimeout(t);
+      cancelAnimationFrame(raf);
+    };
+  }, [to, ms, delay]);
+  return decimals > 0 ? v.toFixed(decimals) : String(Math.round(v));
+}
+
+function CountUp({ to, decimals = 0, delay = 250 }: { to: number; decimals?: number; delay?: number }) {
+  const s = useCountUp(to, { decimals, delay });
+  return <span className="tabular-nums">{s}</span>;
+}
+
+function Chip({ children, delay }: { children: React.ReactNode; delay: number }) {
+  return (
+    <span
+      className="ar-rise rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/95 backdrop-blur-sm shadow-sm"
+      style={rise(delay)}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Bars({
+  values,
+  hot,
+  labels,
+  className = "h-40",
+}: {
+  values: number[];
+  hot: number;
+  labels?: string[];
+  className?: string;
+}) {
+  const max = Math.max(...values, 1);
+  const step = Math.min(0.03, 0.8 / Math.max(values.length, 1));
+  return (
+    <div>
+      <div className={`flex items-end gap-[3px] ${className}`}>
+        {values.map((v, i) => (
+          <div key={i} className="flex h-full min-w-0 flex-1 items-end">
+            <div
+              className="ar-grow w-full rounded-t-[4px]"
+              style={{
+                ...rise(0.3 + i * step),
+                height: `${Math.max((v / max) * 100, v > 0 ? 4 : 1.5)}%`,
+                background: i === hot ? "linear-gradient(to top,#fbbf24,#fff)" : "rgba(255,255,255,.32)",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      {labels && (
+        <div className="mt-2.5 flex gap-[3px] text-[11px] text-white/60">
+          {labels.map((l, i) => (
+            <span key={i} className={`flex-1 text-center ${i === hot ? "font-bold text-amber-200" : ""}`}>
+              {l}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RankRows({ rows, prefix = "", base = 0.35 }: { rows: Counted[]; prefix?: string; base?: number }) {
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  return (
+    <div className="mt-5 space-y-3">
+      {rows.map((r, i) => (
+        <div key={r.name} className="ar-rise" style={rise(base + i * 0.1)}>
+          <div className="mb-1 flex items-start justify-between gap-3 text-sm">
+            <span className="flex min-w-0 items-start gap-2">
+              <span className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[11px] font-bold">
+                {i + 1}
+              </span>
+              <span className="line-clamp-2 font-medium leading-snug">
+                {prefix}
+                {r.name}
+              </span>
+            </span>
+            <span className="shrink-0 font-bold tabular-nums">{r.count}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/15">
+            <div
+              className="ar-growx h-full rounded-full bg-gradient-to-r from-amber-200 to-rose-300"
+              style={{ ...rise(base + 0.15 + i * 0.1), width: `${(r.count / max) * 100}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Ring({ pct, c1, c2, children }: { pct: number; c1: string; c2: string; children: React.ReactNode }) {
+  const id = useId().replace(/:/g, "");
+  const off = 100 - Math.min(100, Math.max(0, pct));
+  return (
+    <div className="relative mx-auto h-52 w-52">
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden="true">
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={c1} />
+            <stop offset="100%" stopColor={c2} />
+          </linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="10" />
+        <circle
+          cx="60"
+          cy="60"
+          r="50"
+          fill="none"
+          stroke={`url(#${id})`}
+          strokeWidth="10"
+          strokeLinecap="round"
+          pathLength={100}
+          strokeDasharray="100"
+          className="ar-ring"
+          style={{ "--off": off } as React.CSSProperties}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">{children}</div>
+    </div>
+  );
+}
+
+function Confetti() {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 32 }, (_, i) => ({
+        x: (Math.random() - 0.5) * 360,
+        y: -(100 + Math.random() * 200),
+        r: Math.random() * 720 - 360,
+        d: Math.random() * 0.35,
+        c: ["#fbbf24", "#f472b6", "#818cf8", "#34d399", "#38bdf8", "#fff"][i % 6],
+        w: 6 + Math.random() * 6,
+      })),
+    []
+  );
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[30%] z-0">
+      {pieces.map((p, i) => (
+        <span
+          key={i}
+          className="ar-confetti"
+          style={
+            {
+              "--x": `${p.x}px`,
+              "--y": `${p.y}px`,
+              "--r": `${p.r}deg`,
+              animationDelay: `${0.2 + p.d}s`,
+              background: p.c,
+              width: p.w,
+              height: p.w * 1.6,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════ Slides Builder ═══════════════════════════════ */
+
+interface SlideCtx {
+  goTo: (i: number) => void;
+  close: () => void;
+  viewDetails: () => void;
+}
+interface SlideDef {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  theme: [string, string, string];
+  body: (c: SlideCtx) => React.ReactNode;
+}
+
+const ic = "h-5 w-5";
+
+function buildSlides(
+  s: RecapStats,
+  schoolYear: string,
+  weekLabel: (week: number) => string
+): SlideDef[] {
+  const slides: SlideDef[] = [];
+
+  slides.push({
+    id: "intro",
+    label: "Recap",
+    icon: <Sparkles className={ic} />,
+    theme: ["#4f46e5", "#d946ef", "#f59e0b"],
+    body: () => (
+      <>
+        <p className="ar-rise ar-kicker" style={rise(0.1)}>
+          Archive Recap • Điểm nhìn một năm
+        </p>
+        <h2 className="ar-rise mt-3 text-[44px] font-black leading-[1.05] tracking-tight" style={rise(0.25)}>
+          Năm học
+          <br />
+          <span className="ar-grad">{schoolYear}</span>
+        </h2>
+        <p className="ar-rise mt-5 max-w-[19rem] text-sm leading-relaxed text-white/80" style={rise(0.5)}>
+          Bản tổng kết phong cách Wrapped: Những con số biết nói, những lớp dẫn đầu và khoảnh khắc đáng nhớ.
+        </p>
+        {s.firstTs > 0 && (
+          <p className="ar-rise mt-8 text-xs font-mono text-white/50" style={rise(0.8)}>
+            Ghi nhận từ {fmtDate(s.firstTs)} → {fmtDate(s.lastTs)}
+          </p>
+        )}
+        <p className="ar-rise absolute inset-x-0 bottom-6 text-center text-[11px] text-white/45" style={rise(1.1)}>
+          Chạm nửa phải để xem tiếp • Giữ để tạm dừng
+        </p>
+      </>
+    ),
+  });
+
+  slides.push({
+    id: "total",
+    label: "Tổng quan",
+    icon: <TrendingUp className={ic} />,
+    theme: ["#0284c7", "#6366f1", "#9333ea"],
+    body: () => (
+      <>
+        <p className="ar-rise ar-kicker" style={rise(0.1)}>
+          Toàn bộ năm học ghi nhận
+        </p>
+        <div className="ar-rise mt-3 text-[92px] font-black leading-none" style={rise(0.2)}>
+          <span className="ar-grad">
+            <CountUp to={s.total} />
+          </span>
+        </div>
+        <p className="ar-rise mt-2 text-xl font-bold" style={rise(0.35)}>
+          lượt nhắc nhở & vi phạm
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {s.avgPerWeek > 0 && <Chip delay={0.65}>~{s.avgPerWeek.toFixed(1)} vụ/tuần</Chip>}
+          <Chip delay={0.75}>{s.studentTargets} cá nhân</Chip>
+          <Chip delay={0.85}>{s.classTargets} cấp lớp</Chip>
+        </div>
+      </>
+    ),
+  });
+
+  const sortedGrades = [...s.grades].sort((a, b) => b.count - a.count);
+  const leadingGrade = sortedGrades[0];
+  slides.push({
+    id: "grades",
+    label: "Khối lớp",
+    icon: <Layers className={ic} />,
+    theme: ["#8b5cf6", "#ec4899", "#3b82f6"],
+    body: () => (
+      <>
+        <p className="ar-rise ar-kicker" style={rise(0.1)}>
+          Tỉ lệ theo khối
+        </p>
+        <h2 className="ar-rise mt-2 text-[32px] font-black leading-tight" style={rise(0.2)}>
+          Khối <span className="ar-grad">{leadingGrade?.grade ?? 10}</span> &quot;chiếm sóng&quot; nhất
+        </h2>
+        <p className="ar-rise mt-1 text-sm text-white/70" style={rise(0.3)}>
+          Chiếm {leadingGrade?.pct ?? 0}% tổng số vi phạm toàn trường.
+        </p>
+        <div className="mt-6 space-y-4">
+          {s.grades.map((g, idx) => (
+            <div key={g.grade} className="ar-rise" style={rise(0.4 + idx * 0.1)}>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-bold">Khối {g.grade}</span>
+                <span className="font-mono text-white/80">{g.count} vụ ({g.pct}%)</span>
+              </div>
+              <div className="h-3 w-full bg-white/15 rounded-full overflow-hidden">
+                <div
+                  className="ar-growx h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400"
+                  style={{ ...rise(0.5 + idx * 0.1), width: `${g.pct}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    ),
+  });
+
+  if (s.weeks.length >= 2 && s.peakWeek) {
+    const peak = s.peakWeek;
+    const hot = s.weeks.findIndex((w) => w.week === peak.week);
+    const first = s.weeks[0].week;
+    const last = s.weeks[s.weeks.length - 1].week;
+    slides.push({
+      id: "weeks",
+      label: "Cao điểm",
+      icon: <Flame className={ic} />,
+      theme: ["#ef4444", "#f97316", "#eab308"],
+      body: () => (
+        <>
+          <p className="ar-rise ar-kicker" style={rise(0.1)}>
+            Nhịp đập tuần học
+          </p>
+          <h2 className="ar-rise mt-2 text-[32px] font-extrabold leading-tight" style={rise(0.2)}>
+            Tuần {peak.week} bùng nổ nhất!
+          </h2>
+          <p className="ar-rise mt-1.5 text-xs text-white/75" style={rise(0.35)}>
+            {weekLabel(peak.week)} · Đạt mốc {peak.count} vi phạm
+          </p>
+          <div className="mt-7">
+            <Bars values={s.weeks.map((w) => w.count)} hot={hot} />
+            <div className="mt-2 flex justify-between text-[11px] text-white/50">
+              <span>Tuần {first}</span>
+              <span>Tuần {last}</span>
+            </div>
+          </div>
+          {s.quietWeek && (
+            <p className="ar-rise mt-5 text-xs text-white/70" style={rise(1.0)}>
+              Thanh bình nhất: tuần {s.quietWeek.week} ({s.quietWeek.count} vụ)
+            </p>
+          )}
+        </>
+      ),
+    });
+  }
+
+  if (s.peakWeekday >= 0) {
+    const pk = s.peakWeekday;
+    slides.push({
+      id: "timing",
+      label: "Thời điểm",
+      icon: <Clock className={ic} />,
+      theme: ["#059669", "#0284c7", "#6366f1"],
+      body: () => (
+        <>
+          <p className="ar-rise ar-kicker" style={rise(0.1)}>
+            Khung giờ & Ngày nóng
+          </p>
+          <h2 className="ar-rise mt-2 text-[32px] font-extrabold leading-tight" style={rise(0.2)}>
+            <span className="ar-grad">{WEEKDAYS[pk]}</span> là ngày căng thẳng nhất
+          </h2>
+          <p className="ar-rise mt-1.5 text-xs text-white/75" style={rise(0.35)}>
+            {pctOf(s.weekday[pk], s.total)}% số lần ghi nhận rơi vào {WEEKDAYS[pk].toLowerCase()}
+          </p>
+          <div className="mt-6">
+            <Bars values={s.weekday} hot={pk} labels={WEEKDAYS_SHORT} className="h-36" />
+          </div>
+          {s.peakTimeSlot && (
+            <div className="ar-rise mt-4 rounded-xl border border-white/15 bg-white/10 p-3" style={rise(0.9)}>
+              <p className="text-[11px] font-bold text-amber-300">Khung giờ vàng:</p>
+              <p className="text-xs text-white/90">
+                {s.peakTimeSlot.label} ({s.peakTimeSlot.count} vụ · {s.peakTimeSlot.pct}%)
+              </p>
+            </div>
+          )}
+        </>
+      ),
+    });
+  }
+
+  if (s.types.length > 0) {
+    const top = s.types[0];
+    slides.push({
+      id: "types",
+      label: "Lỗi phổ biến",
+      icon: <AlertTriangle className={ic} />,
+      theme: ["#9333ea", "#ec4899", "#f43f5e"],
+      body: () => (
+        <>
+          <p className="ar-rise ar-kicker" style={rise(0.1)}>
+            Nội quy hay bị quên
+          </p>
+          <h2 className="ar-rise mt-2 line-clamp-2 text-2xl font-black leading-snug" style={rise(0.2)}>
+            <span className="ar-grad">{top.name}</span>
+          </h2>
+          <p className="ar-rise mt-1 text-xs text-white/75" style={rise(0.3)}>
+            {top.count} lượt · chiếm {pctOf(top.count, s.total)}% tổng số
+          </p>
+          <RankRows rows={s.types.slice(0, 4)} />
+        </>
+      ),
+    });
+  }
+
+  if (s.exemplary) {
+    const ex = s.exemplary;
+    slides.push({
+      id: "exemplary",
+      label: "Lớp gương mẫu",
+      icon: <Award className={ic} />,
+      theme: ["#059669", "#10b981", "#06b6d4"],
+      body: () => (
+        <>
+          <p className="ar-rise ar-kicker" style={rise(0.1)}>
+            Tuyên dương nề nếp
+          </p>
+          {ex.zero.length > 0 ? (
+            <>
+              <div className="ar-rise mt-3 text-[88px] font-black leading-none" style={rise(0.2)}>
+                <span className="ar-grad">
+                  <CountUp to={ex.zero.length} />
+                </span>
+              </div>
+              <p className="ar-rise mt-1 text-xl font-bold" style={rise(0.35)}>
+                lớp giữ thành tích 0 vi phạm
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                {ex.zero.slice(0, 10).map((n, i) => (
+                  <Chip key={n} delay={0.6 + i * 0.05}>
+                    Lớp {n}
+                  </Chip>
+                ))}
+                {ex.zero.length > 10 && <Chip delay={1.1}>+{ex.zero.length - 10} lớp khác</Chip>}
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="ar-rise mt-2 text-[30px] font-black leading-tight" style={rise(0.2)}>
+                Các lớp nề nếp nhất
+              </h2>
+              <p className="ar-rise mt-1 text-xs text-white/75" style={rise(0.3)}>
+                Số lượt vi phạm thấp nhất toàn trường
+              </p>
+              <RankRows rows={ex.lowest} prefix="Lớp " base={0.4} />
+            </>
+          )}
+        </>
+      ),
+    });
+  }
+
+  if (s.cleanStudents) {
+    const cs = s.cleanStudents;
+    slides.push({
+      id: "clean",
+      label: "Học sinh tốt",
+      icon: <Smile className={ic} />,
+      theme: ["#16a34a", "#0284c7", "#6366f1"],
+      body: () => (
+        <>
+          <p className="ar-rise ar-kicker" style={rise(0.1)}>
+            Nề nếp học sinh
+          </p>
+          <div className="mt-6">
+            <Ring pct={cs.pct} c1="#fde68a" c2="#34d399">
+              <span className="text-5xl font-black tabular-nums">
+                <CountUp to={cs.pct} delay={300} />
+                <span className="text-2xl">%</span>
+              </span>
+              <span className="mt-0.5 text-xs text-white/70">học sinh</span>
+            </Ring>
+          </div>
+          <p className="ar-rise mt-6 text-center text-lg font-bold" style={rise(0.75)}>
+            chưa từng có tên trong sổ nề nếp!
+          </p>
+          <p className="ar-rise mt-1 text-center text-xs text-white/60" style={rise(0.9)}>
+            {cs.clean}/{cs.total} học sinh gương mẫu suốt năm học
+          </p>
+        </>
+      ),
+    });
+  }
+
+  if (s.evidence.withEvidence > 0) {
+    const ev = s.evidence;
+    slides.push({
+      id: "evidence",
+      label: "Bằng chứng",
+      icon: <Camera className={ic} />,
+      theme: ["#0284c7", "#818cf8", "#e879f9"],
+      body: () => (
+        <>
+          <p className="ar-rise ar-kicker" style={rise(0.1)}>
+            Minh bạch & Trực quan
+          </p>
+          <div className="mt-6">
+            <Ring pct={ev.pct} c1="#7dd3fc" c2="#f0abfc">
+              <span className="text-5xl font-black tabular-nums">
+                <CountUp to={ev.pct} delay={300} />
+                <span className="text-2xl">%</span>
+              </span>
+              <span className="mt-0.5 text-xs text-white/70">báo cáo</span>
+            </Ring>
+          </div>
+          <p className="ar-rise mt-6 text-center text-lg font-bold" style={rise(0.75)}>
+            có đính kèm ảnh / video
+          </p>
+          <p className="ar-rise mt-1 text-center text-xs text-white/60" style={rise(0.9)}>
+            Đã lưu {ev.files} tệp bằng chứng trong kho archive
+          </p>
+        </>
+      ),
+    });
+  }
+
+  const topType = s.types[0];
+  const topClass = s.classes[0];
+  slides.push({
+    id: "outro",
+    label: "Tấm vé Recap",
+    icon: <Sparkles className={ic} />,
+    theme: ["#4f46e5", "#d946ef", "#f59e0b"],
+    body: ({ goTo, viewDetails }) => (
+      <OutroSlideBody
+        schoolYear={schoolYear}
+        stats={s}
+        topType={topType}
+        topClass={topClass}
+        goTo={goTo}
+        viewDetails={viewDetails}
+      />
+    ),
+  });
+
+  return slides;
+}
+
+function OutroSlideBody({
+  schoolYear,
+  stats,
+  topType,
+  topClass,
+  goTo,
+  viewDetails,
+}: {
+  schoolYear: string;
+  stats: RecapStats;
+  topType?: Counted;
+  topClass?: Counted;
+  goTo: (i: number) => void;
+  viewDetails: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    sfx.playFanfare();
+  }, []);
+
+  const handleShare = () => {
+    const text = `🏆 Recap Nề Nếp Năm Học ${schoolYear}:\n- Tổng vi phạm: ${stats.total}\n- Học sinh gương mẫu: ${stats.cleanStudents?.pct ?? 0}%\n- Lớp dẫn đầu nề nếp: ${stats.exemplary?.zero?.[0] ? stats.exemplary.zero[0] : "Xem chi tiết"}`;
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <>
+      <Confetti />
+      <div className="relative z-10 text-center">
+        <p className="ar-rise ar-kicker" style={rise(0.1)}>
+          Tổng kết năm học • {schoolYear}
+        </p>
+        <h2 className="ar-rise mt-1 text-2xl font-black" style={rise(0.2)}>
+          Tấm vé <span className="ar-grad">lưu trữ</span>
+        </h2>
+      </div>
+
+      <div
+        className="ar-rise relative z-10 mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md shadow-2xl text-xs space-y-2.5"
+        style={rise(0.35)}
+      >
+        <div className="flex justify-between items-center border-b border-white/15 pb-2">
+          <span className="font-bold tracking-wider text-amber-300">ARCHIVE TICKET</span>
+          <span className="font-mono text-[10px] text-white/60">NH {schoolYear}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-left">
+          <div className="bg-black/20 rounded-lg p-2">
+            <span className="text-[10px] text-white/50 block">TỔNG GHI NHẬN</span>
+            <span className="text-base font-black text-rose-300">{stats.total} vụ</span>
+          </div>
+          <div className="bg-black/20 rounded-lg p-2">
+            <span className="text-[10px] text-white/50 block">HỌC SINH TỐT</span>
+            <span className="text-base font-black text-emerald-300">{stats.cleanStudents?.pct ?? 100}%</span>
+          </div>
+          <div className="bg-black/20 rounded-lg p-2">
+            <span className="text-[10px] text-white/50 block">LỖI HAY GẶP</span>
+            <span className="font-bold truncate block">{topType?.name ?? "—"}</span>
+          </div>
+          <div className="bg-black/20 rounded-lg p-2">
+            <span className="text-[10px] text-white/50 block">LỚP SÔI NỔI</span>
+            <span className="font-bold truncate block">Lớp {topClass?.name ?? "—"}</span>
+          </div>
+        </div>
+        <div className="pt-1 flex items-center justify-between opacity-40 font-mono text-[9px]">
+          <span>||||| | |||| ||| |||||</span>
+          <span>VERIFIED ARCHIVE</span>
+        </div>
+      </div>
+
+      <div className="relative z-10 mt-5 flex flex-col gap-2">
+        <button
+          type="button"
+          data-nopress
+          onClick={viewDetails}
+          className="ar-rise inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-slate-900 shadow-lg active:scale-95 transition-transform"
+          style={rise(0.6)}
+        >
+          Xem chi tiết vi phạm <ArrowRight className="h-4 w-4" />
+        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            data-nopress
+            onClick={handleShare}
+            className="ar-rise flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white active:scale-95"
+            style={rise(0.7)}
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Share2 className="h-3.5 w-3.5" />}
+            {copied ? "Đã chép text" : "Sao chép tóm tắt"}
+          </button>
+          <button
+            type="button"
+            data-nopress
+            onClick={() => goTo(0)}
+            className="ar-rise flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white active:scale-95"
+            style={rise(0.8)}
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Xem lại
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ═══════════════════════════════ Recap Story Viewer ═══════════════════════════════ */
+
+const BLOB_POS: React.CSSProperties[] = [
+  { left: "-25%", top: "-10%" },
+  { right: "-25%", top: "25%", animationDelay: "-4s" },
+  { left: "5%", bottom: "-25%", animationDelay: "-8s" },
+];
+
+function RecapStory({
+  slides,
+  startIndex,
+  schoolYear,
+  onSeen,
+  onClose,
+  onViewViolations,
+}: {
+  slides: SlideDef[];
+  startIndex: number;
+  schoolYear: string;
+  onSeen: (id: string) => void;
+  onClose: () => void;
+  onViewViolations: () => void;
+}) {
+  const last = slides.length - 1;
+  const autoplay = useMemo(() => !reducedMotion(), []);
+  const [idx, setIdx] = useState(Math.min(startIndex, last));
+  const [paused, setPaused] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
+  const closeTimer = useRef<number | undefined>(undefined);
+  const press = useRef<{ t: number; x: number; y: number } | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const next = useCallback(() => {
+    sfx.playPop();
+    setIdx((i) => Math.min(i + 1, last));
+  }, [last]);
+
+  const prev = useCallback(() => {
+    sfx.playPop();
+    setIdx((i) => Math.max(i - 1, 0));
+  }, []);
+
+  const requestClose = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    closeTimer.current = window.setTimeout(onClose, CLOSE_MS);
+  }, [closing, onClose]);
+
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+
+  useEffect(() => {
+    onSeen(slides[idx].id);
+  }, [idx, slides, onSeen]);
+
+  useEffect(() => {
+    cardRef.current?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onVis = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") requestClose();
+      else if (e.key === "ArrowRight") next();
+      else if (e.key === "ArrowLeft") prev();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [requestClose, next, prev]);
+
+  const toggleSound = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextState = !soundOn;
+    setSoundOn(nextState);
+    sfx.enabled = nextState;
+    if (nextState) sfx.playPop();
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("[data-nopress]")) return;
+    press.current = { t: Date.now(), x: e.clientX, y: e.clientY };
+    setPaused(true);
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    press.current = null;
+    if (!p) return;
+    setPaused(false);
+    const dt = Date.now() - p.t;
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
+    if (dt < 280 && Math.abs(dx) < 14 && Math.abs(dy) < 14) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (e.clientX - rect.left < rect.width * 0.35) prev();
+      else next();
+    } else if (dy > 80 && dy > Math.abs(dx) * 1.5) {
+      requestClose();
+    }
+  };
+
+  const slide = slides[idx];
+  const running = autoplay && idx < last;
+  const ctx: SlideCtx = {
+    goTo: (i) => {
+      sfx.playPop();
+      setIdx(i);
+    },
+    close: requestClose,
+    viewDetails: () => {
+      onViewViolations();
+      requestClose();
+    },
+  };
+
+  return createPortal(
+    <div
+      className="ar-overlay fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md"
+      data-closing={closing}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Archive Recap ${schoolYear}`}
+    >
+      <div
+        ref={cardRef}
+        tabIndex={-1}
+        data-closing={closing}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => setPaused(false)}
+        className="ar-card relative h-[100dvh] w-full touch-none select-none overflow-hidden bg-[#090d1a] text-white outline-none sm:h-[min(90dvh,800px)] sm:max-w-[420px] sm:rounded-[32px] sm:shadow-2xl sm:border sm:border-white/10"
+      >
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          {slide.theme.map((c, i) => (
+            <div key={i} className="ar-blob" style={{ ...BLOB_POS[i], backgroundColor: c }} />
+          ))}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
+        </div>
+
+        <div className="absolute inset-x-0 top-0 z-20 flex gap-1 px-3 pt-3" aria-hidden="true">
+          {slides.map((s, i) => {
+            const active = i === idx && running;
+            return (
+              <div key={s.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className={`h-full origin-left rounded-full bg-white ${active ? "ar-fill" : ""}`}
+                  style={{
+                    transform: active ? undefined : i <= idx ? "scaleX(1)" : "scaleX(0)",
+                    animationDuration: `${SLIDE_MS}ms`,
+                    animationPlayState: paused || hidden ? "paused" : "running",
+                  }}
+                  onAnimationEnd={active ? next : undefined}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="absolute inset-x-0 top-6 z-20 flex items-center justify-between px-4">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-white/90">
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Recap {schoolYear}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              data-nopress
+              onClick={toggleSound}
+              aria-label={soundOn ? "Tắt âm thanh" : "Bật âm thanh"}
+              className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20 active:scale-90 transition-transform"
+            >
+              {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-white/50" />}
+            </button>
+            <button
+              type="button"
+              data-nopress
+              onClick={requestClose}
+              aria-label="Đóng"
+              className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20 active:scale-90 transition-transform"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div
+          key={idx}
+          className="ar-slide absolute inset-0 z-10 flex flex-col justify-center px-7 pb-16 pt-20"
+          aria-live="polite"
+        >
+          {slide.body(ctx)}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ═══════════════════════════════ Dải Nổi Bật ═══════════════════════════════ */
+
+function ArchiveRecap({
+  stats,
+  schoolYear,
+  weekLabel,
+  onViewViolations,
+}: {
+  stats: RecapStats;
+  schoolYear: string;
+  weekLabel: (week: number) => string;
+  onViewViolations: () => void;
+}) {
+  const slides = useMemo(() => buildSlides(stats, schoolYear, weekLabel), [stats, schoolYear, weekLabel]);
+  const [openAt, setOpenAt] = useState<number | null>(null);
+  const [seen, setSeen] = useState<Set<string>>(() => new Set());
+  const markSeen = useCallback(
+    (id: string) => setSeen((p) => (p.has(id) ? p : new Set(p).add(id))),
+    []
+  );
+
+  if (stats.total === 0) return null;
+
+  const bubbles = slides.map((s, i) => ({ s, i })).filter(({ s }) => s.id !== "outro");
+  const firstUnseen = bubbles.findIndex(({ s }) => !seen.has(s.id));
+
+  return (
+    <section
+      aria-label="Nổi bật năm học"
+      className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur-md"
+    >
+      <style>{RECAP_CSS}</style>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+          <Sparkles className="h-4 w-4 text-fuchsia-600" />
+          Nổi bật năm học {schoolYear}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playPop();
+            setOpenAt(0);
+          }}
+          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-md hover:shadow-lg transition-all active:scale-95"
+        >
+          <Play className="h-3.5 w-3.5 fill-white" />
+          Phát Story Recap
+        </button>
+      </div>
+
+      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {bubbles.map(({ s, i }, bi) => {
+          const isSeen = seen.has(s.id);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                sfx.playPop();
+                setOpenAt(i);
+              }}
+              className="group flex w-[74px] shrink-0 flex-col items-center gap-1.5 focus:outline-none"
+            >
+              <span
+                className={`rounded-full p-[3px] transition-[transform,background-color] duration-300 group-hover:scale-105 group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-indigo-400 ${
+                  isSeen ? "bg-slate-200" : "bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600"
+                } ${bi === firstUnseen ? "ar-pulse" : ""}`}
+              >
+                <span
+                  className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-white text-white shadow-sm"
+                  style={{ background: `linear-gradient(135deg, ${s.theme[0]}, ${s.theme[2]})` }}
+                >
+                  {s.icon}
+                </span>
+              </span>
+              <span className="w-full truncate text-center text-[11px] font-semibold text-slate-700">
+                {s.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {openAt !== null && (
+        <RecapStory
+          slides={slides}
+          startIndex={openAt}
+          schoolYear={schoolYear}
+          onSeen={markSeen}
+          onClose={() => setOpenAt(null)}
+          onViewViolations={onViewViolations}
+        />
+      )}
+    </section>
+  );
+}
+
+/* ═══════════════════════════════ Archive Insights ═══════════════════════════════ */
+
+function InsightCard({
+  title,
+  hint,
+  className = "",
+  children,
+}: {
+  title: string;
+  hint?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-2xl border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm ${className}`}>
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+        {hint && <span className="truncate text-xs text-slate-500">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function LightRank({ rows, prefix = "" }: { rows: Counted[]; prefix?: string }) {
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  return (
+    <div className="space-y-3">
+      {rows.map((r, i) => (
+        <div key={r.name}>
+          <div className="mb-1 flex items-start justify-between gap-3 text-xs">
+            <span className="line-clamp-2 font-medium text-slate-700">
+              {prefix}
+              {r.name}
+            </span>
+            <span className="shrink-0 font-bold tabular-nums text-slate-800">{r.count}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="ar-growx h-full rounded-full bg-gradient-to-r from-indigo-500 to-pink-500"
+              style={{ ...rise(0.1 + i * 0.08), width: `${(r.count / max) * 100}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ArchiveInsights({
+  stats,
+  weekLabel,
+}: {
+  stats: RecapStats;
+  weekLabel: (week: number) => string;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  if (stats.total === 0) return null;
+
+  const maxWeek = Math.max(...stats.weeks.map((w) => w.count), 1);
+  const maxDay = Math.max(...stats.weekday, 1);
+  const peakIdx = stats.peakWeek ? stats.weeks.findIndex((w) => w.week === stats.peakWeek!.week) : -1;
+  const shown = hover ?? (peakIdx >= 0 ? peakIdx : null);
+  const shownWeek = shown !== null ? stats.weeks[shown] : null;
+
+  return (
+    <div className="space-y-4">
+      <style>{RECAP_CSS}</style>
+      <div className="grid gap-4 lg:grid-cols-5">
+        <InsightCard
+          className="lg:col-span-3"
+          title="Xu hướng nhịp độ theo tuần"
+          hint={
+            shownWeek
+              ? `${hover === null ? "Cao điểm: " : ""}Tuần ${shownWeek.week} (${weekLabel(shownWeek.week)}) · ${shownWeek.count} vụ`
+              : undefined
+          }
+        >
+          {stats.weeks.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">Chưa đủ dữ liệu tuần.</p>
+          ) : (
+            <div onMouseLeave={() => setHover(null)}>
+              <div className="flex h-36 items-end gap-[3px]">
+                {stats.weeks.map((w, i) => (
+                  <button
+                    key={w.week}
+                    type="button"
+                    onMouseEnter={() => setHover(i)}
+                    className="flex h-full min-w-0 flex-1 items-end focus:outline-none"
+                  >
+                    <span
+                      className={`ar-grow w-full rounded-t-[3px] transition-colors duration-150 ${
+                        i === shown
+                          ? "bg-gradient-to-t from-amber-500 to-amber-300"
+                          : "bg-gradient-to-t from-indigo-500 to-pink-400 hover:opacity-85"
+                      }`}
+                      style={{
+                        ...rise(Math.min(i * 0.02, 0.7)),
+                        height: `${Math.max((w.count / maxWeek) * 100, w.count > 0 ? 4 : 1.5)}%`,
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex justify-between text-[11px] text-slate-400">
+                <span>Tuần {stats.weeks[0].week}</span>
+                <span>Tuần {stats.weeks[stats.weeks.length - 1].week}</span>
+              </div>
+            </div>
+          )}
+        </InsightCard>
+
+        <InsightCard
+          className="lg:col-span-2"
+          title="Theo thứ trong tuần"
+          hint={stats.peakWeekday >= 0 ? `Nhiều nhất: ${WEEKDAYS[stats.peakWeekday]}` : undefined}
+        >
+          <div className="flex h-36 items-end gap-2">
+            {stats.weekday.map((n, i) => (
+              <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                <span className="text-[10px] font-semibold tabular-nums text-slate-600">{n}</span>
+                <span
+                  className={`ar-grow w-full rounded-t-md ${
+                    i === stats.peakWeekday
+                      ? "bg-gradient-to-t from-amber-500 to-amber-300"
+                      : "bg-gradient-to-t from-indigo-500 to-purple-400"
+                  }`}
+                  style={{ ...rise(i * 0.05), height: `${Math.max((n / maxDay) * 75, n > 0 ? 4 : 1.5)}%` }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2 text-[11px] text-slate-400">
+            {WEEKDAYS_SHORT.map((d) => (
+              <span key={d} className="flex-1 text-center font-medium">
+                {d}
+              </span>
+            ))}
+          </div>
+        </InsightCard>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <InsightCard title="Lỗi phổ biến nhất" hint={`${stats.types.length} danh mục lỗi`}>
+          <LightRank rows={stats.types.slice(0, 5)} />
+        </InsightCard>
+        <InsightCard title="Lớp có nhiều nhắc nhở nhất" hint={`${stats.classes.length} lớp có ghi nhận`}>
+          <LightRank rows={stats.classes.slice(0, 5)} prefix="Lớp " />
+        </InsightCard>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════ Main Component ═══════════════════════════════ */
+
+export type ArchiveLaunch = { url?: string; label?: string };
 
 interface ArchiveViewerProps {
   onExit: () => void;
@@ -392,9 +1837,30 @@ export default function ArchiveViewer({ onExit, initialUrl, initialLabel }: Arch
     [loadFromArrayBuffer]
   );
 
+  const { weekBaseDate, breakWindow } = useMemo(
+    () => (archiveData ? resolveWeekSettings(archiveData) : { weekBaseDate: "", breakWindow: null }),
+    [archiveData]
+  );
+
+  const recapStats = useMemo(() => {
+    if (!archiveData) return null;
+    return computeRecapStats({
+      violations: archiveData.violations,
+      studentRoster: archiveData.studentRoster,
+      userProfiles: archiveData.userProfiles,
+      evidenceFileCount: archiveData.evidenceLoader.list().length,
+      getWeek: (v) => getAcademicWeek(v, weekBaseDate, breakWindow),
+      getTimestamp: (v) => getViolationTimestamp(v),
+    });
+  }, [archiveData, weekBaseDate, breakWindow]);
+
+  const getWeekLabel = useCallback(
+    (week: number) => getWeekDateRangeLabel(week, weekBaseDate, breakWindow),
+    [weekBaseDate, breakWindow]
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
-      {/* ── Sticky banner ── */}
       <div className="sticky top-0 z-50 flex items-center justify-between gap-3 bg-amber-500 px-4 py-2.5 shadow-md">
         <div className="flex items-center gap-2 text-amber-950 font-semibold text-sm">
           <FileArchive className="w-4 h-4 shrink-0" />
@@ -425,7 +1891,6 @@ export default function ArchiveViewer({ onExit, initialUrl, initialLabel }: Arch
       </div>
 
       <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        {/* ── File picker ── */}
         {!archiveData && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/70 bg-white/80 backdrop-blur-sm shadow p-6 sm:p-8 space-y-4">
@@ -523,14 +1988,23 @@ export default function ArchiveViewer({ onExit, initialUrl, initialLabel }: Arch
           </div>
         )}
 
-        {/* ── Archive content ── */}
+        {/* ── BONG BÓNG STORY SPOTIFY WRAPPED ── */}
+        {archiveData && recapStats && (
+          <ArchiveRecap
+            stats={recapStats}
+            schoolYear={archiveData.metadata.schoolYear}
+            weekLabel={getWeekLabel}
+            onViewViolations={() => setActiveTab("violations")}
+          />
+        )}
+
+        {/* ── Tabs & Nội dung Archive ── */}
         {archiveData && (
           <>
-            {/* Tab bar */}
             <div className="flex overflow-x-auto gap-2 p-1 rounded-2xl border border-white/30 bg-white/30 backdrop-blur-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {(
                 [
-                  { id: "overview", label: "Tổng quan" },
+                  { id: "overview", label: "Tổng quan & Recap" },
                   {
                     id: "violations",
                     label: `Vi phạm (${archiveData.violations.length})`,
@@ -561,7 +2035,6 @@ export default function ArchiveViewer({ onExit, initialUrl, initialLabel }: Arch
                   {tab.label}
                 </button>
               ))}
-              {/* Replace file button */}
               <label className="ml-auto shrink-0 inline-flex items-center gap-1.5 cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white/40 transition-colors whitespace-nowrap">
                 <Upload className="w-3.5 h-3.5" />
                 Đổi file
@@ -575,7 +2048,11 @@ export default function ArchiveViewer({ onExit, initialUrl, initialLabel }: Arch
             </div>
 
             {activeTab === "overview" && (
-              <OverviewTab data={archiveData} />
+              <OverviewTab
+                data={archiveData}
+                stats={recapStats}
+                weekLabel={getWeekLabel}
+              />
             )}
             {activeTab === "violations" && (
               <ViolationsTab data={archiveData} />
@@ -590,7 +2067,7 @@ export default function ArchiveViewer({ onExit, initialUrl, initialLabel }: Arch
   );
 }
 
-// ─── Parse ZIP ───────────────────────────────────────────────────────────────
+/* ═══════════════════════════════ Parse ZIP ═══════════════════════════════ */
 
 async function parseZip(zip: JSZip): Promise<ArchiveData> {
   const readJson = async (path: string, fallback: any = []) => {
@@ -633,7 +2110,6 @@ async function parseZip(zip: JSZip): Promise<ArchiveData> {
     readJson("evidence_errors.json", []),
   ]);
 
-  // Index evidence in zip; decode lazily when viewing
   const evidenceLoader = createEvidenceLoader(zip);
 
   return {
@@ -651,7 +2127,7 @@ async function parseZip(zip: JSZip): Promise<ArchiveData> {
   };
 }
 
-// ─── Evidence UI ─────────────────────────────────────────────────────────────
+/* ═══════════════════════════════ Evidence Lightbox ═══════════════════════════════ */
 
 function EvidenceLightbox({
   url,
@@ -790,7 +2266,7 @@ function buildEvidenceByClassAndStudent(data: ArchiveData) {
   return { byClass, unassigned };
 }
 
-// ─── Tab components ──────────────────────────────────────────────────────────
+/* ═══════════════════════════════ Tab Panels ═══════════════════════════════ */
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -831,7 +2307,15 @@ function StatBox({
   );
 }
 
-function OverviewTab({ data }: { data: ArchiveData }) {
+function OverviewTab({
+  data,
+  stats,
+  weekLabel,
+}: {
+  data: ArchiveData;
+  stats: RecapStats | null;
+  weekLabel: (week: number) => string;
+}) {
   const { metadata, violations, studentRoster, users, evidenceLoader, evidenceErrors } = data;
   const { weekBaseDate } = resolveWeekSettings(data);
   const gradeCounts = [10, 11, 12].map((g) => ({
@@ -841,11 +2325,13 @@ function OverviewTab({ data }: { data: ArchiveData }) {
 
   return (
     <div className="space-y-4">
+      {stats && <ArchiveInsights stats={stats} weekLabel={weekLabel} />}
+
       <Card>
         <h3 className="font-semibold text-slate-800 mb-4 text-base">
           Thông tin Archive
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatBox
             icon={<AlertTriangle className="w-6 h-6" />}
             label="Vi phạm"
@@ -870,16 +2356,9 @@ function OverviewTab({ data }: { data: ArchiveData }) {
             value={evidenceLoader.list().length}
             color="emerald"
           />
-          {evidenceErrors.length > 0 && (
-            <StatBox
-              icon={<X className="w-6 h-6" />}
-              label="Lỗi bằng chứng"
-              value={evidenceErrors.length}
-              color="amber"
-            />
-          )}
         </div>
       </Card>
+
       <Card>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
@@ -913,6 +2392,7 @@ function OverviewTab({ data }: { data: ArchiveData }) {
           </div>
         </dl>
       </Card>
+
       <Card>
         <h3 className="font-semibold text-slate-800 mb-3 text-sm">Vi phạm theo khối</h3>
         <div className="grid grid-cols-3 gap-3">
@@ -927,6 +2407,7 @@ function OverviewTab({ data }: { data: ArchiveData }) {
           ))}
         </div>
       </Card>
+
       {evidenceErrors.length > 0 && (
         <Card>
           <h3 className="font-semibold text-amber-700 mb-3 flex items-center gap-2">
@@ -1425,7 +2906,6 @@ function RosterTab({ data }: { data: ArchiveData }) {
 function UsersTab({ data }: { data: ArchiveData }) {
   const { users, userProfiles } = data;
 
-  // Map userId → profile
   const profileByUserId = new Map(
     userProfiles.map((p: any) => [p.userId, p])
   );
