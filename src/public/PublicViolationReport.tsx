@@ -1,27 +1,33 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { format, startOfWeek, endOfWeek, differenceInCalendarWeeks, startOfDay } from "date-fns";
-import { vi } from "date-fns/locale";
-import { useState, useEffect, useMemo, useRef } from "react";
 import {
-  ChevronDown, ChevronUp, Eye, Calendar, AlertCircle, AlertTriangle,
-  FileText, Loader2, Trophy, X, User, Users, FileWarning, Download, ShieldCheck, Award, Moon, Sun, Printer, Play
+  format,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  differenceInCalendarWeeks,
+  startOfDay,
+} from "date-fns";
+import { vi } from "date-fns/locale";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import {
+  ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Calendar, AlertCircle, AlertTriangle,
+  FileText, Loader2, Trophy, X, User, Users, FileWarning, Download, ShieldCheck, Award,
+  Moon, Sun, Play, Paperclip, ArrowUp
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-// --- TYPES ---
-type ModalMedia = {
-  url: string;
-  type: "image" | "video";
-  violationInfo: {
-    student: string;
-    class: string;
-    details: string;
-  };
-};
+/* ============================================================================
+ * TYPES & CONSTANTS
+ * ========================================================================== */
 
 type TuCategoryId = "tuGiac" | "tuTrong" | "tuChu" | "tuCan" | "tuRen";
 type GradeFilter = "all" | 10 | 11 | 12;
+type TabId = "violations" | "scores" | "classSummary";
+type Tone =
+  | "sky" | "violet" | "teal" | "rose" | "emerald" | "blue"
+  | "amber" | "orange" | "slate" | "indigo" | "danger";
 
 type WeeklyRank = {
   label: string;
@@ -29,180 +35,182 @@ type WeeklyRank = {
   tone: "excellent" | "good" | "fair" | "needsWork";
 };
 
-const BASE_SCORE = 120;
-
-const shellStyles = `
-  .public-report-shell {
-    font-feature-settings: "tnum" 1, "lnum" 1;
-  }
-  .public-report-shell.theme-dark {
-    background: #0f172a;
-    color: #f8fafc;
-  }
-  .glass-header {
-    background-color: rgba(255, 255, 255, 0.97) !important;
-  }
-  .public-report-shell.theme-dark .glass-header {
-    background-color: rgba(15, 23, 42, 0.97) !important;
-    border-bottom-color: rgba(148, 163, 184, 0.22) !important;
-  }
-  .glass-card {
-    background-color: #ffffff !important;
-    border-color: rgba(226, 232, 240, 0.9) !important;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-    border-radius: 10px !important;
-    padding: 0 !important;
-  }
-  .public-report-shell .glass-card.p-8 {
-    padding: 2rem !important;
-  }
-  .public-report-shell .glass-card.px-4 {
-    padding: 0.75rem 1rem !important;
-  }
-  .public-report-shell.theme-dark .glass-card {
-    background-color: #1e293b !important;
-    border-color: rgba(51, 65, 85, 0.9) !important;
-    box-shadow: none !important;
-  }
-  .glass-day-expanded {
-    background: #eef2ff !important;
-    color: #1e293b !important;
-  }
-  .public-report-shell.theme-dark .glass-day-expanded {
-    background: rgba(49, 46, 129, 0.35) !important;
-    color: #f1f5f9 !important;
-  }
-  .glass-row { background-color: transparent !important; }
-  .glass-row:hover { background-color: rgba(248, 250, 252, 0.9) !important; }
-  .public-report-shell.theme-dark .glass-row:hover {
-    background-color: rgba(51, 65, 85, 0.45) !important;
-  }
-  .glass-details { background-color: #f8fafc !important; }
-  .public-report-shell.theme-dark .glass-details { background-color: #0f172a !important; }
-  .public-report-shell.theme-dark .bg-white { background-color: #1e293b !important; }
-  .public-report-shell.theme-dark .bg-slate-50,
-  .public-report-shell.theme-dark .bg-slate-50\\/80,
-  .public-report-shell.theme-dark .bg-slate-50\\/50,
-  .public-report-shell.theme-dark .bg-slate-100,
-  .public-report-shell.theme-dark .bg-slate-100\\/80 {
-    background-color: #334155 !important;
-  }
-  .public-report-shell.theme-dark .text-slate-900,
-  .public-report-shell.theme-dark .text-slate-800,
-  .public-report-shell.theme-dark .text-slate-700 {
-    color: #e2e8f0 !important;
-  }
-  .public-report-shell.theme-dark .text-slate-600,
-  .public-report-shell.theme-dark .text-slate-500,
-  .public-report-shell.theme-dark .text-slate-400 {
-    color: #94a3b8 !important;
-  }
-  .public-report-shell.theme-dark .border-slate-100,
-  .public-report-shell.theme-dark .border-slate-200,
-  .public-report-shell.theme-dark .border-slate-300,
-  .public-report-shell.theme-dark .border-slate-200\\/60,
-  .public-report-shell.theme-dark .border-slate-200\\/80 {
-    border-color: rgba(148, 163, 184, 0.26) !important;
-  }
-  .public-report-shell.theme-dark .reporter-badge {
-    background-color: #334155 !important;
-    border-color: rgba(148, 163, 184, 0.35) !important;
-    box-shadow: none !important;
-  }
-  .public-report-shell.theme-dark .reporter-badge-inner {
-    background-color: #1e293b !important;
-  }
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500),
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-600) {
-    background-color: rgba(245, 158, 11, 0.15) !important;
-    border-color: rgba(251, 191, 36, 0.42) !important;
-  }
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) .text-slate-700,
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-600) .text-slate-700 {
-    color: #f8fafc !important;
-  }
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-500) .text-amber-600,
-  .public-report-shell.theme-dark .reporter-badge:has(.text-amber-600) .text-amber-600 {
-    color: #fcd34d !important;
-    border-color: rgba(251, 191, 36, 0.55) !important;
-  }
-  .public-report-shell.theme-dark .reporter-badge:has(.text-indigo-500) .text-slate-700 {
-    color: #f1f5f9 !important;
-  }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .public-report-shell.theme-dark .reporter-label {
-    color: #e2e8f0 !important;
-    border-color: rgba(148, 163, 184, 0.45) !important;
-  }
-  .public-report-shell.theme-dark .admin-shield { color: #bfdbfe !important; }
-  .tabular-nums { font-variant-numeric: tabular-nums; }
-
-  @media print {
-    .no-print, .glass-header button, .public-report-shell button[title] { display: none !important; }
-    .public-report-shell { background: #fff !important; color: #0f172a !important; }
-    .glass-header, .glass-card { background: #fff !important; box-shadow: none !important; }
-    .sticky { position: static !important; }
-    a[href]::after { content: none !important; }
-    table { break-inside: auto; }
-    tr { break-inside: avoid; }
-  }
-`;
-
-const TU_META: Record<TuCategoryId, { label: string; badge: string; className: string }> = {
-  tuGiac: {
-    label: "I. Tự giác",
-    badge: "Tự Giác",
-    className: "bg-sky-100 text-sky-900 border-sky-300 font-bold",
-  },
-  tuTrong: {
-    label: "II. Tự trọng",
-    badge: "Tự Trọng",
-    className: "bg-violet-100 text-violet-900 border-violet-300 font-bold",
-  },
-  tuChu: {
-    label: "III. Tự chủ",
-    badge: "Tự Chủ",
-    className: "bg-teal-100 text-teal-900 border-teal-300 font-bold",
-  },
-  tuCan: {
-    label: "IV. Tự cẩn",
-    badge: "Tự Cẩn",
-    className: "bg-rose-100 text-rose-900 border-rose-300 font-bold",
-  },
-  tuRen: {
-    label: "V. Tự rèn",
-    badge: "Tự Rèn",
-    className: "bg-emerald-100 text-emerald-900 border-emerald-300 font-bold",
-  },
+type EvidenceItem = { url: string; type: "image" | "video" };
+type ViewerState = {
+  items: EvidenceItem[];
+  index: number;
+  info: { student: string; className: string; details: string };
 };
 
-function tuBadgeClass(category: TuCategoryId, isDarkMode: boolean) {
-  if (isDarkMode) {
-    switch (category) {
-      case "tuGiac":
-        return "bg-sky-500/20 text-sky-200 border-sky-400/40 font-semibold";
-      case "tuTrong":
-        return "bg-violet-500/20 text-violet-200 border-violet-400/40 font-semibold";
-      case "tuChu":
-        return "bg-teal-500/20 text-teal-200 border-teal-400/40 font-semibold";
-      case "tuCan":
-        return "bg-rose-500/20 text-rose-200 border-rose-400/40 font-semibold";
-      case "tuRen":
-        return "bg-emerald-500/20 text-emerald-200 border-emerald-400/40 font-semibold";
-    }
+const BASE_SCORE = 120;
+const MAX_WEEK = 99;
+const ACK_KEY = "violationReportUnderstood_v2";
+const CLASS_KEY = "selectedClassSummary";
+const THEME_KEY = "publicReportTheme";
+const SCORES_PATH = "/bang-diem-thi-dua-tho";
+const VIOLATIONS_PATH = "/bang-bao-cao-vi-pham";
+
+const TU_META: Record<TuCategoryId, { label: string; badge: string; tone: Tone }> = {
+  tuGiac: { label: "I. Tự giác", badge: "Tự Giác", tone: "sky" },
+  tuTrong: { label: "II. Tự trọng", badge: "Tự Trọng", tone: "violet" },
+  tuChu: { label: "III. Tự chủ", badge: "Tự Chủ", tone: "teal" },
+  tuCan: { label: "IV. Tự cẩn", badge: "Tự Cẩn", tone: "rose" },
+  tuRen: { label: "V. Tự rèn", badge: "Tự Rèn", tone: "emerald" },
+};
+
+const TAB_META: Record<TabId, { label: string; icon: typeof FileText; acc: string }> = {
+  violations: { label: "Vi phạm", icon: FileText, acc: "acc-indigo" },
+  scores: { label: "Bảng điểm", icon: Trophy, acc: "acc-amber" },
+  classSummary: { label: "Theo lớp", icon: Users, acc: "acc-emerald" },
+};
+const TAB_ORDER: TabId[] = ["violations", "scores", "classSummary"];
+
+/* ============================================================================
+ * STYLES (CSS variables -> light/dark không cần override từng class Tailwind)
+ * ========================================================================== */
+
+// [bgLight, fgLight, bdLight, bgDark, fgDark, bdDark]
+const TONES: Record<Tone, [string, string, string, string, string, string]> = {
+  sky: ["#e0f2fe", "#075985", "#bae6fd", "rgba(14,165,233,.16)", "#7dd3fc", "rgba(56,189,248,.35)"],
+  violet: ["#ede9fe", "#5b21b6", "#ddd6fe", "rgba(139,92,246,.18)", "#c4b5fd", "rgba(167,139,250,.38)"],
+  teal: ["#ccfbf1", "#115e59", "#99f6e4", "rgba(20,184,166,.16)", "#5eead4", "rgba(45,212,191,.35)"],
+  rose: ["#ffe4e6", "#9f1239", "#fecdd3", "rgba(244,63,94,.16)", "#fda4af", "rgba(251,113,133,.38)"],
+  emerald: ["#d1fae5", "#065f46", "#a7f3d0", "rgba(16,185,129,.16)", "#6ee7b7", "rgba(52,211,153,.35)"],
+  blue: ["#dbeafe", "#1e40af", "#bfdbfe", "rgba(59,130,246,.18)", "#93c5fd", "rgba(96,165,250,.38)"],
+  amber: ["#fef3c7", "#92400e", "#fde68a", "rgba(245,158,11,.16)", "#fcd34d", "rgba(251,191,36,.38)"],
+  orange: ["#ffedd5", "#9a3412", "#fed7aa", "rgba(249,115,22,.2)", "#fdba74", "rgba(251,146,60,.4)"],
+  slate: ["#f1f5f9", "#475569", "#e2e8f0", "rgba(148,163,184,.14)", "#cbd5e1", "rgba(148,163,184,.3)"],
+  indigo: ["#e0e7ff", "#3730a3", "#c7d2fe", "rgba(99,102,241,.2)", "#a5b4fc", "rgba(129,140,248,.4)"],
+  danger: ["#e11d48", "#ffffff", "#be123c", "#e11d48", "#ffffff", "#fb7185"],
+};
+
+const toneCssLight = (Object.keys(TONES) as Tone[])
+  .map((n) => `.tone-${n}{--c-bg:${TONES[n][0]};--c-fg:${TONES[n][1]};--c-bd:${TONES[n][2]}}`)
+  .join("");
+const toneCssDark = (Object.keys(TONES) as Tone[])
+  .map((n) => `.pr-root.dark .tone-${n}{--c-bg:${TONES[n][3]};--c-fg:${TONES[n][4]};--c-bd:${TONES[n][5]}}`)
+  .join("");
+
+const styles = `
+.pr-root{
+  --bg:#f4f6fb;--surface:#ffffff;--surface-2:#f8fafc;--surface-3:#eef2f7;
+  --border:#e2e8f0;--border-soft:#edf1f6;
+  --text:#0f172a;--text-2:#334155;--muted:#64748b;--faint:#94a3b8;
+  --hover:rgba(15,23,42,.035);--header-bg:rgba(255,255,255,.86);
+  --shadow:0 1px 2px rgba(15,23,42,.05),0 1px 3px rgba(15,23,42,.04);
+  --ring:rgba(79,70,229,.55);--overlay:rgba(15,23,42,.5);
+  background:var(--bg);color:var(--text);color-scheme:light;
+  font-feature-settings:"tnum" 1,"lnum" 1;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%;
+}
+.pr-root .t1{color:var(--text)}
+.pr-root .t2{color:var(--text-2)}
+.pr-root .tm{color:var(--muted)}
+.pr-root .tf{color:var(--faint)}
+.pr-root .s1{background-color:var(--surface)}
+.pr-root .s2{background-color:var(--surface-2)}
+.pr-root .s3{background-color:var(--surface-3)}
+.pr-root .bd{border-color:var(--border)}
+.pr-root .bd-soft{border-color:var(--border-soft)}
+.pr-root .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.pr-root .divide-soft>*+*{border-top:1px solid var(--border-soft)}
+.pr-root .row-hover{transition:background-color .15s ease}
+.pr-root .row-hover:hover{background:var(--hover)}
+.pr-root .row-hover:active{background:var(--surface-3)}
+.pr-root .header{background:var(--header-bg);-webkit-backdrop-filter:saturate(1.6) blur(14px);backdrop-filter:saturate(1.6) blur(14px);border-bottom:1px solid var(--border)}
+.pr-root .icon-btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--surface);color:var(--text-2);border-radius:10px;transition:background-color .15s,border-color .15s,transform .1s}
+.pr-root .icon-btn:hover{background:var(--surface-3)}
+.pr-root .icon-btn:active{transform:scale(.95)}
+.pr-root .icon-btn:disabled{opacity:.4;pointer-events:none}
+.pr-root :focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.pr-root .chip{background:var(--c-bg);color:var(--c-fg);border:1px solid var(--c-bd)}
+.pr-root .sev{box-shadow:inset 3px 0 0 #f43f5e}
+.pr-root .cv-auto{content-visibility:auto;contain-intrinsic-size:auto 220px}
+.pr-root .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+.pr-root .no-scrollbar::-webkit-scrollbar{display:none}
+
+/* Tab accents */
+.acc-indigo{--tab:#4f46e5}.acc-amber{--tab:#d97706}.acc-emerald{--tab:#059669}
+.pr-root .tab-ind{background:var(--tab);transition:transform .32s cubic-bezier(.4,0,.2,1),background-color .32s}
+.pr-root .tab-btn{transition:color .2s}
+.pr-root .tab-btn[aria-selected="true"]{color:var(--tab)}
+.pr-root .tab-btn[aria-selected="false"]{color:var(--muted)}
+.pr-root .tab-btn[aria-selected="false"]:hover{color:var(--text)}
+
+/* Smooth collapse (animates height without JS measuring) */
+.collapse{display:grid;grid-template-rows:0fr;visibility:hidden;transition:grid-template-rows .28s cubic-bezier(.4,0,.2,1),visibility 0s linear .28s}
+.collapse.open{grid-template-rows:1fr;visibility:visible;transition:grid-template-rows .28s cubic-bezier(.4,0,.2,1),visibility 0s}
+.collapse>.collapse-inner{overflow:hidden;min-height:0}
+
+/* Motion */
+@keyframes pr-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes pr-fade-out{to{opacity:0}}
+@keyframes pr-pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pr-sheet{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:none}}
+@keyframes pr-shimmer{0%{background-position:-420px 0}100%{background-position:420px 0}}
+@keyframes pr-progress{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+.pr-root .anim-tab{animation:pr-fade .26s ease-out both}
+.pr-root .anim-backdrop{animation:pr-fade .18s ease-out both}
+.pr-root .anim-backdrop.closing{animation:pr-fade-out .16s ease-in both}
+.pr-root .anim-panel{animation:pr-sheet .28s cubic-bezier(.2,.8,.2,1) both}
+@media (min-width:640px){.pr-root .anim-panel{animation-name:pr-pop}}
+.pr-root .skeleton{background:linear-gradient(90deg,var(--surface-3) 0,var(--surface-2) 40%,var(--surface-3) 80%);background-size:840px 100%;animation:pr-shimmer 1.4s linear infinite;border-radius:8px}
+.pr-root .progress{position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden}
+.pr-root .progress::after{content:"";position:absolute;inset:0;width:40%;background:var(--tab,#4f46e5);animation:pr-progress 1s ease-in-out infinite}
+.pr-root .stale{opacity:.55;transition:opacity .2s;pointer-events:none}
+.pr-root .fresh{opacity:1;transition:opacity .2s}
+
+@media (prefers-reduced-motion:reduce){
+  .pr-root *,.pr-root *::before,.pr-root *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+
+${toneCssLight}
+
+/* Dark theme (không áp dụng khi in) */
+@media not print{
+  .pr-root.dark{
+    --bg:#0a1020;--surface:#111a2e;--surface-2:#0e1627;--surface-3:#1a2540;
+    --border:#25314d;--border-soft:#1c2740;
+    --text:#f1f5f9;--text-2:#cbd5e1;--muted:#94a3b8;--faint:#64748b;
+    --hover:rgba(148,163,184,.08);--header-bg:rgba(10,16,32,.82);
+    --shadow:none;--ring:rgba(165,180,252,.7);--overlay:rgba(2,6,16,.66);
+    color-scheme:dark;
   }
-  switch (category) {
-    case "tuGiac":
-      return "bg-sky-100 text-sky-900 border-sky-300 font-bold";
-    case "tuTrong":
-      return "bg-violet-100 text-violet-900 border-violet-300 font-bold";
-    case "tuChu":
-      return "bg-teal-100 text-teal-900 border-teal-300 font-bold";
-    case "tuCan":
-      return "bg-rose-100 text-rose-900 border-rose-300 font-bold";
-    case "tuRen":
-      return "bg-emerald-100 text-emerald-900 border-emerald-300 font-bold";
+  .pr-root.dark .acc-indigo,.pr-root.dark.acc-indigo{--tab:#a5b4fc}
+  .pr-root.dark .acc-amber{--tab:#fbbf24}
+  .pr-root.dark .acc-emerald{--tab:#6ee7b7}
+  ${toneCssDark}
+}
+
+@media print{
+  .no-print{display:none!important}
+  .pr-root{background:#fff!important}
+  .pr-root .header{position:static!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+  .pr-root .card{box-shadow:none}
+  .pr-root .cv-auto{content-visibility:visible}
+  .pr-root .collapse{grid-template-rows:1fr!important;visibility:visible!important}
+  .pr-root .anim-tab{animation:none}
+  .pr-root *{break-inside:avoid}
+}
+`;
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeStored(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* private mode / storage đầy: bỏ qua */
   }
 }
 
@@ -266,38 +274,18 @@ function getWeeklyRank(totalScore: number): WeeklyRank {
   return { label: "Trung bình / Cần chấn chỉnh", shortLabel: "TB", tone: "needsWork" };
 }
 
-function rankToneClass(tone: WeeklyRank["tone"], isDarkMode: boolean) {
-  switch (tone) {
-    case "excellent":
-      return isDarkMode ? "bg-emerald-500/20 text-emerald-200 border-emerald-400/40" : "bg-emerald-50 text-emerald-800 border-emerald-200";
-    case "good":
-      return isDarkMode ? "bg-blue-500/20 text-blue-200 border-blue-400/40" : "bg-blue-50 text-blue-800 border-blue-200";
-    case "fair":
-      return isDarkMode ? "bg-amber-500/20 text-amber-200 border-amber-400/40" : "bg-amber-50 text-amber-800 border-amber-200";
-    default:
-      return isDarkMode ? "bg-rose-500/20 text-rose-200 border-rose-400/40" : "bg-rose-50 text-rose-800 border-rose-200";
-  }
-}
+const RANK_TONE: Record<WeeklyRank["tone"], Tone> = {
+  excellent: "emerald",
+  good: "blue",
+  fair: "amber",
+  needsWork: "rose",
+};
 
-function pointsBadgeClass(points: number, isDarkMode: boolean) {
-  if (points >= 20) {
-    return isDarkMode
-      ? "bg-rose-600 text-white border-rose-400"
-      : "bg-rose-600 text-white border-rose-700";
-  }
-  if (points >= 10) {
-    return isDarkMode
-      ? "bg-orange-500/25 text-orange-200 border-orange-400/40"
-      : "bg-orange-100 text-orange-800 border-orange-200";
-  }
-  if (points >= 5) {
-    return isDarkMode
-      ? "bg-amber-500/20 text-amber-200 border-amber-400/40"
-      : "bg-amber-50 text-amber-800 border-amber-200";
-  }
-  return isDarkMode
-    ? "bg-slate-700 text-slate-200 border-slate-500/60"
-    : "bg-slate-100 text-slate-700 border-slate-200";
+function pointsTone(points: number): Tone {
+  if (points >= 20) return "danger";
+  if (points >= 10) return "orange";
+  if (points >= 5) return "amber";
+  return "slate";
 }
 
 function isSevereViolation(violation: { points?: number; violationType?: string; details?: string }) {
@@ -312,14 +300,14 @@ function getClassGrade(className: string): 10 | 11 | 12 | null {
   return Number(match[1]) as 10 | 11 | 12;
 }
 
-function isImageUrl(url: string) {
-  const ext = url.split("?")[0].split(".").pop()?.toLowerCase() || "";
-  return ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+function fileExt(url: string) {
+  return url.split("#")[0].split("?")[0].split(".").pop()?.toLowerCase() || "";
 }
-
+function isImageUrl(url: string) {
+  return ["jpg", "jpeg", "png", "gif", "webp", "avif"].includes(fileExt(url));
+}
 function isVideoUrl(url: string) {
-  const ext = url.split("?")[0].split(".").pop()?.toLowerCase() || "";
-  return ["mp4", "webm", "ogg", "mov"].includes(ext);
+  return ["mp4", "webm", "ogg", "mov"].includes(fileExt(url));
 }
 
 function displayStudentHeading(violation: any): string {
@@ -338,7 +326,7 @@ function getBreakWindow(baseDateISO: string, breakStartISO?: string | null, brea
   const baseWeekStart = getWeekStart(new Date(baseDateISO));
   const breakStart = getWeekStart(new Date(breakStartISO));
   const breakEnd = getWeekStart(new Date(breakEndISO));
-  if (Number.isNaN(breakStart.getTime()) || Number.isNaN(breakEnd.getTime())) return null;
+  if ([baseWeekStart, breakStart, breakEnd].some((d) => Number.isNaN(d.getTime()))) return null;
   const start = breakStart <= breakEnd ? breakStart : breakEnd;
   const end = breakStart <= breakEnd ? breakEnd : breakStart;
   const overlapStart = start < baseWeekStart ? baseWeekStart : start;
@@ -347,422 +335,1497 @@ function getBreakWindow(baseDateISO: string, breakStartISO?: string | null, brea
   const skippedWeeks = differenceInCalendarWeeks(end, overlapStart, { weekStartsOn: 1 }) + 1;
   return { startWeekIndex, skippedWeeks };
 }
+type BreakWindow = ReturnType<typeof getBreakWindow>;
 
-function toAcademicWeek(rawWeek: number, breakWindow: ReturnType<typeof getBreakWindow>) {
-  if (!breakWindow) return rawWeek;
-  if (rawWeek < breakWindow.startWeekIndex) return rawWeek;
-  return Math.max(1, rawWeek - breakWindow.skippedWeeks);
+function toAcademicWeek(rawWeek: number, bw: BreakWindow) {
+  if (!bw) return rawWeek;
+  if (rawWeek < bw.startWeekIndex) return rawWeek;
+  // Đang trong tuần nghỉ: gộp vào tuần học gần nhất trước kỳ nghỉ
+  if (rawWeek < bw.startWeekIndex + bw.skippedWeeks) return Math.max(1, bw.startWeekIndex - 1);
+  return rawWeek - bw.skippedWeeks;
 }
 
-function toCalendarWeek(academicWeek: number, breakWindow: ReturnType<typeof getBreakWindow>) {
-  if (!breakWindow) return academicWeek;
-  if (academicWeek < breakWindow.startWeekIndex) return academicWeek;
-  return academicWeek + breakWindow.skippedWeeks;
+function toCalendarWeek(academicWeek: number, bw: BreakWindow) {
+  if (!bw) return academicWeek;
+  if (academicWeek < bw.startWeekIndex) return academicWeek;
+  return academicWeek + bw.skippedWeeks;
 }
 
-function TuBadge({ category, isDarkMode = false }: { category: TuCategoryId | null; isDarkMode?: boolean }) {
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/* ============================================================================
+ * HOOKS
+ * ========================================================================== */
+
+/** Giữ dữ liệu cũ trong lúc query mới đang tải -> đổi tuần không bị nháy skeleton. */
+function useKeepPrevious<T>(value: T | undefined, key: string, enabled: boolean) {
+  const ref = useRef<{ key: string; value: T | undefined }>({ key, value: undefined });
+  if (value !== undefined) ref.current = { key, value };
+  else if (ref.current.key !== key) ref.current = { key, value: undefined };
+  const data = value !== undefined ? value : ref.current.value;
+  return { data, isRefreshing: enabled && value === undefined && data !== undefined };
+}
+
+let scrollLocks = 0;
+let prevBodyOverflow = "";
+function useLockBodyScroll() {
+  useEffect(() => {
+    if (scrollLocks === 0) {
+      prevBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    scrollLocks++;
+    return () => {
+      scrollLocks--;
+      if (scrollLocks === 0) document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+}
+
+function useEscape(handler: () => void, enabled = true) {
+  useEffect(() => {
+    if (!enabled) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handler();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handler, enabled]);
+}
+
+/* ============================================================================
+ * SMALL UI PIECES
+ * ========================================================================== */
+
+const Collapse = ({ open, children }: { open: boolean; children: ReactNode }) => (
+  <div className={`collapse ${open ? "open" : ""}`} aria-hidden={!open}>
+    <div className="collapse-inner">{children}</div>
+  </div>
+);
+
+const TuBadge = ({ category }: { category: TuCategoryId | null }) => {
   if (!category) return null;
   const meta = TU_META[category];
   return (
-    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] tracking-wide whitespace-nowrap flex-shrink-0 ${tuBadgeClass(category, isDarkMode)}`}>
+    <span className={`chip tone-${meta.tone} inline-flex flex-shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none`}>
       {meta.badge}
     </span>
   );
-}
+};
 
-// --- SUB-COMPONENT: VIOLATION ROW ---
-const ViolationRow = ({
+const Skeleton = ({ className = "" }: { className?: string }) => <div className={`skeleton ${className}`} />;
+
+const SkeletonList = ({ rows = 4 }: { rows?: number }) => (
+  <div className="space-y-3" role="status" aria-label="Đang tải dữ liệu">
+    {Array.from({ length: 2 }, (_, c) => (
+      <div key={c} className="card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3.5">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-5 w-20" />
+        </div>
+        <div className="divide-soft border-t bd-soft">
+          {Array.from({ length: rows - c }, (_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+              <div className="flex flex-col items-center gap-1.5">
+                <Skeleton className="h-4 w-10" />
+                <Skeleton className="h-4 w-7" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-2/5" />
+                <Skeleton className="h-3 w-3/5" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const EmptyState = ({ icon, title, hint }: { icon: ReactNode; title: string; hint?: string }) => (
+  <div className="card mt-6 px-6 py-12 text-center anim-tab">
+    <div className="s3 mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full tf">{icon}</div>
+    <p className="text-base font-semibold t1">{title}</p>
+    {hint && <p className="mx-auto mt-1 max-w-sm text-sm tm">{hint}</p>}
+  </div>
+);
+
+const Overlay = ({
+  children,
+  onBackdrop,
+  closing = false,
+}: {
+  children: ReactNode;
+  onBackdrop?: () => void;
+  closing?: boolean;
+}) => {
+  useLockBodyScroll();
+  return (
+    <div
+      className={`anim-backdrop ${closing ? "closing" : ""} fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4`}
+      style={{ background: "var(--overlay)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onBackdrop?.();
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
+/* ---------------- Reporter badge ---------------- */
+
+const ReporterBadge = ({ violation, compact }: { violation: any; compact: boolean }) => {
+  const reporterName: string | undefined = violation.requesterName || violation.reporterName;
+  if (!reporterName) return null;
+
+  const imported = Boolean(violation.requesterName);
+  const custom = Boolean(violation.customReporterName);
+  const isAdmin = Boolean(violation.reporterIsSuperUser);
+  const customization = violation.reporterCustomization || null;
+
+  let tone: Tone = "slate";
+  let label = "Nhập bởi";
+  let icon: ReactNode = null;
+
+  if (imported) {
+    tone = "emerald";
+    label = "Nhập từ trang xin nghỉ";
+    icon = <FileText className="h-3 w-3 shrink-0" strokeWidth={2.5} />;
+  } else if (custom) {
+    tone = "amber";
+    label = "Nguồn";
+    if (customization?.icon) icon = <span className="text-[11px] leading-none">{customization.icon}</span>;
+  } else if (isAdmin) {
+    tone = "indigo";
+    label = "Admin nhập";
+    icon = <ShieldCheck className="h-3 w-3 shrink-0" strokeWidth={2.5} />;
+  } else if (customization) {
+    label = customization.label || "Nhập bởi";
+    if (customization.icon) icon = <span className="text-[11px] leading-none">{customization.icon}</span>;
+  }
+
+  if (compact) {
+    return (
+      <span className={`chip tone-${tone} sm:hidden ml-auto inline-flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none`}>
+        {imported ? (
+          <>
+            {icon}
+            XN
+          </>
+        ) : (
+          <>
+            {icon}
+            <span className="max-w-[56px] truncate">{reporterName}</span>
+          </>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <span className={`chip tone-${tone} hidden flex-shrink-0 items-center gap-1.5 rounded-full py-1 pl-2.5 pr-3 text-xs sm:inline-flex`} title={`${label}: ${reporterName}`}>
+      {icon}
+      <span className="whitespace-nowrap font-medium opacity-80">{label}</span>
+      <span className="max-w-[130px] truncate font-semibold">{reporterName}</span>
+    </span>
+  );
+};
+
+/* ---------------- Detail item ---------------- */
+
+const DetailItem = ({
+  icon,
+  label,
+  children,
+  wide = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+  wide?: boolean;
+}) => (
+  <div className={`flex gap-2.5 ${wide ? "sm:col-span-2" : ""}`}>
+    <div className="mt-0.5 flex-shrink-0 tf">{icon}</div>
+    <div className="min-w-0">
+      <p className="text-xs font-medium tm">{label}</p>
+      <div className="mt-0.5 text-sm leading-relaxed t2 break-words">{children}</div>
+    </div>
+  </div>
+);
+
+/* ============================================================================
+ * VIOLATION ROW
+ * ========================================================================== */
+
+const ViolationRow = memo(function ViolationRow({
   violation,
   onOpenEvidence,
-  isDarkMode,
 }: {
   violation: any;
   onOpenEvidence: (v: any, url: string) => void;
-  isDarkMode: boolean;
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const violationTimestamp = (() => {
+}) {
+  const [open, setOpen] = useState(false);
+
+  const timestamp = (() => {
     const t = violation?.violationDate ? new Date(violation.violationDate).getTime() : NaN;
-    if (!Number.isFinite(t)) return typeof violation?._creationTime === "number" ? violation._creationTime : null;
-    return t;
+    if (Number.isFinite(t)) return t;
+    return typeof violation?._creationTime === "number" ? violation._creationTime : null;
   })();
 
-  const hasDetails = violation.details && violation.details.trim() !== "";
+  const hasDetails = Boolean(violation.details && String(violation.details).trim() !== "");
   const evidenceUrls: string[] = (violation.evidenceUrls || []).filter(Boolean);
-  const hasEvidence = evidenceUrls.length > 0;
-  const reporterName = (violation as any).requesterName || violation.reporterName;
-  const isImportedFromAbsenceRequest = Boolean((violation as any).requesterName);
-  const reporterIsSuperUser = (violation as any).reporterIsSuperUser || false;
-  const reporterCustomization = (violation as any).reporterCustomization || null;
-  const isCustomReporter = Boolean(violation.customReporterName);
+  const reporterName: string | undefined = violation.requesterName || violation.reporterName;
   const category = categorizeViolation(violation.violationType, violation.details);
   const severe = isSevereViolation(violation);
   const points = Number(violation.points) || 0;
 
+  const toggle = () => setOpen((v) => !v);
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggle();
+    }
+  };
+
   return (
-    <div className={`glass-row transition-colors w-full ${severe ? "border-l-2 border-l-rose-500" : ""}`}>
+    <div className={`w-full ${severe ? "sev" : ""}`}>
       <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer select-none group"
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={toggle}
+        onKeyDown={onKeyDown}
+        className="row-hover group flex cursor-pointer select-none items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4"
       >
-        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 overflow-hidden">
-          <div className="flex flex-col items-center justify-center gap-1 min-w-[2.75rem]">
-            <span className="font-bold text-slate-700 text-xs sm:text-sm tabular-nums">{violation.violatingClass}</span>
-            <span className={`inline-flex items-center justify-center min-w-[1.75rem] h-5 border font-bold rounded-md text-[10px] px-1.5 tabular-nums ${pointsBadgeClass(points, isDarkMode)}`}>
-              -{points}
-            </span>
-          </div>
+        <div className="flex min-w-[2.9rem] flex-col items-center gap-1">
+          <span className="text-xs font-bold tabular-nums t2 sm:text-sm">{violation.violatingClass}</span>
+          <span className={`chip tone-${pointsTone(points)} inline-flex h-5 min-w-[1.9rem] items-center justify-center rounded-md px-1.5 text-[10px] font-bold tabular-nums`}>
+            -{points}
+          </span>
+        </div>
 
-          <div className="flex flex-col min-w-0 flex-1 gap-1">
-            <span className="text-xs sm:text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-              {displayStudentHeading(violation)}
-            </span>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <TuBadge category={category} isDarkMode={isDarkMode} />
-              <span className="text-xs text-slate-500 truncate">
-                {violation.violationType || "Vi phạm khác"}
-              </span>
-              {/* Mobile-only compact reporter indicator */}
-              {reporterName && (
-                <span className="sm:hidden inline-flex items-center gap-0.5 flex-shrink-0 ml-auto">
-                  {isImportedFromAbsenceRequest ? (
-                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
-                      <FileText className="w-2.5 h-2.5 shrink-0" strokeWidth={2.5} />
-                      XN
-                    </span>
-                  ) : isCustomReporter ? (
-                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
-                      {reporterCustomization?.icon ? <span className="text-[10px] leading-none">{reporterCustomization.icon}</span> : null}
-                      <span className="truncate max-w-[48px]">{reporterName}</span>
-                    </span>
-                  ) : reporterIsSuperUser ? (
-                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
-                      <ShieldCheck className="w-2.5 h-2.5 shrink-0" strokeWidth={2.5} />
-                      <span className="truncate max-w-[48px]">{reporterName}</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1 py-0.5 leading-none flex-shrink-0">
-                      <span className="truncate max-w-[48px]">{reporterName}</span>
-                    </span>
-                  )}
-                </span>
-              )}
-            </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate text-sm font-semibold t1">{displayStudentHeading(violation)}</span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <TuBadge category={category} />
+            <span className="truncate text-xs tm">{violation.violationType || "Vi phạm khác"}</span>
+            <ReporterBadge violation={violation} compact />
           </div>
+        </div>
 
-          {hasEvidence && (
-            <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        {evidenceUrls.length > 0 && (
+          <>
+            <div className="hidden flex-shrink-0 items-center gap-1.5 sm:flex" onClick={(e) => e.stopPropagation()}>
               {evidenceUrls.slice(0, 2).map((url, i) => (
                 <button
                   key={`${url}-${i}`}
                   type="button"
                   onClick={() => onOpenEvidence(violation, url)}
-                  className={`h-9 w-9 rounded-md overflow-hidden border border-slate-200/80 ${isDarkMode ? "bg-slate-800 border-slate-600" : "bg-slate-50"}`}
+                  className="s3 bd h-10 w-10 overflow-hidden rounded-lg border transition-transform hover:scale-105 active:scale-95"
                   title="Xem bằng chứng"
+                  aria-label={`Xem bằng chứng ${i + 1}`}
                 >
                   {isImageUrl(url) ? (
-                    <img src={url} alt="" className="h-full w-full object-cover" />
+                    <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="flex h-full w-full items-center justify-center text-indigo-500">
-                      {isVideoUrl(url) ? <Play className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <span className="flex h-full w-full items-center justify-center tm">
+                      {isVideoUrl(url) ? <Play className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </span>
                   )}
                 </button>
               ))}
-              {evidenceUrls.length > 2 && (
-                <span className="text-[10px] font-semibold text-slate-500">+{evidenceUrls.length - 2}</span>
-              )}
+              {evidenceUrls.length > 2 && <span className="text-[11px] font-semibold tm">+{evidenceUrls.length - 2}</span>}
             </div>
-          )}
+            <span className="chip tone-slate inline-flex flex-shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold sm:hidden">
+              <Paperclip className="h-3 w-3" />
+              {evidenceUrls.length}
+            </span>
+          </>
+        )}
 
-          {reporterName && (
-            <div className="hidden sm:flex items-center ml-auto pl-2">
-              {isImportedFromAbsenceRequest ? (
-                <div className="reporter-badge relative inline-flex overflow-hidden rounded-full p-[0.5px] flex-shrink-0 cursor-default border border-emerald-200">
-                  <div className="reporter-badge-inner relative flex items-center bg-white rounded-full py-0.5 px-1.5 pl-2 gap-1.5 h-full w-full">
-                    <FileText className="w-3.5 h-3.5 text-emerald-700 shrink-0" strokeWidth={2.5} />
-                    <div className="flex flex-row items-baseline gap-1.5">
-                      <span className="text-[9px] font-extrabold tracking-wider text-emerald-700 uppercase leading-none border-r border-emerald-100 pr-1.5">
-                        Nhập từ trang xin nghỉ
-                      </span>
-                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
-                        {reporterName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : isCustomReporter ? (
-                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default border border-amber-200/70 bg-amber-50/60 overflow-hidden">
-                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
-                    <div className="flex flex-row items-baseline gap-1.5">
-                      <span className="text-[9px] font-extrabold tracking-wider text-amber-600 uppercase leading-none border-r border-amber-200 pr-1.5">
-                        Nguồn
-                      </span>
-                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
-                        {reporterName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : reporterIsSuperUser ? (
-                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-slate-50/80 overflow-hidden">
-                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
-                    <ShieldCheck className="admin-shield w-3.5 h-3.5 text-indigo-700 shrink-0" strokeWidth={2.5} />
-                    <div className="flex flex-row items-baseline gap-1.5">
-                      <span className="text-[9px] font-extrabold tracking-wider text-slate-700 uppercase leading-none border-r border-slate-200 pr-1.5">
-                        Admin nhập
-                      </span>
-                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
-                        {reporterName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : reporterCustomization ? (
-                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default overflow-hidden border border-slate-200 bg-white">
-                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
-                    {reporterCustomization.icon && (
-                      <span className="text-sm leading-none shrink-0">{reporterCustomization.icon}</span>
-                    )}
-                    <div className="flex flex-row items-baseline gap-1.5">
-                      <span className="reporter-label text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-none border-r border-slate-200 pr-1.5">
-                        {reporterCustomization.label || "Nhập bởi"}
-                      </span>
-                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
-                        {reporterName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="reporter-badge relative inline-flex rounded-full flex-shrink-0 cursor-default border border-slate-200 bg-white overflow-hidden">
-                  <div className="relative flex items-center rounded-full py-0.5 px-1.5 pl-2 gap-1.5">
-                    <div className="flex flex-row items-baseline gap-1.5">
-                      <span className="reporter-label text-[9px] font-extrabold tracking-wider text-slate-500 uppercase leading-none border-r border-slate-200 pr-1.5">
-                        Nhập bởi
-                      </span>
-                      <span className="text-xs font-bold text-slate-700 leading-none truncate max-w-[120px]">
-                        {reporterName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {reporterName && (
+          <div className="hidden flex-shrink-0 md:block">
+            <ReporterBadge violation={violation} compact={false} />
+          </div>
+        )}
 
-        <div className="text-slate-400 pl-2 flex-shrink-0">
-          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
-        </div>
+        <ChevronDown className={`h-5 w-5 flex-shrink-0 tf transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </div>
 
-      <div className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-out ${isExpanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="glass-details p-3 sm:p-4 text-sm space-y-3 border-t border-slate-200/80">
-          {violationTimestamp && (
-            <div className="flex gap-3">
-              <div className="mt-0.5 min-w-[20px]"><Calendar className="w-4 h-4 text-slate-400" /></div>
-              <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Ngày vi phạm</span>
-                <p className="text-slate-700 mt-0.5 font-medium">
-                  {format(new Date(violationTimestamp), "iiii, dd/MM", { locale: vi })}
-                </p>
-              </div>
-            </div>
+      <Collapse open={open}>
+        <div className="s2 border-t bd-soft grid gap-3.5 px-4 py-4 sm:grid-cols-2 sm:gap-x-6">
+          {timestamp && (
+            <DetailItem icon={<Calendar className="h-4 w-4" />} label="Ngày vi phạm">
+              {capitalize(format(new Date(timestamp), "iiii, dd/MM", { locale: vi }))}
+            </DetailItem>
           )}
-
-          <div className="flex gap-3">
-            <div className="mt-0.5 min-w-[20px]"><AlertTriangle className="w-4 h-4 text-slate-400" /></div>
-            <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Loại vi phạm</span>
-              <p className="text-slate-700 mt-0.5 font-medium leading-snug">
-                {violation.violationType || "Vi phạm khác"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="mt-0.5 min-w-[20px]"><FileWarning className="w-4 h-4 text-slate-400" /></div>
-            <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Chi tiết vi phạm</span>
-              <p className="text-slate-700 mt-0.5 leading-relaxed">
-                {hasDetails ? violation.details : "Không có mô tả chi tiết."}
-              </p>
-            </div>
-          </div>
-
+          <DetailItem icon={<AlertTriangle className="h-4 w-4" />} label="Loại vi phạm">
+            {violation.violationType || "Vi phạm khác"}
+          </DetailItem>
+          <DetailItem icon={<FileWarning className="h-4 w-4" />} label="Chi tiết vi phạm" wide>
+            {hasDetails ? violation.details : <span className="tm">Không có mô tả chi tiết.</span>}
+          </DetailItem>
           {reporterName && (
-            <div className="flex gap-3">
-              <div className="mt-0.5 min-w-[20px]"><User className="w-4 h-4 text-slate-400" /></div>
-              <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Người báo cáo</span>
-                <p className="text-slate-700 mt-0.5 font-medium">{reporterName}</p>
-              </div>
-            </div>
+            <DetailItem icon={<User className="h-4 w-4" />} label="Người báo cáo">
+              {reporterName}
+            </DetailItem>
           )}
-
-          <div className="flex gap-3 pt-1">
-            <div className="mt-1.5 min-w-[20px]"><Eye className="w-4 h-4 text-slate-400" /></div>
-            <div className="flex-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Bằng chứng</span>
-              {hasEvidence ? (
-                <div className="flex flex-wrap gap-2">
-                  {evidenceUrls.map((url: string, i: number) => (
-                    <button
-                      key={i}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenEvidence(violation, url);
-                      }}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg transition-colors text-xs font-medium ${isDarkMode
-                        ? "bg-slate-800 border-indigo-900/50 text-indigo-400 hover:bg-indigo-950/30"
-                        : "bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-                        }`}
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Xem bằng chứng {i + 1}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-xs text-slate-400 italic">Không có bằng chứng đính kèm</span>
-              )}
-            </div>
-          </div>
+          <DetailItem icon={<Eye className="h-4 w-4" />} label="Bằng chứng" wide={!reporterName}>
+            {evidenceUrls.length > 0 ? (
+              <div className="flex flex-wrap gap-2 pt-0.5">
+                {evidenceUrls.map((url, i) => (
+                  <button
+                    key={`${url}-${i}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenEvidence(violation, url);
+                    }}
+                    className="chip tone-indigo inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-transform active:scale-95"
+                  >
+                    {isVideoUrl(url) ? <Play className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    Xem bằng chứng {i + 1}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="italic tf">Không có bằng chứng đính kèm</span>
+            )}
+          </DetailItem>
         </div>
+      </Collapse>
+    </div>
+  );
+});
+
+/* ============================================================================
+ * MEDIA VIEWER (pointer-based zoom/pan, pinch, double-tap, keyboard, gallery)
+ * ========================================================================== */
+
+const ZoomableImage = ({ src, onLoad, onError }: { src: string; onLoad: () => void; onError: () => void }) => {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const tf = useRef({ scale: 1, x: 0, y: 0 });
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinchDist = useRef(0);
+  const lastTap = useRef({ t: 0, x: 0, y: 0 });
+  const lastType = useRef("mouse");
+  const moved = useRef(false);
+  const raf = useRef(0);
+  const [grabbing, setGrabbing] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
+
+  const paint = useCallback((animated = false) => {
+    cancelAnimationFrame(raf.current);
+    raf.current = requestAnimationFrame(() => {
+      const el = innerRef.current;
+      if (!el) return;
+      const { x, y, scale } = tf.current;
+      el.style.transition = animated ? "transform .22s cubic-bezier(.2,.8,.2,1)" : "none";
+      el.style.transform = `translate3d(${x}px,${y}px,0) scale(${scale})`;
+    });
+  }, []);
+
+  const zoomAt = useCallback(
+    (clientX: number, clientY: number, nextScale: number, animated = false) => {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const cx = clientX - rect.left - rect.width / 2;
+      const cy = clientY - rect.top - rect.height / 2;
+      const cur = tf.current;
+      const s = Math.min(Math.max(nextScale, 1), 8);
+      const ratio = s / cur.scale;
+      cur.x = cx - (cx - cur.x) * ratio;
+      cur.y = cy - (cy - cur.y) * ratio;
+      cur.scale = s;
+      if (s === 1) {
+        cur.x = 0;
+        cur.y = 0;
+      }
+      setZoomed(s > 1);
+      paint(animated);
+    },
+    [paint]
+  );
+
+  const toggleZoom = useCallback(
+    (x: number, y: number) => {
+      if (tf.current.scale > 1) zoomAt(x, y, 1, true);
+      else zoomAt(x, y, 2.5, true);
+    },
+    [zoomAt]
+  );
+
+  // Wheel phải là non-passive để preventDefault -> dùng native listener
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, tf.current.scale * Math.exp(-e.deltaY * 0.002));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [zoomAt]);
+
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+
+  const endPointer = (e: ReactPointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(e.pointerId);
+    pinchDist.current = 0;
+    if (pointers.current.size === 0) setGrabbing(false);
+
+    if (e.type === "pointerup" && e.pointerType === "touch" && !moved.current) {
+      const now = Date.now();
+      const lt = lastTap.current;
+      if (now - lt.t < 300 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 30) {
+        toggleZoom(e.clientX, e.clientY);
+        lastTap.current = { t: 0, x: 0, y: 0 };
+      } else {
+        lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+      }
+    }
+  };
+
+  return (
+    <div
+      ref={wrapRef}
+      className="flex h-full w-full select-none items-center justify-center overflow-hidden"
+      style={{ touchAction: "none", cursor: zoomed ? (grabbing ? "grabbing" : "grab") : "zoom-in" }}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        lastType.current = e.pointerType;
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        moved.current = false;
+        if (pointers.current.size === 2) {
+          const [a, b] = Array.from(pointers.current.values());
+          pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y);
+        }
+        setGrabbing(true);
+      }}
+      onPointerMove={(e) => {
+        const p = pointers.current.get(e.pointerId);
+        if (!p) return;
+        const dx = e.clientX - p.x;
+        const dy = e.clientY - p.y;
+        if (Math.abs(dx) + Math.abs(dy) > 3) moved.current = true;
+        p.x = e.clientX;
+        p.y = e.clientY;
+        if (pointers.current.size === 2) {
+          const [a, b] = Array.from(pointers.current.values());
+          const dist = Math.hypot(a.x - b.x, a.y - b.y);
+          if (pinchDist.current > 0) {
+            zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, tf.current.scale * (dist / pinchDist.current));
+          }
+          pinchDist.current = dist;
+        } else if (tf.current.scale > 1) {
+          tf.current.x += dx;
+          tf.current.y += dy;
+          paint();
+        }
+      }}
+      onPointerUp={endPointer}
+      onPointerCancel={endPointer}
+      onDoubleClick={(e) => {
+        if (lastType.current === "touch") return; // đã xử lý bằng double-tap
+        toggleZoom(e.clientX, e.clientY);
+      }}
+    >
+      <div ref={innerRef} className="flex h-full w-full items-center justify-center will-change-transform">
+        <img
+          src={src}
+          alt="Bằng chứng"
+          draggable={false}
+          onLoad={onLoad}
+          onError={onError}
+          className="max-h-full max-w-full object-contain"
+        />
       </div>
     </div>
   );
 };
 
+const MediaViewer = ({ state, onClose }: { state: ViewerState; onClose: () => void }) => {
+  const [index, setIndex] = useState(state.index);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const total = state.items.length;
+  const item = state.items[index];
+
+  const close = useCallback(() => {
+    setClosing(true);
+    window.setTimeout(onClose, 160);
+  }, [onClose]);
+
+  const go = useCallback(
+    (d: number) => {
+      if (total < 2) return;
+      setLoading(true);
+      setFailed(false);
+      setIndex((i) => (i + d + total) % total);
+    },
+    [total]
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "ArrowRight") go(1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close, go]);
+
+  if (!item) return null;
+
+  const done = () => setLoading(false);
+  const fail = () => {
+    setLoading(false);
+    setFailed(true);
+  };
+
+  return (
+    <Overlay onBackdrop={close} closing={closing}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Xem bằng chứng"
+        className="fixed inset-0 z-50 flex h-[100dvh] flex-col bg-black/90 text-white"
+      >
+        <div className="flex h-14 flex-shrink-0 items-center justify-between px-3" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium tabular-nums">
+            {total > 1 ? `${index + 1} / ${total}` : item.type === "video" ? "Video" : "Hình ảnh"}
+          </span>
+          <div className="flex items-center gap-2">
+            <a
+              href={item.url}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-10 items-center gap-1.5 rounded-full bg-white/10 px-3.5 text-xs font-semibold transition-colors hover:bg-white/20"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Tải xuống</span>
+            </a>
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Đóng"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="relative min-h-0 flex-1">
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center">
+              <Loader2 className="h-10 w-10 animate-spin text-white/70" />
+            </div>
+          )}
+          {failed ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+              <AlertCircle className="h-10 w-10 text-white/60" />
+              <p className="text-sm text-white/80">Không tải được tệp này.</p>
+              <a href={item.url} target="_blank" rel="noopener noreferrer" className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">
+                Mở trong tab mới
+              </a>
+            </div>
+          ) : (
+            <div key={item.url} className={`h-full w-full transition-opacity duration-300 ${loading ? "opacity-0" : "opacity-100"}`}>
+              {item.type === "image" ? (
+                <ZoomableImage src={item.url} onLoad={done} onError={fail} />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center p-2">
+                  <video
+                    src={item.url}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="max-h-full max-w-full rounded-lg object-contain"
+                    onLoadedData={done}
+                    onError={fail}
+                  >
+                    Trình duyệt của bạn không hỗ trợ video.
+                  </video>
+                </div>
+              )}
+            </div>
+          )}
+
+          {total > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => go(-1)}
+                aria-label="Bằng chứng trước"
+                className="absolute left-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 transition-colors hover:bg-white/20"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <button
+                type="button"
+                onClick={() => go(1)}
+                aria-label="Bằng chứng sau"
+                className="absolute right-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 transition-colors hover:bg-white/20"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="flex-shrink-0 px-4 pb-4 pt-2" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+          <div className="mx-auto max-w-xl rounded-xl bg-white/10 px-4 py-3 text-sm backdrop-blur">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
+              <span className="flex items-center gap-1.5"><User className="h-4 w-4 text-slate-300" />{state.info.student}</span>
+              <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-slate-300" />{state.info.className}</span>
+            </div>
+            {state.info.details && (
+              <p className="mt-2 flex items-start justify-center gap-2 border-t border-white/15 pt-2 text-xs text-slate-200">
+                <FileWarning className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-300" />
+                <span>{state.info.details}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </Overlay>
+  );
+};
+
+/* ============================================================================
+ * MODALS
+ * ========================================================================== */
+
+const WELCOME_ITEMS: Array<{ icon: typeof FileText; tone: Tone; title: string; text: string }> = [
+  { icon: FileText, tone: "indigo", title: "Vi phạm", text: "Xem vi phạm theo từng ngày trong tuần; mở dòng để xem chi tiết và bằng chứng." },
+  { icon: Users, tone: "emerald", title: "Tổng hợp theo lớp", text: "Chọn lớp để xem toàn bộ vi phạm từ đầu năm học, gom theo tuần." },
+  { icon: Trophy, tone: "amber", title: "Bảng điểm", text: "Theo dõi điểm thi đua trên nền 120 điểm chuẩn theo tuần." },
+  { icon: Eye, tone: "teal", title: "Ẩn nghỉ có phép", text: "Dùng nút “Ẩn nghỉ CP” để lọc nhanh các trường hợp nghỉ có phép." },
+];
+
+const WelcomeModal = ({ onConfirm }: { onConfirm: (dontShowAgain: boolean) => void }) => {
+  const [mode, setMode] = useState<"welcome" | "mustAgree">("welcome");
+  const [dontShow, setDontShow] = useState(false);
+
+  const checkbox = (id: string) => (
+    <label htmlFor={id} className="flex cursor-pointer select-none items-center gap-2.5 border-t bd-soft pt-3 text-sm t2">
+      <input
+        id={id}
+        type="checkbox"
+        checked={dontShow}
+        onChange={(e) => setDontShow(e.target.checked)}
+        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+      />
+      Không hiện lại thông báo này
+    </label>
+  );
+
+  return (
+    <Overlay>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-title"
+        className="anim-panel s1 bd max-h-[92dvh] w-full space-y-4 overflow-y-auto rounded-t-2xl border p-5 shadow-2xl sm:max-w-md sm:rounded-2xl sm:p-6"
+        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+      >
+        {mode === "welcome" ? (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="chip tone-blue flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 id="welcome-title" className="text-lg font-bold t1">CSDLCoDo2BT</h2>
+                <p className="text-xs tm">Thông báo và hướng dẫn sử dụng</p>
+              </div>
+            </div>
+
+            <p className="text-sm font-medium t2">Cổng thông tin phục vụ GVCN, BCH Đoàn trường và BGH.</p>
+
+            <ul className="space-y-3">
+              {WELCOME_ITEMS.map(({ icon: Icon, tone, title, text }) => (
+                <li key={title} className="flex gap-3">
+                  <div className={`chip tone-${tone} flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold t1">{title}</p>
+                    <p className="text-xs leading-relaxed tm">{text}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <p className="chip tone-blue rounded-lg px-3 py-2.5 text-xs leading-relaxed">
+              <strong>Lưu ý:</strong> Hệ thống ghi nhớ lớp đã chọn ở tab “Tổng hợp theo lớp” cho lần truy cập sau.
+            </p>
+
+            {checkbox("dontShowAgain")}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => onConfirm(dontShow)}
+                className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 active:scale-[.98]"
+              >
+                Tôi đã hiểu
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("mustAgree")}
+                className="rounded-xl px-4 py-3 font-medium tm transition-colors hover:text-[color:var(--text)]"
+              >
+                Đóng
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="chip tone-amber flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <h2 id="welcome-title" className="text-lg font-bold t1">Xác nhận</h2>
+            </div>
+            <p className="text-sm t2">Vui lòng xác nhận đã đọc hướng dẫn để tiếp tục sử dụng hệ thống.</p>
+            {checkbox("dontShowAgain2")}
+            <button
+              type="button"
+              autoFocus
+              onClick={() => onConfirm(dontShow)}
+              className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 active:scale-[.98]"
+            >
+              Xác nhận
+            </button>
+          </>
+        )}
+      </div>
+    </Overlay>
+  );
+};
+
+const ClassSelector = ({
+  selected,
+  onSelect,
+  onClose,
+}: {
+  selected: string | null;
+  onSelect: (cls: string) => void;
+  onClose: () => void;
+}) => {
+  useEscape(onClose);
+  return (
+    <Overlay onBackdrop={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="class-title"
+        className="anim-panel s1 bd max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border p-5 shadow-2xl sm:max-w-lg sm:rounded-2xl sm:p-6"
+        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 id="class-title" className="flex items-center gap-2 text-lg font-bold t1">
+            <Users className="h-5 w-5 text-emerald-600" />
+            Chọn lớp
+          </h3>
+          <button type="button" onClick={onClose} aria-label="Đóng" className="icon-btn h-9 w-9">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-5">
+          {[10, 11, 12].map((grade) => (
+            <section key={grade} className="space-y-2">
+              <h4 className="flex items-center gap-3 text-xs font-semibold tm">
+                <span className="h-px flex-1 s3" />
+                Khối {grade}
+                <span className="h-px flex-1 s3" />
+              </h4>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                {Array.from({ length: 8 }, (_, i) => `${grade}A${i + 1}`).map((cls) => {
+                  const active = selected === cls;
+                  return (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => onSelect(cls)}
+                      aria-pressed={active}
+                      className={`h-11 rounded-xl border text-sm font-semibold transition active:scale-95 ${active
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "s2 bd t2 hover:border-emerald-500 hover:text-emerald-600"
+                        }`}
+                    >
+                      {cls.substring(2)}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </Overlay>
+  );
+};
+
+/* ============================================================================
+ * HEADER CONTROLS
+ * ========================================================================== */
+
+const WeekPicker = ({
+  weekInput,
+  weekNumber,
+  currentWeek,
+  weekError,
+  dateRange,
+  onInput,
+  onStep,
+  onCommit,
+  onToday,
+}: {
+  weekInput: string;
+  weekNumber: number;
+  currentWeek: number;
+  weekError: string | null;
+  dateRange?: { start: number; end: number };
+  onInput: (v: string) => void;
+  onStep: (delta: number) => void;
+  onCommit: () => void;
+  onToday: () => void;
+}) => (
+  <div className="flex w-full items-center gap-2 sm:w-auto">
+    <div className={`s1 flex flex-1 items-center gap-1 rounded-xl border p-1 sm:flex-initial ${weekError ? "border-red-400" : "bd"}`}>
+      <button
+        type="button"
+        onClick={() => onStep(-1)}
+        disabled={weekNumber <= 1}
+        aria-label="Tuần trước"
+        className="icon-btn h-9 w-9 border-transparent bg-transparent"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <div className="flex min-w-0 flex-1 flex-col items-center px-1 leading-tight sm:flex-initial">
+        <label className="flex items-center gap-1.5">
+          <span className="text-xs font-medium tm">Tuần</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={weekInput}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => onInput(e.target.value)}
+            onBlur={onCommit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onCommit();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            onFocus={(e) => e.target.select()}
+            aria-invalid={Boolean(weekError)}
+            aria-label="Số tuần"
+            className="w-10 rounded-md bg-transparent text-center text-base font-bold tabular-nums t1 outline-none focus:bg-[var(--surface-3)]"
+          />
+        </label>
+        {dateRange && (
+          <span className="text-[11px] tabular-nums tm">
+            {format(new Date(dateRange.start), "dd/MM")} – {format(new Date(dateRange.end), "dd/MM")}
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => onStep(1)}
+        aria-label="Tuần sau"
+        className="icon-btn h-9 w-9 border-transparent bg-transparent"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+    {weekNumber !== currentWeek && (
+      <button
+        type="button"
+        onClick={onToday}
+        className="chip tone-indigo h-11 flex-shrink-0 rounded-xl px-3 text-xs font-semibold transition active:scale-95"
+      >
+        Tuần này
+      </button>
+    )}
+  </div>
+);
+
+const BackToTop = () => {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        setShow(window.scrollY > 700);
+        ticking = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return (
+    <button
+      type="button"
+      aria-label="Lên đầu trang"
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      className={`icon-btn no-print fixed right-4 z-20 h-11 w-11 rounded-full shadow-lg transition-all duration-300 ${show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"
+        }`}
+      style={{ bottom: "max(1rem, env(safe-area-inset-bottom))" }}
+    >
+      <ArrowUp className="h-5 w-5" />
+    </button>
+  );
+};
+
+/* ============================================================================
+ * TAB: VIOLATIONS
+ * ========================================================================== */
+
+type DayGroup = { day: number; all: any[]; shown: any[]; excused: number };
+
+const ViolationsTab = ({
+  violations,
+  refreshing,
+  hideExcused,
+  onOpenEvidence,
+}: {
+  violations: any[] | undefined;
+  refreshing: boolean;
+  hideExcused: boolean;
+  onOpenEvidence: (v: any, url: string) => void;
+}) => {
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+
+  const groups = useMemo<DayGroup[]>(() => {
+    if (!violations) return [];
+    const map = new Map<number, any[]>();
+    for (const v of violations) {
+      const day = startOfDay(new Date(v.violationDate)).getTime();
+      const list = map.get(day);
+      if (list) list.push(v);
+      else map.set(day, [v]);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([day, all]) => {
+        const shown = hideExcused ? all.filter((v) => v.violationType !== "Nghỉ học có phép") : all;
+        return { day, all, shown, excused: all.length - shown.length };
+      });
+  }, [violations, hideExcused]);
+
+  const visibleGroups = groups.filter((g) => g.shown.length > 0);
+  const totalShown = visibleGroups.reduce((s, g) => s + g.shown.length, 0);
+  const allCollapsed = visibleGroups.length > 0 && visibleGroups.every((g) => collapsed[g.day]);
+
+  const toggleAll = () => {
+    if (allCollapsed) setCollapsed({});
+    else setCollapsed(Object.fromEntries(visibleGroups.map((g) => [g.day, true])));
+  };
+
+  if (violations === undefined) return <SkeletonList />;
+
+  if (violations.length === 0) {
+    return (
+      <EmptyState
+        icon={<FileText className="h-7 w-7" />}
+        title="Không ghi nhận vi phạm"
+        hint={`Không có vi phạm nào trong tuần này (bảo toàn ${BASE_SCORE} điểm chuẩn).`}
+      />
+    );
+  }
+
+  return (
+    <div className={`space-y-3 ${refreshing ? "stale" : "fresh"}`}>
+      {visibleGroups.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs tm tabular-nums">
+            {totalShown} vi phạm trong {visibleGroups.length} ngày
+          </p>
+          <button type="button" onClick={toggleAll} className="rounded-md px-2 py-1 text-xs font-semibold transition-colors hover:bg-[var(--hover)]" style={{ color: "var(--tab)" }}>
+            {allCollapsed ? "Mở tất cả" : "Thu gọn tất cả"}
+          </button>
+        </div>
+      )}
+
+      {groups.map(({ day, shown, excused }) => {
+        if (shown.length === 0) {
+          if (!hideExcused || excused === 0) return null;
+          return (
+            <div key={day} className="card flex items-center justify-between px-4 py-3 tm">
+              <span className="text-sm font-semibold">{capitalize(format(new Date(day), "iiii, dd/MM", { locale: vi }))}</span>
+              <span className="chip tone-slate rounded-md px-2 py-1 text-xs">Chỉ có {excused} nghỉ CP</span>
+            </div>
+          );
+        }
+        const open = !collapsed[day];
+        return (
+          <section key={day} className="card cv-auto overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setCollapsed((p) => ({ ...p, [day]: open }))}
+              aria-expanded={open}
+              className={`row-hover flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left ${open ? "s3" : ""}`}
+              style={open ? { background: "var(--surface-3)" } : undefined}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="text-sm font-bold t1 sm:text-base">{capitalize(format(new Date(day), "iiii", { locale: vi }))}</span>
+                <span className="chip tone-slate rounded-full px-2 py-0.5 text-xs font-medium tabular-nums">{format(new Date(day), "dd/MM")}</span>
+              </div>
+              <div className="flex flex-shrink-0 items-center gap-2">
+                <span className="chip tone-indigo rounded-md px-2 py-1 text-xs font-medium tabular-nums">{shown.length} vi phạm</span>
+                <ChevronDown className={`h-4 w-4 tm transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+            <Collapse open={open}>
+              <div className="divide-soft border-t bd-soft">
+                {shown.map((v: any) => (
+                  <ViolationRow key={v._id} violation={v} onOpenEvidence={onOpenEvidence} />
+                ))}
+              </div>
+            </Collapse>
+          </section>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ============================================================================
+ * TAB: SCORES
+ * ========================================================================== */
+
+const ScoreDetails = ({ violations }: { violations: any[] }) => {
+  if (violations.length === 0) {
+    return <span className="text-sm italic tf">Lớp không ghi nhận vi phạm trong tuần này (bảo toàn {BASE_SCORE} điểm chuẩn)</span>;
+  }
+  return (
+    <ul className="space-y-1.5">
+      {violations.map((v) => {
+        const cat = categorizeViolation(v.violationType, v.details);
+        const severe = isSevereViolation(v);
+        return (
+          <li
+            key={v._id}
+            className={`flex items-start gap-2 rounded-lg px-2 py-1.5 ${severe ? "chip tone-rose" : "s2"}`}
+          >
+            <div className="min-w-0 flex-1 text-sm">
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                <TuBadge category={cat} />
+                {severe && (
+                  <span className="chip tone-rose rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none">Vi phạm nghiêm trọng</span>
+                )}
+                <span className={`chip tone-${pointsTone(v.points ?? 0)} rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none`}>
+                  -{v.points ?? 0}
+                </span>
+                <span className="text-xs tabular-nums tf">{format(new Date(v.violationDate), "dd/MM")}</span>
+              </div>
+              <p className="leading-snug t1">
+                <span className="font-medium">{v.violationType}</span>
+                {v.studentName && <span className="tm"> ({v.studentName})</span>}
+                {v.details && <span className="t2">: {v.details}</span>}
+              </p>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
+const ScoresTab = ({
+  scores,
+  refreshing,
+  gradeFilter,
+  setGradeFilter,
+}: {
+  scores: any[] | undefined;
+  refreshing: boolean;
+  gradeFilter: GradeFilter;
+  setGradeFilter: (g: GradeFilter) => void;
+}) => {
+  const filtered = useMemo(() => {
+    if (!scores) return [];
+    if (gradeFilter === "all") return scores;
+    return scores.filter((s) => getClassGrade(s.className) === gradeFilter);
+  }, [scores, gradeFilter]);
+
+  if (scores === undefined) return <SkeletonList rows={3} />;
+
+  if (scores.length === 0) {
+    return <EmptyState icon={<Award className="h-7 w-7" />} title="Chưa có dữ liệu" hint="Chưa có điểm thi đua cho tuần này." />;
+  }
+
+  const clean = filtered.filter((s) => s.totalPoints <= 0).length;
+  const GRADES: Array<[GradeFilter, string]> = [
+    ["all", "Tất cả"],
+    [10, "Khối 10"],
+    [11, "Khối 11"],
+    [12, "Khối 12"],
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="no-print flex flex-wrap items-center justify-between gap-2">
+        <div className="no-scrollbar s1 bd flex max-w-full overflow-x-auto rounded-xl border p-1" role="tablist" aria-label="Lọc theo khối">
+          {GRADES.map(([value, label]) => {
+            const active = gradeFilter === value;
+            return (
+              <button
+                key={String(value)}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setGradeFilter(value)}
+                className={`h-8 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors sm:text-sm ${active ? "chip tone-amber" : "tm hover:bg-[var(--hover)]"
+                  }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState icon={<Users className="h-7 w-7" />} title="Không có lớp thuộc khối đã chọn" hint="Thử chọn khối khác hoặc xem tất cả." />
+      ) : (
+        <div className={`card overflow-hidden ${refreshing ? "stale" : "fresh"}`}>
+          <div className="px-4 py-2.5 text-xs tm tabular-nums border-b bd-soft s2">
+            {filtered.length} lớp · {clean} lớp bảo toàn {BASE_SCORE} điểm
+          </div>
+
+          <div className="s2 bd-soft hidden border-b px-4 py-2.5 text-xs font-semibold tm md:flex md:gap-3">
+            <div className="w-16 text-center">Lớp</div>
+            <div className="w-20 text-center">Điểm trừ</div>
+            <div className="w-20 text-center">Tổng điểm</div>
+            <div className="w-40 text-center">Xếp loại tuần</div>
+            <div className="flex-1">Chi tiết vi phạm</div>
+          </div>
+
+          <div className="divide-soft">
+            {filtered.map((score) => {
+              const totalScore = BASE_SCORE - score.totalPoints;
+              const rank = getWeeklyRank(totalScore);
+              const tone = RANK_TONE[rank.tone];
+              return (
+                <div key={score.className} className="row-hover space-y-3 px-3 py-3.5 md:flex md:items-start md:gap-3 md:space-y-0 md:px-4">
+                  <div className="flex flex-wrap items-center gap-2 md:contents">
+                    <div className="order-1 md:order-none md:flex md:w-16 md:justify-center">
+                      <span className="text-base font-bold tabular-nums t1">{score.className}</span>
+                    </div>
+                    <div className="order-3 ml-auto md:order-none md:ml-0 md:flex md:w-20 md:justify-center">
+                      <span
+                        className={`chip tone-${score.totalPoints > 0 ? "rose" : "emerald"} inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-bold tabular-nums`}
+                      >
+                        <span className="text-[10px] font-medium opacity-70 md:hidden">Trừ</span>
+                        {score.totalPoints > 0 ? `-${score.totalPoints}` : score.totalPoints}
+                      </span>
+                    </div>
+                    <div className="order-4 md:order-none md:flex md:w-20 md:justify-center">
+                      <span className={`chip tone-${tone} inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-bold tabular-nums`}>
+                        <span className="text-[10px] font-medium opacity-70 md:hidden">Tổng</span>
+                        {totalScore}
+                      </span>
+                    </div>
+                    <div className="order-2 md:order-none md:flex md:w-40 md:justify-center">
+                      <span className={`chip tone-${tone} inline-flex items-center rounded-md px-2 py-1 text-[11px] font-semibold`}>
+                        <span className="md:hidden">{rank.shortLabel === "TB" ? "Trung bình" : rank.label}</span>
+                        <span className="hidden md:inline">{rank.label}</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="min-w-0 md:flex-1">
+                    <ScoreDetails violations={score.violations} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ============================================================================
+ * TAB: CLASS SUMMARY
+ * ========================================================================== */
+
+const ClassSummaryTab = ({
+  selectedClass,
+  data,
+  weeks,
+  metrics,
+  refreshing,
+  onPickClass,
+  onOpenEvidence,
+}: {
+  selectedClass: string | null;
+  data: any[] | undefined;
+  weeks: { week: number; violations: any[] }[];
+  metrics: { totalLost: number; count: number; mostFrequentLabel: string };
+  refreshing: boolean;
+  onPickClass: () => void;
+  onOpenEvidence: (v: any, url: string) => void;
+}) => {
+  if (!selectedClass) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 py-16 anim-tab">
+        <div className="chip tone-emerald flex h-16 w-16 items-center justify-center rounded-full">
+          <Users className="h-8 w-8" />
+        </div>
+        <div className="space-y-2 text-center">
+          <h3 className="text-lg font-bold t1">Chưa chọn lớp</h3>
+          <p className="mx-auto max-w-xs text-sm tm">Chọn một lớp để xem tổng hợp vi phạm.</p>
+          <button
+            type="button"
+            onClick={onPickClass}
+            className="mt-3 rounded-xl bg-emerald-600 px-6 py-2.5 font-semibold text-white transition hover:bg-emerald-700 active:scale-95"
+          >
+            Chọn lớp
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (data === undefined) return <SkeletonList />;
+
+  if (weeks.length === 0) {
+    return <EmptyState icon={<FileText className="h-7 w-7" />} title="Chưa có dữ liệu" hint="Không tìm thấy dữ liệu vi phạm cho lớp này." />;
+  }
+
+  return (
+    <div className={`space-y-3 ${refreshing ? "stale" : "fresh"}`}>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="card px-3 py-3 sm:px-4">
+          <p className="text-[11px] font-medium tm sm:text-xs">Tổng số vi phạm</p>
+          <p className="mt-0.5 text-lg font-bold tabular-nums t1">{metrics.count}</p>
+        </div>
+        <div className="card px-3 py-3 sm:px-4">
+          <p className="text-[11px] font-medium tm sm:text-xs">Tổng điểm trừ</p>
+          <p className="mt-0.5 text-lg font-bold tabular-nums text-rose-600">-{metrics.totalLost}</p>
+        </div>
+        <div className="card px-3 py-3 sm:px-4">
+          <p className="text-[11px] font-medium tm sm:text-xs">Nhóm thường gặp</p>
+          <p className="mt-1 text-sm font-semibold leading-snug t1">{metrics.mostFrequentLabel}</p>
+        </div>
+      </div>
+
+      {weeks.map(({ week, violations }) => (
+        <section key={week} className="card cv-auto overflow-hidden">
+          <div className="flex items-center justify-between border-b bd-soft px-4 py-3">
+            <h3 className="text-sm font-bold t1 sm:text-base">Tuần {week}</h3>
+            <span className={`chip tone-${violations.length > 0 ? "rose" : "emerald"} rounded-md px-2 py-1 text-xs font-medium tabular-nums`}>
+              {violations.length > 0 ? `${violations.length} vi phạm` : "Không có vi phạm"}
+            </span>
+          </div>
+          {violations.length > 0 ? (
+            <div className="divide-soft">
+              {violations.map((v: any) => (
+                <ViolationRow key={v._id} violation={v} onOpenEvidence={onOpenEvidence} />
+              ))}
+            </div>
+          ) : (
+            <p className="px-4 py-4 text-center text-sm tm">Lớp không ghi nhận vi phạm trong tuần này (bảo toàn {BASE_SCORE} điểm chuẩn)</p>
+          )}
+        </section>
+      ))}
+    </div>
+  );
+};
+
+/* ============================================================================
+ * MAIN PAGE
+ * ========================================================================== */
+
 const PublicViolationReport = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"violations" | "scores" | "classSummary">(() => {
-    if (location.pathname === "/bang-diem-thi-dua-tho") return "scores";
-    return "violations";
+  /* ---------- Theme (lưu lựa chọn, theo hệ thống nếu chưa chọn) ---------- */
+  const [themePref, setThemePref] = useState<"light" | "dark" | null>(() => {
+    const v = readStored(THEME_KEY);
+    return v === "light" || v === "dark" ? v : null;
   });
+  const [systemDark, setSystemDark] = useState(
+    () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  const isDarkMode = themePref ? themePref === "dark" : systemDark;
+  const toggleTheme = () => {
+    const next = isDarkMode ? "light" : "dark";
+    setThemePref(next);
+    writeStored(THEME_KEY, next);
+  };
+  // Đồng bộ màu nền body (tránh viền trắng khi overscroll trên mobile)
+  useEffect(() => {
+    const prev = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = isDarkMode ? "#0a1020" : "#f4f6fb";
+    return () => {
+      document.body.style.backgroundColor = prev;
+    };
+  }, [isDarkMode]);
 
+  /* ---------- UI state ---------- */
+  const [activeTab, setActiveTab] = useState<TabId>(() =>
+    location.pathname === SCORES_PATH ? "scores" : "violations"
+  );
+  const [hasAcknowledged, setHasAcknowledged] = useState(() => readStored(ACK_KEY) === "true");
+  const [selectedClass, setSelectedClass] = useState<string | null>(() => readStored(CLASS_KEY));
+  const [isClassSelectorOpen, setIsClassSelectorOpen] = useState(false);
+  const [hideExcusedAbsence, setHideExcusedAbsence] = useState(false);
+  const [gradeFilter, setGradeFilter] = useState<GradeFilter>("all");
+  const [viewer, setViewer] = useState<ViewerState | null>(null);
+
+  /* ---------- Week state ---------- */
   const [weekNumber, setWeekNumber] = useState(1);
   const [weekInput, setWeekInput] = useState("1");
-  const [debouncedWeekInput, setDebouncedWeekInput] = useState("1");
-  const [selectedClass, setSelectedClass] = useState<string | null>(() => {
-    return localStorage.getItem("selectedClassSummary") || null;
-  });
-  const [isClassSelectorOpen, setIsClassSelectorOpen] = useState(false);
   const [weekError, setWeekError] = useState<string | null>(null);
-  const [expandedDays, setExpandedDays] = useState<{ [key: number]: boolean }>({});
-  const [dateRange, setDateRange] = useState<{ start: number; end: number } | undefined>(undefined);
-  const [hideExcusedAbsence, setHideExcusedAbsence] = useState(false);
-  const [showWelcomeModal, setShowWelcomeModal] = useState(true);
-  const [hasAcknowledged, setHasAcknowledged] = useState(() => {
-    return localStorage.getItem("violationReportUnderstood_v2") === "true";
-  });
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
-  const [dontShowAgain, setDontShowAgain] = useState(false);
-  const [modalState, setModalState] = useState<"welcome" | "mustAgree">("welcome");
-  const [gradeFilter, setGradeFilter] = useState<GradeFilter>("all");
+  const userChangedWeek = useRef(false);
 
-  const [modalMedia, setModalMedia] = useState<ModalMedia | null>(null);
-  const [isMediaLoading, setIsMediaLoading] = useState(true);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isInteracting, setIsInteracting] = useState(false);
-  const [startInteraction, setStartInteraction] = useState({ x: 0, y: 0 });
-  const initialPinchDistance = useRef(0);
-
+  /* ---------- Data ---------- */
   const baseDateStr = useQuery(api.users.getSetting, { key: "weekBaseDate" });
   const breakStartDateStr = useQuery(api.users.getSetting, { key: "holidayBreakStartDate" });
   const breakEndDateStr = useQuery(api.users.getSetting, { key: "holidayBreakEndDate" });
-  const violations = useQuery(
-    api.violations.getPublicViolations,
-    dateRange && hasAcknowledged ? { start: dateRange.start, end: dateRange.end } : "skip"
-  );
-  const emulationScores = useQuery(
-    api.violations.getPublicEmulationScores,
-    dateRange ? { start: dateRange.start, end: dateRange.end } : "skip"
-  );
-  const classViolations = useQuery(
-    api.violations.getViolationsByClass,
-    activeTab === "classSummary" && selectedClass ? { className: selectedClass } : "skip"
-  );
 
-  const violationsByDay = useMemo(() => {
-    if (!violations) return new Map();
-    const grouped = new Map<number, typeof violations>();
-    violations.forEach((v: any) => {
-      const dayStart = startOfDay(new Date(v.violationDate)).getTime();
-      if (!grouped.has(dayStart)) grouped.set(dayStart, []);
-      grouped.get(dayStart)!.push(v);
-    });
-    return grouped;
-  }, [violations]);
-
-  const sortedDays = Array.from(violationsByDay.keys()).sort((a, b) => a - b);
   const breakWindow = useMemo(
     () => (baseDateStr ? getBreakWindow(baseDateStr, breakStartDateStr || null, breakEndDateStr || null) : null),
     [baseDateStr, breakStartDateStr, breakEndDateStr]
   );
 
-  useEffect(() => {
-    if (sortedDays.length > 0 && Object.keys(expandedDays).length === 0) {
-      const allExpanded: { [key: number]: boolean } = {};
-      sortedDays.forEach((day) => {
-        allExpanded[day] = true;
-      });
-      setExpandedDays(allExpanded);
-    }
-  }, [sortedDays.length]);
-
-  useEffect(() => {
-    if (weekNumber && sortedDays.length > 0) {
-      setExpandedDays({});
-    }
-  }, [weekNumber]);
-
   const currentWeekNumber = useMemo(() => {
     if (!baseDateStr) return 1;
     const base = new Date(baseDateStr);
-    const now = new Date();
-    const rawWeek = differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
-    return toAcademicWeek(rawWeek, breakWindow);
+    if (Number.isNaN(base.getTime())) return 1;
+    const rawWeek = differenceInCalendarWeeks(new Date(), base, { weekStartsOn: 1 }) + 1;
+    return Math.max(1, toAcademicWeek(rawWeek, breakWindow));
   }, [baseDateStr, breakWindow]);
 
+  // Khởi tạo về tuần hiện tại (chỉ khi người dùng chưa tự đổi tuần)
+  useEffect(() => {
+    if (!baseDateStr || userChangedWeek.current) return;
+    setWeekNumber(currentWeekNumber);
+    setWeekInput(String(currentWeekNumber));
+    setWeekError(null);
+  }, [baseDateStr, currentWeekNumber]);
+
+  const applyWeek = useCallback((raw: string) => {
+    const trimmed = raw.trim();
+    if (trimmed === "") return setWeekError("Tuần không được để trống");
+    if (!/^\d+$/.test(trimmed)) return setWeekError("Tuần phải là một số dương hợp lệ");
+    const n = parseInt(trimmed, 10);
+    if (n <= 0 || n > MAX_WEEK) return setWeekError(`Tuần phải từ 1 đến ${MAX_WEEK}`);
+    setWeekError(null);
+    setWeekNumber(n);
+  }, []);
+
+  // Debounce khi gõ số tuần
+  useEffect(() => {
+    const t = window.setTimeout(() => applyWeek(weekInput), 350);
+    return () => window.clearTimeout(t);
+  }, [weekInput, applyWeek]);
+
+  const handleWeekInput = (v: string) => {
+    userChangedWeek.current = true;
+    setWeekInput(v);
+  };
+  const handleWeekStep = (delta: number) => {
+    userChangedWeek.current = true;
+    const next = Math.min(MAX_WEEK, Math.max(1, weekNumber + delta));
+    setWeekNumber(next);
+    setWeekInput(String(next));
+    setWeekError(null);
+  };
+  const handleWeekToday = () => {
+    userChangedWeek.current = true;
+    setWeekNumber(currentWeekNumber);
+    setWeekInput(String(currentWeekNumber));
+    setWeekError(null);
+  };
+
+  const dateRange = useMemo(() => {
+    if (!baseDateStr || weekError) return undefined;
+    const base = new Date(baseDateStr);
+    if (Number.isNaN(base.getTime())) return undefined;
+    const monday = startOfWeek(base, { weekStartsOn: 1 });
+    const start = addWeeks(monday, toCalendarWeek(weekNumber, breakWindow) - 1);
+    const end = endOfWeek(start, { weekStartsOn: 1 });
+    return { start: start.getTime(), end: end.getTime() };
+  }, [baseDateStr, weekError, weekNumber, breakWindow]);
+
+  const violationsEnabled = Boolean(dateRange && hasAcknowledged);
+  const violationsRaw = useQuery(
+    api.violations.getPublicViolations,
+    dateRange && hasAcknowledged ? { start: dateRange.start, end: dateRange.end } : "skip"
+  );
+  const scoresRaw = useQuery(
+    api.violations.getPublicEmulationScores,
+    dateRange ? { start: dateRange.start, end: dateRange.end } : "skip"
+  );
+  const classEnabled = activeTab === "classSummary" && Boolean(selectedClass);
+  const classRaw = useQuery(
+    api.violations.getViolationsByClass,
+    classEnabled && selectedClass ? { className: selectedClass } : "skip"
+  );
+
+  const { data: violations, isRefreshing: violationsRefreshing } = useKeepPrevious(violationsRaw, "v", violationsEnabled);
+  const { data: emulationScores, isRefreshing: scoresRefreshing } = useKeepPrevious(scoresRaw, "s", Boolean(dateRange));
+  const { data: classViolations, isRefreshing: classRefreshing } = useKeepPrevious(classRaw, `c:${selectedClass}`, classEnabled);
+
+  /* ---------- Derived: class summary ---------- */
   const classViolationsByWeek = useMemo(() => {
     if (!classViolations || !baseDateStr) return [];
-
     const base = new Date(baseDateStr);
+    if (Number.isNaN(base.getTime())) return [];
+
     const grouped = new Map<number, any[]>();
-
-    classViolations.forEach((v: any) => {
-      if (hideExcusedAbsence && v.violationType === "Nghỉ học có phép") return;
-
+    for (const v of classViolations as any[]) {
+      if (hideExcusedAbsence && v.violationType === "Nghỉ học có phép") continue;
       const vDate = new Date(v.violationDate);
-      const diffTime = vDate.getTime() - base.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      const rawWeek = Math.floor(diffDays / 7) + 1;
+      if (Number.isNaN(vDate.getTime())) continue;
+      const rawWeek = differenceInCalendarWeeks(vDate, base, { weekStartsOn: 1 }) + 1;
       const w = toAcademicWeek(rawWeek, breakWindow);
-
-      if (!grouped.has(w)) grouped.set(w, []);
-      grouped.get(w)!.push(v);
-    });
-
-    for (const [, rows] of grouped) {
-      rows.sort((a: any, b: any) => {
-        const at = a?.violationDate ? new Date(a.violationDate).getTime() : (typeof a?._creationTime === "number" ? a._creationTime : 0);
-        const bt = b?.violationDate ? new Date(b.violationDate).getTime() : (typeof b?._creationTime === "number" ? b._creationTime : 0);
-        return at - bt;
-      });
+      if (w < 1) continue;
+      const list = grouped.get(w);
+      if (list) list.push(v);
+      else grouped.set(w, [v]);
     }
+
+    const time = (x: any) =>
+      x?.violationDate ? new Date(x.violationDate).getTime() : typeof x?._creationTime === "number" ? x._creationTime : 0;
+    grouped.forEach((rows) => rows.sort((a, b) => time(a) - time(b)));
+
+    let top = currentWeekNumber;
+    grouped.forEach((_, w) => {
+      if (w > top) top = w;
+    });
+    top = Math.min(top, 200);
 
     const weeks: { week: number; violations: any[] }[] = [];
-    for (let i = currentWeekNumber; i >= 1; i--) {
-      weeks.push({ week: i, violations: grouped.get(i) || [] });
-    }
+    for (let i = top; i >= 1; i--) weeks.push({ week: i, violations: grouped.get(i) || [] });
     return weeks;
   }, [classViolations, baseDateStr, currentWeekNumber, hideExcusedAbsence, breakWindow]);
 
@@ -783,947 +1846,254 @@ const PublicViolationReport = () => {
     };
   }, [classViolationsByWeek]);
 
-  const filteredEmulationScores = useMemo(() => {
-    if (!emulationScores) return [];
-    if (gradeFilter === "all") return emulationScores;
-    return emulationScores.filter((score) => getClassGrade(score.className) === gradeFilter);
-  }, [emulationScores, gradeFilter]);
-
+  /* ---------- Routing / tabs ---------- */
   useEffect(() => {
-    if (baseDateStr) {
-      const base = new Date(baseDateStr);
-      const now = new Date();
-      const rawWeek = differenceInCalendarWeeks(now, base, { weekStartsOn: 1 }) + 1;
-      const academicWeek = toAcademicWeek(rawWeek, breakWindow);
-      setWeekNumber(academicWeek);
-      setWeekInput(academicWeek.toString());
-      setDebouncedWeekInput(academicWeek.toString());
-    }
-  }, [baseDateStr, breakWindow]);
+    if (location.pathname === SCORES_PATH) setActiveTab("scores");
+    else if (location.pathname === VIOLATIONS_PATH) setActiveTab((prev) => (prev === "scores" ? "violations" : prev));
+  }, [location.pathname]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedWeekInput(weekInput);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [weekInput]);
-
-  useEffect(() => {
-    if (debouncedWeekInput.trim() === "") {
-      setWeekError("Tuần không được để trống");
-      return;
-    }
-    const num = parseInt(debouncedWeekInput, 10);
-    if (isNaN(num) || num <= 0) {
-      setWeekError("Tuần phải là một số dương hợp lệ");
-    } else {
-      setWeekError(null);
-      setWeekNumber(num);
-    }
-  }, [debouncedWeekInput]);
-
-  useEffect(() => {
-    if (modalMedia) {
-      const timer = setTimeout(() => setIsModalVisible(true), 10);
-      return () => clearTimeout(timer);
-    }
-  }, [modalMedia]);
-
-  useEffect(() => {
-    if (baseDateStr && !weekError) {
-      const base = new Date(baseDateStr);
-      const monday = startOfWeek(base, { weekStartsOn: 1 });
-      const calendarWeek = toCalendarWeek(weekNumber, breakWindow);
-      const start = new Date(monday.getTime() + (calendarWeek - 1) * 7 * 24 * 60 * 60 * 1000);
-      const end = endOfWeek(start, { weekStartsOn: 1 });
-      setDateRange({ start: start.getTime(), end: end.getTime() });
-    } else {
-      setDateRange(undefined);
-    }
-  }, [weekNumber, baseDateStr, weekError, breakWindow]);
-
-  const resetTransform = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    if (tab === "scores") navigate(SCORES_PATH, { replace: true });
+    else if (tab === "violations") navigate(VIOLATIONS_PATH, { replace: true });
   };
 
-  const getDistance = (touches: React.TouchList) => {
-    return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  const onTabKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const i = TAB_ORDER.indexOf(activeTab);
+    if (e.key === "ArrowRight") handleTabChange(TAB_ORDER[(i + 1) % TAB_ORDER.length]);
+    else if (e.key === "ArrowLeft") handleTabChange(TAB_ORDER[(i - 1 + TAB_ORDER.length) % TAB_ORDER.length]);
   };
 
-  const handleOpenModal = (violation: any, url: string) => {
-    resetTransform();
-    setIsMediaLoading(true);
-    const videoExtensions = ["mp4", "webm", "ogg", "mov"];
-    const imageExtensions = ["jpg", "jpeg", "png", "gif", "webp"];
-    const extension = url.split(".").pop()?.toLowerCase() || "";
-
-    let type: "image" | "video" | null = null;
-    if (videoExtensions.includes(extension)) type = "video";
-    else if (imageExtensions.includes(extension)) type = "image";
-    else {
-      window.open(url, "_blank");
-      return;
-    }
-
-    setModalMedia({
-      url,
-      type,
-      violationInfo: {
-        student: displayStudentHeading(violation),
-        class: violation.violatingClass,
-        details: violation.details ? `${violation.violationType}: ${violation.details}` : violation.violationType,
-      },
-    });
-  };
-
-  const handleCloseModal = () => {
-    setIsModalVisible(false);
-    setTimeout(() => setModalMedia(null), 300);
-  };
-
-  const handleWeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setWeekInput(e.target.value);
+  /* ---------- Handlers ---------- */
+  const handleConfirmWelcome = (dontShowAgain: boolean) => {
+    if (dontShowAgain) writeStored(ACK_KEY, "true");
+    setHasAcknowledged(true);
   };
 
   const handleClassSelect = (cls: string) => {
     setSelectedClass(cls);
-    localStorage.setItem("selectedClassSummary", cls);
+    writeStored(CLASS_KEY, cls);
     setIsClassSelectorOpen(false);
   };
 
-  const toggleDay = (day: number) => {
-    setExpandedDays((prev) => ({ ...prev, [day]: !prev[day] }));
-  };
+  const closeClassSelector = useCallback(() => setIsClassSelectorOpen(false), []);
+  const closeViewer = useCallback(() => setViewer(null), []);
 
-  const handleTabChange = (tab: "violations" | "scores" | "classSummary") => {
-    setActiveTab(tab);
-    if (tab === "scores") {
-      navigate("/bang-diem-thi-dua-tho", { replace: true });
-    } else if (tab === "violations") {
-      navigate("/bang-bao-cao-vi-pham", { replace: true });
+  const handleOpenEvidence = useCallback((violation: any, url: string) => {
+    const urls: string[] = (violation.evidenceUrls || []).filter(Boolean);
+    const items: EvidenceItem[] = [];
+    for (const u of urls) {
+      if (isVideoUrl(u)) items.push({ url: u, type: "video" });
+      else if (isImageUrl(u)) items.push({ url: u, type: "image" });
     }
-  };
-
-  useEffect(() => {
-    if (location.pathname === "/bang-diem-thi-dua-tho") {
-      setActiveTab("scores");
-    } else if (location.pathname === "/bang-bao-cao-vi-pham" && activeTab === "scores") {
-      setActiveTab("violations");
+    const index = items.findIndex((i) => i.url === url);
+    if (index === -1) {
+      // Định dạng không xem trực tiếp được (pdf, doc...) -> mở tab mới
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
     }
-  }, [location.pathname]);
+    setViewer({
+      items,
+      index,
+      info: {
+        student: displayStudentHeading(violation),
+        className: violation.violatingClass,
+        details: violation.details ? `${violation.violationType}: ${violation.details}` : violation.violationType,
+      },
+    });
+  }, []);
 
-  const handleUnderstood = () => {
-    if (dontShowAgain) {
-      localStorage.setItem("violationReportUnderstood_v2", "true");
-    }
-    setHasAcknowledged(true);
-    setShowWelcomeModal(false);
-  };
-
-  const handleClose = () => {
-    setModalState("mustAgree");
-  };
-
-  useEffect(() => {
-    if (hasAcknowledged) {
-      setShowWelcomeModal(false);
-    }
-  }, [hasAcknowledged]);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const newScale = scale - e.deltaY * 0.005;
-    setScale(Math.min(Math.max(newScale, 0.5), 10));
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsInteracting(true);
-    setStartInteraction({ x: e.clientX - position.x, y: e.clientY - position.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isInteracting) return;
-    e.preventDefault();
-    setPosition({ x: e.clientX - startInteraction.x, y: e.clientY - startInteraction.y });
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      setIsInteracting(true);
-      setStartInteraction({ x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y });
-    } else if (e.touches.length === 2) {
-      initialPinchDistance.current = getDistance(e.touches);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1 && isInteracting) {
-      setPosition({ x: e.touches[0].clientX - startInteraction.x, y: e.touches[0].clientY - startInteraction.y });
-    } else if (e.touches.length === 2 && initialPinchDistance.current > 0) {
-      const newDistance = getDistance(e.touches);
-      const newScale = scale * (newDistance / initialPinchDistance.current);
-      setScale(Math.min(Math.max(newScale, 0.5), 10));
-      initialPinchDistance.current = newDistance;
-    }
-  };
-
-  const handleInteractionEnd = () => {
-    setIsInteracting(false);
-    initialPinchDistance.current = 0;
-  };
-
-  const fieldClass = isDarkMode ? "text-slate-100" : "text-slate-800";
+  /* ---------- Render ---------- */
+  const settingMissing = baseDateStr === null;
+  const refreshing =
+    activeTab === "violations" ? violationsRefreshing : activeTab === "scores" ? scoresRefreshing : classRefreshing;
+  const tabIndex = TAB_ORDER.indexOf(activeTab);
+  const activeAcc = TAB_META[activeTab].acc;
 
   return (
-    <div className={`public-report-shell ${isDarkMode ? "theme-dark" : "theme-light"} min-h-screen pb-10 relative ${isDarkMode ? "bg-slate-950" : "bg-slate-50"}`}>
-      <style>{shellStyles}</style>
+    <div
+      className={`pr-root ${isDarkMode ? "dark" : ""} ${activeAcc} min-h-screen`}
+      style={{ paddingBottom: "max(2.5rem, env(safe-area-inset-bottom))" }}
+    >
+      <style>{styles}</style>
 
-      {showWelcomeModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? "bg-slate-900 border border-slate-700/80" : "bg-white"} rounded-xl shadow-lg max-w-md w-full p-6 space-y-4`}>
-            {modalState === "welcome" ? (
-              <>
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-blue-500/20" : "bg-blue-100"}`}>
-                    <AlertCircle className={`w-6 h-6 ${isDarkMode ? "text-blue-300" : "text-blue-600"}`} />
-                  </div>
-                  <div>
-                    <h2 className={`text-lg font-bold ${fieldClass}`}>CSDLCoDo2BT</h2>
-                    <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Thông báo & Hướng dẫn sử dụng</p>
-                  </div>
-                </div>
-                <div className={`space-y-3 text-sm ${isDarkMode ? "text-slate-300" : "text-slate-700"}`}>
-                  <p className={`font-medium ${isDarkMode ? "text-blue-300" : "text-blue-800"}`}>
-                    Cổng thông tin phục vụ GVCN, BCH Đoàn trường và BGH.
-                  </p>
-                  <div className="space-y-3">
-                    <div className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDarkMode ? "bg-indigo-500/20" : "bg-indigo-50"}`}>
-                        <FileText className={`w-4 h-4 ${isDarkMode ? "text-indigo-300" : "text-indigo-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`font-bold ${fieldClass}`}>Vi phạm</p>
-                        <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Xem vi phạm theo từng ngày trong tuần; mở dòng để xem chi tiết và bằng chứng.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDarkMode ? "bg-emerald-500/20" : "bg-emerald-50"}`}>
-                        <Users className={`w-4 h-4 ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`font-bold ${fieldClass}`}>Tổng hợp theo lớp</p>
-                        <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Chọn lớp để xem toàn bộ vi phạm từ đầu năm học, gom theo tuần.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDarkMode ? "bg-amber-500/20" : "bg-amber-50"}`}>
-                        <Trophy className={`w-4 h-4 ${isDarkMode ? "text-amber-300" : "text-amber-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`font-bold ${fieldClass}`}>Bảng điểm</p>
-                        <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Theo dõi điểm thi đua trên nền 120 điểm chuẩn theo tuần.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDarkMode ? "bg-green-500/20" : "bg-green-50"}`}>
-                        <Eye className={`w-4 h-4 ${isDarkMode ? "text-green-300" : "text-green-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`font-bold ${fieldClass}`}>Ẩn nghỉ có phép</p>
-                        <p className={`text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Sử dụng nút “Ẩn nghỉ CP” để lọc nhanh các trường hợp nghỉ có phép.</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`rounded-lg p-3 mt-2 ${isDarkMode ? "bg-blue-500/10 border border-blue-400/30" : "bg-blue-50 border border-blue-200"}`}>
-                    <p className={`text-[11px] leading-relaxed ${isDarkMode ? "text-blue-200" : "text-blue-800"}`}>
-                      <strong>Lưu ý:</strong> Hệ thống ghi nhớ lớp đã chọn tại tab “Tổng hợp theo lớp” cho lần truy cập sau.
-                    </p>
-                  </div>
-                </div>
-                <div className={`flex items-center gap-2 pt-3 pb-2 ${isDarkMode ? "border-t border-slate-700" : "border-t border-slate-200"}`}>
-                  <input
-                    type="checkbox"
-                    id="dontShowAgain"
-                    checked={dontShowAgain}
-                    onChange={(e) => setDontShowAgain(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="dontShowAgain" className={`text-sm cursor-pointer select-none ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
-                    Không hiện lại thông báo này
-                  </label>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleUnderstood}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
-                  >
-                    Tôi đã hiểu
-                  </button>
-                  <button
-                    onClick={handleClose}
-                    className={`px-4 py-2.5 font-medium transition-colors ${isDarkMode ? "text-slate-300 hover:text-slate-100" : "text-slate-600 hover:text-slate-800"}`}
-                  >
-                    Đóng
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-amber-500/20" : "bg-amber-100"}`}>
-                    <AlertCircle className={`w-6 h-6 ${isDarkMode ? "text-amber-300" : "text-amber-600"}`} />
-                  </div>
-                  <h2 className={`text-lg font-bold ${fieldClass}`}>Xác nhận</h2>
-                </div>
-                <div className={`space-y-3 text-sm ${isDarkMode ? "text-slate-300" : "text-slate-700"}`}>
-                  <p>Vui lòng xác nhận đã đọc hướng dẫn để tiếp tục sử dụng hệ thống.</p>
-                </div>
-                <div className={`flex items-center gap-2 pt-3 pb-2 ${isDarkMode ? "border-t border-slate-700" : "border-t border-slate-200"}`}>
-                  <input
-                    type="checkbox"
-                    id="dontShowAgain2"
-                    checked={dontShowAgain}
-                    onChange={(e) => setDontShowAgain(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="dontShowAgain2" className={`text-sm cursor-pointer select-none ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
-                    Không hiện lại thông báo này
-                  </label>
-                </div>
-                <button
-                  onClick={handleUnderstood}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
-                >
-                  Xác nhận
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+      {!hasAcknowledged && <WelcomeModal onConfirm={handleConfirmWelcome} />}
+      {viewer && <MediaViewer state={viewer} onClose={closeViewer} />}
+      {isClassSelectorOpen && (
+        <ClassSelector selected={selectedClass} onSelect={handleClassSelect} onClose={closeClassSelector} />
       )}
 
-      {modalMedia && (
-        <div
-          className={`fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-0 transition-opacity duration-300 ease-in-out ${isModalVisible ? "opacity-100" : "opacity-0"}`}
-          onMouseMove={modalMedia.type === "image" ? handleMouseMove : undefined}
-          onMouseUp={modalMedia.type === "image" ? handleInteractionEnd : undefined}
-          onMouseLeave={modalMedia.type === "image" ? handleInteractionEnd : undefined}
-        >
-          <button onClick={handleCloseModal} className="absolute top-2 right-2 z-50 text-white flex items-center justify-center w-10 h-10 rounded-full bg-black/20 hover:bg-white/20 transition-colors" aria-label="Đóng">
-            <X className="w-6 h-6" />
-          </button>
-
-          <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 w-auto max-w-[95%] md:max-w-xl bg-black/70 text-white rounded-lg text-sm transition-all duration-300 ease-in-out z-50 overflow-hidden ${!isMediaLoading ? "opacity-100" : "opacity-0"}`}>
-            <div className="p-3">
-              <div className="flex items-center justify-center gap-4">
-                <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-300" /><span>{modalMedia.violationInfo.student}</span></div>
-                <div className="flex items-center gap-2"><Users className="w-4 h-4 text-slate-300" /><span>{modalMedia.violationInfo.class}</span></div>
+      {/* ------------------------------ HEADER ------------------------------ */}
+      <header className="header sticky top-0 z-30" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pb-2 pt-2.5 sm:px-4">
+            <div className="mr-auto flex min-w-0 items-center gap-2.5">
+              <div className="s1 bd flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border" style={isDarkMode ? { background: "rgba(241,245,249,.9)" } : undefined}>
+                <img
+                  src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
+                  alt="Logo"
+                  className="h-8 w-8 rounded-full"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+                  }}
+                />
               </div>
-              <div className="mt-2 pt-2 border-t border-white/20 text-xs text-slate-200 flex items-center justify-center gap-2">
-                <FileWarning className="w-4 h-4 text-slate-300 flex-shrink-0" />
-                <span className="text-left">{modalMedia.violationInfo.details}</span>
-              </div>
+              <h1 className="truncate text-base font-bold leading-tight t1">CSDLCoDo2BT</h1>
             </div>
-            <a
-              href={modalMedia.url}
-              download
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full bg-white/10 hover:bg-white/20 transition-colors py-2 text-xs font-semibold flex items-center justify-center gap-2 border-t border-white/20"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Tải xuống
-            </a>
-          </div>
 
-          <div className={`transform-gpu transition-all duration-300 ease-in-out max-w-full max-h-full w-full h-full flex items-center justify-center relative ${isModalVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
-            {isMediaLoading && (
-              <div className="absolute">
-                <Loader2 className="w-12 h-12 text-indigo-400 animate-spin" />
-              </div>
-            )}
-            <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ease-in-out ${isMediaLoading ? "opacity-0" : "opacity-100"}`}>
-              {modalMedia.type === "image" ? (
-                <div
-                  className="w-full h-full"
-                  style={{ touchAction: "none", cursor: isInteracting ? "grabbing" : "grab" }}
-                  onWheel={handleWheel}
-                  onMouseDown={handleMouseDown}
-                  onDoubleClick={resetTransform}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleInteractionEnd}
+            <div className="no-print order-2 flex-shrink-0 sm:order-3">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={isDarkMode ? "Chuyển sang nền sáng" : "Chuyển sang nền tối"}
+                aria-label={isDarkMode ? "Chuyển sang nền sáng" : "Chuyển sang nền tối"}
+                className="icon-btn h-10 w-10"
+              >
+                {isDarkMode ? <Sun className="h-[18px] w-[18px] text-amber-400" /> : <Moon className="h-[18px] w-[18px] text-indigo-600" />}
+              </button>
+            </div>
+
+            <div className="no-print order-3 w-full sm:order-2 sm:w-auto">
+              {activeTab === "classSummary" ? (
+                <button
+                  type="button"
+                  onClick={() => setIsClassSelectorOpen(true)}
+                  className="s1 bd flex h-[46px] w-full items-center justify-between gap-3 rounded-xl border px-3 transition-colors hover:border-emerald-500 sm:w-auto"
                 >
-                  <div className="w-full h-full" style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
-                    <img src={modalMedia.url} alt="Bằng chứng" className="w-full h-full object-contain" onLoad={() => setIsMediaLoading(false)} />
-                  </div>
-                </div>
+                  <span className="flex items-center gap-2.5">
+                    <span className="chip tone-emerald flex h-7 w-7 items-center justify-center rounded-full">
+                      <Users className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="text-[11px] font-medium tm">Lớp</span>
+                      <span className="text-sm font-bold t1">{selectedClass || "Chọn lớp"}</span>
+                    </span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 tm" />
+                </button>
               ) : (
-                <video
-                  src={modalMedia.url}
-                  controls
-                  autoPlay
-                  className="max-w-full max-h-full object-contain"
-                  onLoadedData={() => setIsMediaLoading(false)}
-                >
-                  Trình duyệt của bạn không hỗ trợ video.
-                </video>
+                <WeekPicker
+                  weekInput={weekInput}
+                  weekNumber={weekNumber}
+                  currentWeek={currentWeekNumber}
+                  weekError={weekError}
+                  dateRange={dateRange}
+                  onInput={handleWeekInput}
+                  onStep={handleWeekStep}
+                  onCommit={() => applyWeek(weekInput)}
+                  onToday={handleWeekToday}
+                />
               )}
             </div>
-          </div>
-        </div>
-      )}
 
-      {isClassSelectorOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setIsClassSelectorOpen(false)}>
-          <div className={`${isDarkMode ? "bg-slate-900 border border-slate-700" : "bg-white"} rounded-xl shadow-lg max-w-lg w-full p-6`} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-lg font-bold flex items-center gap-2 ${fieldClass}`}>
-                <Users className="w-5 h-5 text-emerald-600" />
-                Chọn lớp
-              </h3>
-              <button onClick={() => setIsClassSelectorOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              {[10, 11, 12].map((grade) => (
-                <div key={grade} className="space-y-2">
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-full h-px bg-slate-200"></span>
-                    <span className="whitespace-nowrap">Khối {grade}</span>
-                    <span className="w-full h-px bg-slate-200"></span>
-                  </div>
-                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                    {Array.from({ length: 8 }, (_, i) => `${grade}A${i + 1}`).map((cls) => (
-                      <button
-                        key={cls}
-                        onClick={() => handleClassSelect(cls)}
-                        className={`px-2 py-2 text-sm font-medium rounded-lg transition-colors ${selectedClass === cls
-                          ? "bg-emerald-600 text-white"
-                          : isDarkMode
-                            ? "bg-slate-800 text-slate-200 border border-slate-600 hover:border-emerald-400"
-                            : "bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200"
-                          }`}
-                      >
-                        {cls.substring(2)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className={`glass-header border-b ${isDarkMode ? "border-slate-700/60" : "border-slate-200/80"} sticky top-0 z-10`}>
-        <div className="max-w-7xl mx-auto">
-          <div className={`px-3 sm:px-4 py-2 border-b ${isDarkMode ? "border-slate-700/50" : "border-slate-100"}`}>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-              <div className="flex items-center justify-center gap-2 min-w-0">
-                <div className={`rounded-full p-1.5 ${isDarkMode ? "bg-slate-100/65" : "bg-white border border-slate-200/80"}`}>
-                  <img
-                    src="https://www.dropbox.com/scl/fi/qhdckf1zj8svntuz93gcq/csdl512.png?rlkey=ms93xygjfp7mzk727hij811po&st=lt8k0y9x&raw=1"
-                    alt="logo"
-                    className="w-8 h-8 sm:w-7 sm:h-7 rounded-full"
-                  />
-                </div>
-                <div className="min-w-0 text-center sm:text-left">
-                  <h1 className="text-sm sm:text-base font-bold text-slate-800 leading-tight">
-                    CSDLCoDo2BT
-                  </h1>
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-2 no-print">
-                <button
-                  onClick={() => setIsDarkMode((prev) => !prev)}
-                  className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${isDarkMode ? "bg-slate-800 border-slate-600 text-amber-300" : "bg-white border-slate-200 text-indigo-600"
-                    }`}
-                  title={isDarkMode ? "Chuyển sang nền sáng" : "Chuyển sang nền tối"}
-                >
-                  {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-600" />}
-                </button>
-
-                {activeTab === "classSummary" ? (
-                  <button
-                    onClick={() => setIsClassSelectorOpen(true)}
-                    className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg border transition-colors group ${isDarkMode ? "bg-slate-800 border-slate-600" : "bg-white border-slate-200 hover:border-emerald-300"
-                      }`}
-                  >
-                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <Users className="w-3 h-3 text-emerald-600" />
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-none mb-0.5">Lớp</span>
-                      <span className="text-sm font-bold text-slate-800 leading-none group-hover:text-emerald-700">
-                        {selectedClass || "Chọn lớp"}
-                      </span>
-                    </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
-                  </button>
-                ) : (
-                  <div className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg border flex-shrink-0 ${isDarkMode ? "bg-slate-800/70 border-slate-600/80" : "bg-white border-slate-200"}`}>
-                    <Calendar className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${isDarkMode ? "text-slate-300" : "text-slate-600"}`} />
-                    <div className="flex items-center gap-1.5">
-                      <label className={`text-xs sm:text-sm font-medium ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>Tuần:</label>
-                      <input
-                        type="text"
-                        value={weekInput}
-                        onChange={handleWeekChange}
-                        className={`border px-1.5 sm:px-2 py-0.5 sm:py-1 w-10 sm:w-16 text-center text-xs sm:text-sm rounded font-medium tabular-nums ${weekError
-                          ? isDarkMode
-                            ? "border-red-500/80 bg-red-500/15 text-red-200"
-                            : "border-red-400 bg-red-50"
-                          : isDarkMode
-                            ? "border-slate-500 bg-slate-900/70 text-slate-100"
-                            : "border-slate-300"
-                          }`}
-                      />
-                    </div>
-                    {dateRange && (
-                      <span className={`text-[10px] sm:text-xs whitespace-nowrap ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
-                        ({format(new Date(dateRange.start), "dd/MM")} - {format(new Date(dateRange.end), "dd/MM")})
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {weekError && (
-              <div className="mt-1.5 flex items-center justify-center gap-1 text-red-600 text-xs">
-                <AlertCircle className="w-3 h-3" />
-                <span>{weekError}</span>
-              </div>
+            {weekError && activeTab !== "classSummary" && (
+              <p role="alert" className="order-4 flex w-full items-center gap-1 text-xs text-red-600">
+                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                {weekError}
+              </p>
             )}
           </div>
 
-          <div className="px-3 sm:px-4 py-0 no-print">
-            <div className={`flex items-end justify-center sm:justify-start border-b-2 ${isDarkMode ? "border-slate-700/50" : "border-slate-200"}`}>
-              <button
-                onClick={() => handleTabChange("violations")}
-                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${activeTab === "violations"
-                  ? isDarkMode
-                    ? "text-indigo-300 border-indigo-300"
-                    : "text-indigo-600 border-indigo-600"
-                  : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
-                  }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>Vi phạm</span>
-                </span>
-              </button>
-              <button
-                onClick={() => handleTabChange("scores")}
-                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${activeTab === "scores"
-                  ? isDarkMode
-                    ? "text-amber-300 border-amber-300"
-                    : "text-amber-600 border-amber-600"
-                  : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
-                  }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>Bảng điểm</span>
-                </span>
-              </button>
-              <button
-                onClick={() => handleTabChange("classSummary")}
-                className={`relative px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap border-b-2 -mb-[2px] ${activeTab === "classSummary"
-                  ? isDarkMode
-                    ? "text-emerald-300 border-emerald-300"
-                    : "text-emerald-600 border-emerald-600"
-                  : "border-transparent " + (isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700")
-                  }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>Tổng hợp theo lớp</span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className={`glass-header border-b no-print ${isDarkMode ? "border-slate-700/50" : "border-slate-200/80"}`}>
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[10px] sm:text-xs text-slate-500 leading-relaxed flex-1 min-w-[200px]">
-            {activeTab === "violations" ? (
-              <>Dữ liệu vi phạm được cập nhật bởi Ban Cờ đỏ. Nếu phát hiện sai sót, vui lòng phản ánh với thành viên Ban Cờ đỏ hoặc Quản trị viên.</>
-            ) : activeTab === "scores" ? (
-              <>Bảng điểm thi đua tính trên điểm chuẩn {BASE_SCORE}, dựa trên vi phạm đã ghi nhận. Chưa bao gồm điểm giờ học và điểm thưởng (nếu có).</>
-            ) : (
-              <>Tổng hợp vi phạm của lớp {selectedClass || "—"} từ đầu năm học đến nay, sắp xếp theo tuần mới nhất.</>
-            )}
-          </p>
-
-          {(activeTab === "violations" || activeTab === "classSummary") && (
-            <button
-              onClick={() => setHideExcusedAbsence(!hideExcusedAbsence)}
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[10px] sm:text-xs font-medium whitespace-nowrap flex-shrink-0 ${hideExcusedAbsence
-                ? isDarkMode
-                  ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 border border-emerald-400/50"
-                  : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                : isDarkMode
-                  ? "bg-slate-700/60 text-slate-200 hover:bg-slate-600/70 border border-slate-500/70"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
-                }`}
-              title={hideExcusedAbsence ? "Đang ẩn nghỉ có phép" : "Đang hiện nghỉ có phép"}
+          {/* Tabs */}
+          <div className="no-print px-3 sm:px-4">
+            <div
+              role="tablist"
+              aria-label="Chuyển mục"
+              onKeyDown={onTabKeyDown}
+              className="relative grid grid-cols-3 sm:max-w-md"
             >
-              <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              <span>{hideExcusedAbsence ? "Ẩn nghỉ CP" : "Hiện tất cả"}</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-3 py-3">
-        {activeTab === "violations" ? (
-          <>
-            {violations === undefined && (
-              <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-                <div className="text-center space-y-1">
-                  <p className="text-base font-medium text-slate-700">Đang tải dữ liệu...</p>
-                  <p className="text-sm text-slate-500">Vui lòng chờ trong giây lát</p>
-                </div>
-              </div>
-            )}
-            {violations && violations.length === 0 && (
-              <div className="glass-card border border-slate-200/80 rounded-lg p-8 text-center mt-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
-                  <FileText className="w-8 h-8 text-slate-400" />
-                </div>
-                <p className="text-lg font-medium text-slate-700 mb-1">Không ghi nhận vi phạm</p>
-                <p className="text-sm text-slate-500">Không có vi phạm nào trong tuần này (Bảo toàn {BASE_SCORE} điểm chuẩn)</p>
-              </div>
-            )}
-
-            <div className="space-y-4 mt-2">
-              {sortedDays.map((dayTimestamp) => {
-                const allDayViolations = violationsByDay.get(dayTimestamp)!;
-                const dayViolations = hideExcusedAbsence
-                  ? allDayViolations.filter((v: { violationType: string }) => v.violationType !== "Nghỉ học có phép")
-                  : allDayViolations;
-                const isExpanded = expandedDays[dayTimestamp] === true;
-
-                if (hideExcusedAbsence && dayViolations.length === 0) {
-                  const excusedAbsenceCount = allDayViolations.filter((v: { violationType: string }) => v.violationType === "Nghỉ học có phép").length;
-                  if (excusedAbsenceCount === 0) return null;
-                  return (
-                    <div key={dayTimestamp} className="w-full glass-card text-slate-500 !px-4 !py-3 rounded-xl flex items-center justify-between border border-slate-200/80">
-                      <span className="font-semibold text-sm">{format(new Date(dayTimestamp), "iiii, dd/MM", { locale: vi })}</span>
-                      <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200">Chỉ có {excusedAbsenceCount} nghỉ CP</span>
-                    </div>
-                  );
-                }
-
-                if (dayViolations.length === 0) return null;
-
+              {TAB_ORDER.map((id) => {
+                const { label, icon: Icon, acc } = TAB_META[id];
                 return (
-                  <div key={dayTimestamp} className="glass-card !p-0 border border-slate-200/80 overflow-hidden mb-3">
-                    <button
-                      onClick={() => toggleDay(dayTimestamp)}
-                      className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${isExpanded ? "glass-day-expanded" : "glass-row " + (isDarkMode ? "text-slate-200" : "text-slate-800")
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`font-bold text-sm sm:text-base capitalize ${isExpanded ? (isDarkMode ? "text-slate-100" : "text-slate-800") : ""}`}>
-                          {format(new Date(dayTimestamp), "iiii", { locale: vi })}
-                        </span>
-                        <span className={`text-xs sm:text-sm font-medium px-2 py-0.5 rounded-full tabular-nums ${isExpanded
-                          ? isDarkMode ? "bg-slate-700/50 text-slate-200" : "bg-slate-200 text-slate-700"
-                          : isDarkMode ? "bg-slate-700/50 text-slate-300" : "bg-slate-100 text-slate-600"
-                          }`}>
-                          {format(new Date(dayTimestamp), "dd/MM")}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium px-2 py-1 rounded tabular-nums ${isExpanded
-                          ? isDarkMode ? "bg-slate-700/50 text-slate-200" : "bg-slate-200 text-slate-700"
-                          : isDarkMode ? "bg-indigo-500/20 text-indigo-300 border border-indigo-400/30" : "bg-indigo-50 text-indigo-600"
-                          }`}>
-                          {dayViolations.length} vi phạm
-                        </span>
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </div>
-                    </button>
-
-                    <div className={`overflow-hidden ${isExpanded ? "max-h-[9999px]" : "max-h-0"}`}>
-                      <div className="border-t border-slate-200/80">
-                        <div className="divide-y divide-slate-200/80">
-                          {dayViolations.map((v: any) => (
-                            <ViolationRow
-                              key={v._id}
-                              violation={v}
-                              onOpenEvidence={handleOpenModal}
-                              isDarkMode={isDarkMode}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    id={`tab-${id}`}
+                    aria-selected={activeTab === id}
+                    aria-controls="report-panel"
+                    tabIndex={activeTab === id ? 0 : -1}
+                    onClick={() => handleTabChange(id)}
+                    className={`tab-btn ${acc} flex h-11 items-center justify-center gap-1.5 text-xs font-semibold sm:text-sm`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                  </button>
                 );
               })}
+              <span
+                aria-hidden
+                className="tab-ind absolute bottom-0 left-0 h-0.5 w-1/3 rounded-full"
+                style={{ transform: `translateX(${tabIndex * 100}%)` }}
+              />
             </div>
-          </>
-        ) : activeTab === "scores" ? (
-          <>
-            {emulationScores === undefined && (
-              <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                <Loader2 className="w-10 h-10 text-amber-600 animate-spin" />
-                <div className="text-center space-y-1">
-                  <p className="text-base font-medium text-slate-700">Đang tải dữ liệu...</p>
-                  <p className="text-sm text-slate-500">Vui lòng chờ trong giây lát</p>
-                </div>
-              </div>
+          </div>
+
+          {/* Info bar */}
+          <div className="bd-soft no-print flex items-center justify-between gap-3 border-t px-3 py-2 sm:px-4">
+            <p className="min-w-0 flex-1 text-[11px] leading-snug tm sm:text-xs">
+              {activeTab === "violations"
+                ? "Dữ liệu do Đội Cờ đỏ cập nhật. Nếu phát hiện sai sót, vui lòng phản ánh với thành viên Đội Cờ đỏ hoặc Quản trị viên."
+                : activeTab === "scores"
+                  ? `Điểm thi đua tính trên điểm chuẩn ${BASE_SCORE}, dựa trên vi phạm đã ghi nhận. Chưa gồm điểm giờ học và điểm thưởng (nếu có).`
+                  : `Tổng hợp vi phạm của lớp ${selectedClass || "—"} từ đầu năm học đến nay, tuần mới nhất ở trên cùng.`}
+            </p>
+            {activeTab !== "scores" && (
+              <button
+                type="button"
+                onClick={() => setHideExcusedAbsence((v) => !v)}
+                aria-pressed={hideExcusedAbsence}
+                title={hideExcusedAbsence ? "Đang ẩn nghỉ có phép" : "Đang hiện nghỉ có phép"}
+                className={`flex h-8 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-medium transition active:scale-95 ${hideExcusedAbsence ? "chip tone-emerald" : "chip tone-slate"
+                  }`}
+              >
+                {hideExcusedAbsence ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                Ẩn nghỉ CP
+              </button>
             )}
+          </div>
+        </div>
+        {refreshing && <div className="progress" aria-hidden />}
+      </header>
 
-            {emulationScores && emulationScores.length === 0 && (
-              <div className="glass-card rounded-lg border border-slate-200/80 p-8 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
-                  <Award className="w-8 h-8 text-slate-400" />
-                </div>
-                <p className="text-lg font-medium text-slate-700 mb-1">Chưa có dữ liệu</p>
-                <p className="text-sm text-slate-500">Chưa có điểm thi đua cho tuần này</p>
-              </div>
-            )}
+      {/* ------------------------------ CONTENT ----------------------------- */}
+      <main id="report-panel" role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="mx-auto max-w-6xl px-3 py-4 sm:px-4">
+        <div key={activeTab} className="anim-tab">
+          {settingMissing ? (
+            <EmptyState
+              icon={<Calendar className="h-7 w-7" />}
+              title="Chưa cấu hình ngày bắt đầu tuần học"
+              hint="Quản trị viên cần thiết lập “weekBaseDate” để hiển thị dữ liệu theo tuần."
+            />
+          ) : activeTab === "violations" ? (
+            <ViolationsTab
+              violations={violations as any[] | undefined}
+              refreshing={violationsRefreshing}
+              hideExcused={hideExcusedAbsence}
+              onOpenEvidence={handleOpenEvidence}
+            />
+          ) : activeTab === "scores" ? (
+            <ScoresTab
+              scores={emulationScores as any[] | undefined}
+              refreshing={scoresRefreshing}
+              gradeFilter={gradeFilter}
+              setGradeFilter={setGradeFilter}
+            />
+          ) : (
+            <ClassSummaryTab
+              selectedClass={selectedClass}
+              data={classViolations as any[] | undefined}
+              weeks={classViolationsByWeek}
+              metrics={classSummaryMetrics}
+              refreshing={classRefreshing}
+              onPickClass={() => setIsClassSelectorOpen(true)}
+              onOpenEvidence={handleOpenEvidence}
+            />
+          )}
+        </div>
+      </main>
 
-            {emulationScores && emulationScores.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 no-print">
-                  <div className="inline-flex rounded-lg border border-slate-200/80 overflow-hidden">
-                    {([
-                      ["all", "Tất cả"],
-                      [10, "Khối 10"],
-                      [11, "Khối 11"],
-                      [12, "Khối 12"],
-                    ] as Array<[GradeFilter, string]>).map(([value, label]) => (
-                      <button
-                        key={String(value)}
-                        onClick={() => setGradeFilter(value)}
-                        className={`px-3 py-1.5 text-xs sm:text-sm font-semibold transition-colors ${gradeFilter === value
-                          ? isDarkMode
-                            ? "bg-amber-500/20 text-amber-200"
-                            : "bg-amber-50 text-amber-800"
-                          : isDarkMode
-                            ? "text-slate-300 hover:bg-slate-800"
-                            : "text-slate-600 hover:bg-slate-50"
-                          }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${isDarkMode ? "border-slate-600 text-slate-200 hover:bg-slate-800" : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                      }`}
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    In bảng điểm
-                  </button>
-                </div>
-
-                {filteredEmulationScores.length === 0 ? (
-                  <div className="glass-card rounded-lg border border-slate-200/80 p-8 text-center">
-                    <p className="text-sm text-slate-500">Không có lớp thuộc khối đã chọn trong tuần này.</p>
-                  </div>
-                ) : (
-                  <div className="glass-card !p-0 rounded-lg overflow-hidden border border-slate-200/80">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs sm:text-sm">
-                        <thead>
-                          <tr className={`${isDarkMode ? "bg-slate-800/80 border-b border-slate-600/80" : "bg-slate-50 border-b border-slate-200"}`}>
-                            <th className={`px-2 py-3 text-center font-semibold w-16 ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>Lớp</th>
-                            <th className={`px-2 py-3 text-center font-semibold w-20 ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>Điểm trừ</th>
-                            <th className={`px-2 py-3 text-center font-semibold w-20 ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>Tổng điểm</th>
-                            <th className={`px-2 py-3 text-center font-semibold w-36 ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>Xếp loại tuần</th>
-                            <th className={`px-2 py-3 text-left font-semibold ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>Chi tiết vi phạm</th>
-                          </tr>
-                        </thead>
-                        <tbody className={`${isDarkMode ? "divide-y divide-slate-700/60" : "divide-y divide-slate-100"}`}>
-                          {filteredEmulationScores.map((score) => {
-                            const totalScore = BASE_SCORE - score.totalPoints;
-                            const rank = getWeeklyRank(totalScore);
-                            return (
-                              <tr key={score.className} className="glass-row">
-                                <td className="px-2 py-3 text-center align-top">
-                                  <span className={`font-semibold tabular-nums ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}>{score.className}</span>
-                                </td>
-                                <td className="px-2 py-3 text-center align-top">
-                                  <span className={`inline-flex items-center justify-center px-2 py-1 rounded font-bold text-sm tabular-nums ${score.totalPoints > 0
-                                    ? isDarkMode ? "bg-red-500/20 text-red-200" : "bg-red-100 text-red-700"
-                                    : isDarkMode ? "bg-emerald-500/20 text-emerald-200" : "bg-emerald-100 text-emerald-700"
-                                    }`}>
-                                    {score.totalPoints > 0 ? `-${score.totalPoints}` : score.totalPoints}
-                                  </span>
-                                </td>
-                                <td className="px-2 py-3 text-center align-top">
-                                  <span className={`inline-flex items-center justify-center px-2 py-1 rounded font-bold text-sm tabular-nums ${rankToneClass(rank.tone, isDarkMode)}`}>
-                                    {totalScore}
-                                  </span>
-                                </td>
-                                <td className="px-2 py-3 text-center align-top">
-                                  <span className={`inline-flex items-center justify-center px-2 py-1 rounded-md border text-[11px] font-semibold ${rankToneClass(rank.tone, isDarkMode)}`}>
-                                    {rank.label}
-                                  </span>
-                                </td>
-                                <td className="px-2 py-3 align-top">
-                                  {score.violations.length > 0 ? (
-                                    <ul className="space-y-1.5">
-                                      {score.violations.map((v) => {
-                                        const cat = categorizeViolation(v.violationType, v.details);
-                                        const severe = isSevereViolation(v);
-                                        return (
-                                          <li
-                                            key={v._id}
-                                            className={`flex items-start gap-2 rounded-md px-1.5 py-1 ${severe ? (isDarkMode ? "bg-rose-500/15 border border-rose-400/30" : "bg-rose-50 border border-rose-200") : ""
-                                              }`}
-                                          >
-                                            <span className={`${isDarkMode ? "text-slate-500" : "text-slate-400"} mt-0.5`}>•</span>
-                                            <div className="flex-1 min-w-0">
-                                              <div className="flex flex-wrap items-center gap-1.5">
-                                                <TuBadge category={cat} isDarkMode={isDarkMode} />
-                                                {severe && (
-                                                  <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold ${isDarkMode ? "border-rose-400/40 text-rose-200" : "border-rose-200 text-rose-700 bg-white"
-                                                    }`}>
-                                                    Vi phạm nghiêm trọng
-                                                  </span>
-                                                )}
-                                                <span className={`inline-flex rounded border px-1 py-0.5 text-[10px] font-bold tabular-nums ${pointsBadgeClass(v.points ?? 0, isDarkMode)}`}>
-                                                  -{v.points ?? 0}
-                                                </span>
-                                              </div>
-                                              <div className="mt-0.5">
-                                                <span className={`font-medium ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}>{v.violationType}</span>
-                                                {v.studentName && (
-                                                  <span className={`${isDarkMode ? "text-slate-300" : "text-slate-600"}`}> ({v.studentName})</span>
-                                                )}
-                                                {v.details && (
-                                                  <span className={`${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>: {v.details}</span>
-                                                )}
-                                                <span className={`${isDarkMode ? "text-slate-500" : "text-slate-400"} text-xs ml-2`}>
-                                                  ({format(new Date(v.violationDate), "dd/MM")})
-                                                </span>
-                                              </div>
-                                            </div>
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                  ) : (
-                                    <span className="text-slate-400 italic text-sm">Lớp không ghi nhận vi phạm trong tuần này (Bảo toàn {BASE_SCORE} điểm chuẩn)</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            {!selectedClass ? (
-              <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
-                  <Users className="w-8 h-8 text-emerald-600" />
-                </div>
-                <div className="text-center space-y-2">
-                  <h3 className="text-lg font-bold text-slate-800">Chưa chọn lớp</h3>
-                  <p className="text-sm text-slate-500 max-w-xs mx-auto">
-                    Vui lòng chọn một lớp để xem tổng hợp vi phạm.
-                  </p>
-                  <button
-                    onClick={() => setIsClassSelectorOpen(true)}
-                    className="mt-4 px-6 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
-                  >
-                    Chọn lớp
-                  </button>
-                </div>
-              </div>
-            ) : classViolations === undefined ? (
-              <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
-                <div className="text-center space-y-1">
-                  <p className="text-base font-medium text-slate-700">Đang tải dữ liệu lớp {selectedClass}...</p>
-                  <p className="text-sm text-slate-500">Vui lòng chờ trong giây lát</p>
-                </div>
-              </div>
-            ) : classViolations && classViolationsByWeek.length === 0 ? (
-              <div className="glass-card rounded-lg border border-slate-200/80 p-8 text-center mt-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
-                  <FileText className="w-8 h-8 text-slate-400" />
-                </div>
-                <p className="text-lg font-medium text-slate-700 mb-1">Chưa có dữ liệu</p>
-                <p className="text-sm text-slate-500">Không tìm thấy dữ liệu vi phạm cho lớp này</p>
-              </div>
-            ) : (
-              <div className="space-y-4 mt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="glass-card border border-slate-200/80 !px-4 !py-3">
-                    <p className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Tổng số vi phạm</p>
-                    <p className="text-lg font-bold tabular-nums text-slate-800 mt-0.5">{classSummaryMetrics.count}</p>
-                  </div>
-                  <div className="glass-card border border-slate-200/80 !px-4 !py-3">
-                    <p className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Tổng điểm trừ</p>
-                    <p className="text-lg font-bold tabular-nums text-rose-700 mt-0.5">-{classSummaryMetrics.totalLost}</p>
-                  </div>
-                  <div className="glass-card border border-slate-200/80 !px-4 !py-3">
-                    <p className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Nhóm vi phạm thường gặp</p>
-                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{classSummaryMetrics.mostFrequentLabel}</p>
-                  </div>
-                </div>
-
-                {classViolationsByWeek.map(({ week, violations }) => (
-                  <div key={week} className="glass-card !p-0 border border-slate-200/80 overflow-hidden mb-3">
-                    <div className={`w-full px-4 py-3 flex items-center justify-between border-b ${isDarkMode ? "border-slate-600/70" : "border-slate-200/80"} glass-row`}>
-                      <span className={`font-bold text-sm sm:text-base ${isDarkMode ? "text-slate-100" : "text-slate-800"}`}>Tuần {week}</span>
-                      <span className={`text-xs font-medium px-2 py-1 rounded tabular-nums ${violations.length > 0
-                        ? isDarkMode ? "bg-red-500/20 text-red-200 border border-red-400/40" : "bg-red-50 text-red-600 border border-red-100"
-                        : isDarkMode ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40" : "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                        }`}>
-                        {violations.length > 0 ? `${violations.length} vi phạm` : "Không có vi phạm"}
-                      </span>
-                    </div>
-
-                    {violations.length > 0 ? (
-                      <div className={`${isDarkMode ? "divide-y divide-slate-700/60" : "divide-y divide-slate-200/80"}`}>
-                        {violations.map((v: any) => (
-                          <ViolationRow
-                            key={v._id}
-                            violation={v}
-                            onOpenEvidence={handleOpenModal}
-                            isDarkMode={isDarkMode}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className={`p-4 text-center text-sm ${isDarkMode ? "text-slate-300 glass-row" : "text-slate-500 glass-row"}`}>
-                        Lớp không ghi nhận vi phạm trong tuần này (Bảo toàn {BASE_SCORE} điểm chuẩn)
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <BackToTop />
     </div>
   );
 };

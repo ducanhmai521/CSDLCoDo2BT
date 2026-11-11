@@ -14,7 +14,7 @@ const PublicAbsenceRequest = () => {
         </div>
         <h1 className="text-xl font-bold text-slate-800">Tính năng tạm ngưng</h1>
         <p className="text-sm text-slate-600">
-          Tính năng xin phép công khai hiện không còn hoạt động. Vui lòng liên hệ trực tiếp với giáo viên chủ nhiệm hoặc ban cờ đỏ.
+          Tính năng xin phép công khai hiện không còn hoạt động. Vui lòng liên hệ trực tiếp với giáo viên chủ nhiệm.
         </p>
         <Link
           to="/"
