@@ -107,9 +107,11 @@ export function ViolationTypePicker({
             <>
               {selectedPoints !== null && (
                 <span className={`shrink-0 text-[11px] font-bold px-1.5 py-0.5 rounded-md ${
-                  dk ? "bg-red-900/50 text-red-300" : "bg-red-50 text-red-600 border border-red-100"
+                  selectedPoints === 0
+                    ? dk ? "bg-slate-700 text-slate-300" : "bg-slate-100 text-slate-600 border border-slate-200"
+                    : dk ? "bg-red-900/50 text-red-300" : "bg-red-50 text-red-600 border border-red-100"
                 }`}>
-                  -{selectedPoints}
+                  {selectedPoints > 0 ? `-${selectedPoints}` : "0đ"}
                 </span>
               )}
               <span className="truncate">{value}</span>
@@ -164,9 +166,11 @@ export function ViolationTypePicker({
                       {cat.name}
                     </span>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      dk ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-500"
+                      cat.points === 0
+                        ? dk ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-600"
+                        : dk ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-500"
                     }`}>
-                      -{cat.points}đ
+                      {cat.points > 0 ? `-${cat.points}đ` : "0đ"}
                     </span>
                   </div>
                   {/* Violations */}

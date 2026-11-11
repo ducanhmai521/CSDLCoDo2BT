@@ -13,19 +13,28 @@ export interface Criterion5Tu {
 export const CRITERIA_5_TU: Criterion5Tu[] = [
   // I. TỰ GIÁC (Chuyên cần, Giờ giấc, Học tập & Báo cáo)
   {
-    stt: 1,
+    stt: 0,
     category: "I",
     categoryTitle: "I. TỰ GIÁC (Chuyên cần, Giờ giấc, Học tập & Báo cáo)",
-    name: "Đi học muộn có phép (báo GVCN trước 7h15, GVCN báo ĐTN trước 9h15) / Nghỉ học có phép",
-    points: 3,
+    name: "Nghỉ học có phép",
+    points: 0,
     keywords: [
-      "muộn có phép",
-      "đi học muộn có phép",
       "nghỉ học có phép",
       "nghỉ có phép",
       "vắng có phép",
       "nghỉ cp",
       "vắng cp",
+    ],
+  },
+  {
+    stt: 1,
+    category: "I",
+    categoryTitle: "I. TỰ GIÁC (Chuyên cần, Giờ giấc, Học tập & Báo cáo)",
+    name: "Đi học muộn có phép (báo GVCN trước 7h15, GVCN báo ĐTN trước 9h15)",
+    points: 3,
+    keywords: [
+      "muộn có phép",
+      "đi học muộn có phép",
     ],
   },
   {

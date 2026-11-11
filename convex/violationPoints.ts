@@ -3,11 +3,17 @@
 // Keep names short: these strings are fed directly to the AI for parsing.
 export const VIOLATION_CATEGORIES = [
   {
-    name: "I. Tự giác – Chuyên cần & Học tập",
+    name: "I. Tự giác – Nghỉ học có phép (0đ)",
+    points: 0,
+    violations: [
+      "Nghỉ học có phép",
+    ],
+  },
+  {
+    name: "I. Tự giác – Chuyên cần & Học tập (3đ)",
     points: 3,
     violations: [
       "Đi học muộn có phép",
-      "Nghỉ học có phép",
       "Thiếu đồ dùng học tập hoặc thiếu ghế chào cờ",
     ],
   },

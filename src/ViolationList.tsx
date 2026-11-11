@@ -679,7 +679,7 @@ function ViolationCard({
             points <= 5 ? "bg-orange-50 text-orange-700 border border-orange-200" :
             "bg-rose-50 text-rose-700 border border-rose-200"
           }`}>
-            -{points}
+            {points > 0 ? `-${points}` : points}
           </div>
 
           <div className="flex-1 min-w-0">

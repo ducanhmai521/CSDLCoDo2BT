@@ -282,6 +282,7 @@ const RANK_TONE: Record<WeeklyRank["tone"], Tone> = {
 };
 
 function pointsTone(points: number): Tone {
+  if (points <= 0) return "slate";
   if (points >= 20) return "danger";
   if (points >= 10) return "orange";
   if (points >= 5) return "amber";
@@ -594,7 +595,7 @@ const ViolationRow = memo(function ViolationRow({
         <div className="flex min-w-[2.9rem] flex-col items-center gap-1">
           <span className="text-xs font-bold tabular-nums t2 sm:text-sm">{violation.violatingClass}</span>
           <span className={`chip tone-${pointsTone(points)} inline-flex h-5 min-w-[1.9rem] items-center justify-center rounded-md px-1.5 text-[10px] font-bold tabular-nums`}>
-            -{points}
+            {points > 0 ? `-${points}` : points}
           </span>
         </div>
 
@@ -1421,7 +1422,7 @@ const ScoreDetails = ({ violations }: { violations: any[] }) => {
                   <span className="chip tone-rose rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-none">Vi phạm nghiêm trọng</span>
                 )}
                 <span className={`chip tone-${pointsTone(v.points ?? 0)} rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums leading-none`}>
-                  -{v.points ?? 0}
+                  {(v.points ?? 0) > 0 ? `-${v.points}` : (v.points ?? 0)}
                 </span>
                 <span className="text-xs tabular-nums tf">{format(new Date(v.violationDate), "dd/MM")}</span>
               </div>

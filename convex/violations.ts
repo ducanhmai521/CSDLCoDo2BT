@@ -80,10 +80,34 @@ async function getActiveCategories(ctx: QueryCtx) {
         .query("settings")
         .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
         .unique();
+    let categories: { name: string; points: number; violations: string[] }[];
     if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
-        return row.value as { name: string; points: number; violations: string[] }[];
+        categories = JSON.parse(JSON.stringify(row.value));
+    } else {
+        categories = JSON.parse(JSON.stringify(VIOLATION_CATEGORIES));
     }
-    return VIOLATION_CATEGORIES;
+
+    // Ensure "Nghỉ học có phép" is always 0 points
+    let found = false;
+    for (const cat of categories) {
+        if (cat.violations.includes("Nghỉ học có phép")) {
+            if (cat.violations.length === 1) {
+                cat.points = 0;
+                found = true;
+            } else {
+                cat.violations = cat.violations.filter(v => v !== "Nghỉ học có phép");
+            }
+        }
+    }
+    if (!found) {
+        categories.unshift({
+            name: "I. Tự giác – Nghỉ học có phép (0đ)",
+            points: 0,
+            violations: ["Nghỉ học có phép"],
+        });
+    }
+
+    return categories;
 }
 
 /** Build a violation-name → points lookup from the active categories. */
@@ -91,6 +115,8 @@ async function buildPointsMap(ctx: QueryCtx): Promise<Map<string, number>> {
     const categories = await getActiveCategories(ctx);
     const map = new Map<string, number>();
     categories.forEach((cat) => cat.violations.forEach((v) => map.set(v, cat.points)));
+    // "Nghỉ học có phép" always deducts 0 points
+    map.set("Nghỉ học có phép", 0);
     return map;
 }
 
@@ -110,14 +136,7 @@ export const getViolationCategories = query({
         })
     ),
     handler: async (ctx) => {
-        const row = await ctx.db
-            .query("settings")
-            .withIndex("by_key", (q) => q.eq("key", "violationCategories"))
-            .unique();
-        if (row?.value && Array.isArray(row.value) && row.value.length > 0) {
-            return row.value as { name: string; points: number; violations: string[] }[];
-        }
-        return VIOLATION_CATEGORIES;
+        return await getActiveCategories(ctx);
     },
 });
 
